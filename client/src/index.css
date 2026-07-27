@@ -1761,6 +1761,125 @@ textarea:focus-visible {
   color: var(--gold-bright);
 }
 
+/* ---------- Нижняя навигация (телефоны) ---------- */
+
+.mobile-nav {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .mobile-nav {
+    display: block;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    padding: 0 0.6rem calc(0.5rem + env(safe-area-inset-bottom));
+    background: linear-gradient(180deg, transparent, rgba(8, 8, 10, 0.85) 45%);
+    pointer-events: none;
+  }
+
+  .mobile-nav__inner {
+    position: relative;
+    display: flex;
+    align-items: stretch;
+    justify-content: space-around;
+    height: 62px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    background: rgba(19, 19, 22, 0.86);
+    backdrop-filter: blur(20px) saturate(150%);
+    box-shadow: 0 18px 40px -20px rgba(0, 0, 0, 0.95);
+    pointer-events: auto;
+  }
+
+  .mobile-nav__item {
+    position: relative;
+    z-index: 2;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.22rem;
+    text-decoration: none;
+    color: var(--text-muted);
+    opacity: 0.55;
+    transition: opacity 0.2s var(--ease), color 0.2s var(--ease);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mobile-nav__item.active {
+    opacity: 1;
+    color: var(--gold-bright);
+  }
+
+  .mobile-nav__icon svg {
+    width: 21px;
+    height: 21px;
+    display: block;
+  }
+
+  /* Подписи на пять пунктов в 375px не помещаются, поэтому показываем
+     только у активного — место под неё зарезервировано, чтобы иконки
+     не прыгали при переключении. */
+  .mobile-nav__label {
+    height: 0.72rem;
+    line-height: 0.72rem;
+    font-family: var(--font-display);
+    font-size: 0.54rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+    opacity: 0;
+    transform: translateY(-2px);
+    transition: opacity 0.2s var(--ease), transform 0.2s var(--ease);
+  }
+
+  .mobile-nav__item.active .mobile-nav__label {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* Луч над активным пунктом: полоска сверху и расходящийся под ней конус. */
+  .mobile-nav__beam {
+    position: absolute;
+    top: 0;
+    z-index: 1;
+    width: 42px;
+    height: 3px;
+    border-radius: 0 0 999px 999px;
+    background: var(--gold-bright);
+    box-shadow: 0 0 18px 2px rgba(216, 187, 132, 0.55);
+    opacity: 0;
+    left: -999px;
+  }
+
+  .mobile-nav__beam.is-ready {
+    transition: left 0.34s var(--ease), opacity 0.2s var(--ease);
+  }
+
+  .mobile-nav__cone {
+    position: absolute;
+    left: -55%;
+    top: 3px;
+    width: 210%;
+    height: 46px;
+    clip-path: polygon(12% 100%, 32% 0, 68% 0, 88% 100%);
+    background: linear-gradient(180deg, rgba(216, 187, 132, 0.3), transparent 78%);
+    pointer-events: none;
+  }
+
+}
+
+@media (max-width: 640px) and (prefers-reduced-motion: reduce) {
+  .mobile-nav__beam.is-ready {
+    transition: opacity 0.2s var(--ease);
+  }
+}
+
 /* ---------- Чат с тренером ---------- */
 
 .chat-page {
@@ -2618,59 +2737,47 @@ textarea:focus-visible {
 
 @media (max-width: 640px) {
   .navbar {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
     padding: 0 1rem;
   }
 
   .navbar__bar {
+    flex: 1;
     height: 58px;
   }
 
+  /* Разделы переехали в нижнюю панель, гамбургер больше не нужен.
+     В шапке остаются логотип и вход/выход. */
   .navbar__toggle {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 5px;
-    width: 32px;
-    height: 32px;
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 0;
-  }
-
-  .navbar__toggle span {
-    display: block;
-    height: 1px;
-    background: var(--text);
+    display: none;
   }
 
   .navbar__links {
-    display: none;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.85rem;
-    padding: 0.85rem 0 1.25rem;
-    border-top: 1px solid var(--border);
-  }
-
-  .navbar__links--open {
     display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    padding: 0;
+    border-top: none;
   }
 
   .navbar__links a:not(.button) {
-    padding: 0.5rem 0;
-  }
-
-  .navbar__links a.active::after {
     display: none;
   }
 
   .navbar__links button {
-    width: 100%;
+    width: auto;
   }
 
   .content {
-    padding: 2rem 1rem;
+    padding: 2rem 1rem 6rem;
+  }
+
+  .footer {
+    padding-bottom: 5.5rem;
   }
 
   .hero {

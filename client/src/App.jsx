@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom'
 import Navbar from './components/Navbar.jsx'
 import Footer from './components/Footer.jsx'
+import MobileNav from './components/MobileNav.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import AdminRoute from './components/AdminRoute.jsx'
 import Home from './pages/Home.jsx'
@@ -118,6 +119,7 @@ export default function App() {
         </Routes>
       </main>
       <Footer />
+      <MobileNav />
     </div>
   )
 }
