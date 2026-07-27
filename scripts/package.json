@@ -1,0 +1,11 @@
+{
+  "name": "askesis-scripts",
+  "private": true,
+  "scripts": {
+    "import:exercises": "node importExercises.js",
+    "seed:programs": "node seedPrograms.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.5.0"
+  }
+}

@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.env
+.dev.vars
+worker/.wrangler/
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
+ui-debug.log
+scripts/serviceAccountKey.json
+client/test-results/
+client/playwright-report/
+client/playwright/.cache/
