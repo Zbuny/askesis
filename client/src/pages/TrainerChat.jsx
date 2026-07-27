@@ -181,7 +181,14 @@ export default function TrainerChat() {
 
       {error && <p className="error">{error}</p>}
 
-      {plan && <GeneratedPlan plan={plan} exerciseById={exerciseById} heading="Программа из диалога" />}
+      {plan && (
+        <GeneratedPlan
+          plan={plan}
+          exerciseById={exerciseById}
+          heading="Программа из диалога"
+          autoSave
+        />
+      )}
     </section>
   )
 }
