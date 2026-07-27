@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../api/firestore.js'
+import ExerciseAnimation from '../components/ExerciseAnimation.jsx'
 import {
   exerciseInstructions,
   exerciseName,
@@ -38,7 +39,7 @@ export default function ExerciseDetail() {
       <div className="exercise-detail__layout">
         {exercise.imageUrl && (
           <div className="exercise-detail__media">
-            <img src={exercise.imageUrl} alt={exerciseName(exercise)} />
+            <ExerciseAnimation exercise={exercise} alt={exerciseName(exercise)} />
           </div>
         )}
 

@@ -15,17 +15,14 @@ service cloud.firestore {
         request.auth.uid in get(/databases/$(database)/documents/settings/admins).data.uids;
     }
 
-    // Бутстрап первого админа: пока список пуст (или документа нет),
-    // любой залогиненный пользователь может назначить СЕБЯ единственным
-    // админом. После этого список меняют только текущие админы.
+    // Список админов правится только вручную — через консоль Firestore или
+    // Admin SDK (они правила не проверяют). Из клиента запись закрыта
+    // полностью, иначе на публичном сайте права мог бы забрать кто угодно.
+    // Чтение нужно, чтобы приложение показывало админские разделы своему
+    // владельцу.
     match /settings/admins {
       allow read: if isSignedIn();
-      allow create: if isSignedIn()
-        && request.resource.data.uids is list
-        && request.resource.data.uids == [request.auth.uid];
-      allow update: if isAdmin()
-        || (resource.data.uids.size() == 0 && request.resource.data.uids == [request.auth.uid]);
-      allow delete: if false;
+      allow write: if false;
     }
 
     // Библиотека упражнений и программы — читают все, пишет только админ

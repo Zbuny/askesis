@@ -6,7 +6,7 @@
 
 - **client/** — React + Vite, Firebase Auth (email/пароль + Google) + прямой доступ к Firestore через Firebase SDK
 - **Firestore** — база данных (упражнения, программы, тренировки, лог выполнения); вся бизнес-логика прав — в `firestore.rules`
-- **worker/** — Cloudflare Worker: прокси к Gemini для ИИ-тренера. Держит API-ключ у себя и проверяет Firebase ID-токен, потому что во фронтенде ключ спрятать негде (см. [worker/README.md](worker/README.md))
+- **worker/** — Cloudflare Worker: прокси к Groq для ИИ-тренера. Держит API-ключ у себя и проверяет Firebase ID-токен, потому что во фронтенде ключ спрятать негде (см. [worker/README.md](worker/README.md))
 - **scripts/** — разовый Node-скрипт импорта библиотеки упражнений (Admin SDK, не деплоится)
 
 Работает целиком на бесплатном **Spark**-плане Firebase — Cloud Functions не используются (они требуют платный Blaze-план, даже в рамках бесплатной квоты — см. [PLAN.md](PLAN.md)).
@@ -74,7 +74,7 @@ firebase deploy --only hosting,firestore
 ИИ-тренер деплоится отдельно, в Cloudflare:
 
 ```bash
-cd worker && npm install && npx wrangler secret put GEMINI_API_KEY && npm run deploy
+cd worker && npm install && npx wrangler secret put GROQ_API_KEY && npm run deploy
 ```
 
 Адрес воркера из вывода команды пропишите в `client/.env` как `VITE_AI_WORKER_URL`. Пока переменная не задана, страница `/workouts/ai` честно сообщает, что помощник не настроен, — остальное приложение работает как обычно.

@@ -9,7 +9,7 @@ import {
   signOut as firebaseSignOut,
   sendPasswordResetEmail,
 } from 'firebase/auth'
-import { doc, getDoc, setDoc } from 'firebase/firestore'
+import { doc, getDoc } from 'firebase/firestore'
 import { auth, db } from '../firebase.js'
 
 const AuthContext = createContext(null)
@@ -47,28 +47,9 @@ export function AuthProvider({ children }) {
 
   const resetPassword = useCallback((email) => sendPasswordResetEmail(auth, email), [])
 
-  // Бутстрап первого админа: пока settings/admins.uids пуст, любой
-  // залогиненный пользователь может назначить себя единственным админом
-  // (см. firestore.rules — то же самое правило проверяется на сервере).
-  const claimAdmin = useCallback(async () => {
-    if (!auth.currentUser) throw new Error('Требуется авторизация')
-    const ref = doc(db, 'settings', 'admins')
-    const snap = await getDoc(ref)
-    const uids = snap.exists() ? snap.data().uids || [] : []
-
-    if (uids.length > 0) {
-      if (!uids.includes(auth.currentUser.uid)) {
-        throw new Error('Администратор уже назначен')
-      }
-    } else {
-      await setDoc(ref, { uids: [auth.currentUser.uid] })
-    }
-    setIsAdmin(true)
-  }, [])
-
   return (
     <AuthContext.Provider
-      value={{ user, isAdmin, loading, login, register, loginWithGoogle, logout, claimAdmin, resetPassword }}
+      value={{ user, isAdmin, loading, login, register, loginWithGoogle, logout, resetPassword }}
     >
       {children}
     </AuthContext.Provider>

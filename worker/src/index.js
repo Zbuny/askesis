@@ -1,4 +1,4 @@
-const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models'
+const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
 const JWKS_URL = 'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com'
 
 const MAX_CANDIDATES = 150
@@ -109,6 +109,16 @@ const RESPONSE_SCHEMA = {
   required: ['summary', 'workouts'],
 }
 
+// Groq принимает только флаг json_object, без схемы — поэтому форму ответа
+// задаём текстом, а RESPONSE_SCHEMA остаётся единственным её описанием.
+const SYSTEM_PROMPT = `Ты — опытный тренер по силовой подготовке. Отвечай ТОЛЬКО валидным JSON без markdown-обёрток и пояснений.
+
+JSON должен строго соответствовать этой схеме:
+${JSON.stringify(RESPONSE_SCHEMA)}
+
+Пример формы ответа:
+{"summary":"текст","workouts":[{"title":"День 1 — Верх тела","items":[{"exerciseId":"Barbell_Squat","targetSets":4,"targetReps":8}]}]}`
+
 function buildPrompt(profile, candidates) {
   const catalogue = candidates
     .map((ex) => `${ex.id} | ${ex.name} | ${ex.muscleGroup || '-'} | ${ex.equipment || '-'}`)
@@ -204,34 +214,37 @@ export default {
     }
     const profile = sanitizeProfile(body.profile)
 
-    const model = env.GEMINI_MODEL || 'gemini-2.0-flash'
-    const geminiResponse = await fetch(
-      `${GEMINI_BASE}/${model}:generateContent?key=${env.GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: buildPrompt(profile, candidates) }] }],
-          generationConfig: {
-            temperature: 0.7,
-            responseMimeType: 'application/json',
-            responseSchema: RESPONSE_SCHEMA,
-          },
-        }),
+    const model = env.GROQ_MODEL || 'llama-3.3-70b-versatile'
+    const groqResponse = await fetch(GROQ_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${env.GROQ_API_KEY}`,
       },
-    )
+      body: JSON.stringify({
+        model,
+        temperature: 0.7,
+        // json_object — режим, который Groq поддерживает на всех моделях;
+        // структуру описываем в промпте, а мусорные id всё равно отсеиваем ниже.
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: buildPrompt(profile, candidates) },
+        ],
+      }),
+    })
 
-    if (!geminiResponse.ok) {
-      // Текст ошибки от Gemini нужен, чтобы отличить исчерпанную квоту от
-      // неверного ключа или недоступной модели — иначе виден только код.
-      const detail = await geminiResponse.text().catch(() => '')
-      console.log('gemini error', geminiResponse.status, detail.slice(0, 500))
-      const message = detail.slice(0, 200) || geminiResponse.status
-      return json({ error: `Gemini вернул ошибку ${geminiResponse.status}: ${message}` }, 502, origin)
+    if (!groqResponse.ok) {
+      // Текст ошибки нужен, чтобы отличить исчерпанную квоту от неверного
+      // ключа или снятой с обслуживания модели — иначе виден только код.
+      const detail = await groqResponse.text().catch(() => '')
+      console.log('groq error', groqResponse.status, detail.slice(0, 500))
+      const message = detail.slice(0, 400) || groqResponse.status
+      return json({ error: `Groq вернул ошибку ${groqResponse.status}: ${message}` }, 502, origin)
     }
 
-    const data = await geminiResponse.json()
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text
+    const data = await groqResponse.json()
+    const text = data?.choices?.[0]?.message?.content
     if (!text) return json({ error: 'Пустой ответ модели' }, 502, origin)
 
     let plan

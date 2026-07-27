@@ -8,9 +8,8 @@ import { pluralRu } from '../utils/translate.js'
 const emptyProfileData = { weight: '', height: '', age: '' }
 
 export default function Profile() {
-  const { user, isAdmin, claimAdmin } = useAuth()
-  const [claimError, setClaimError] = useState(null)
-  const [claiming, setClaiming] = useState(false)
+  const { user, isAdmin } = useAuth()
+  const [uidCopied, setUidCopied] = useState(false)
   const [history, setHistory] = useState([])
   const [error, setError] = useState(null)
 
@@ -102,15 +101,15 @@ export default function Profile() {
   const selectedSeries =
     exerciseSeries.find((s) => s.exerciseId === selectedExerciseId) || exerciseSeries[0]
 
-  async function handleClaimAdmin() {
-    setClaimError(null)
-    setClaiming(true)
+  async function handleCopyUid() {
+    if (!user?.uid) return
     try {
-      await claimAdmin()
-    } catch (err) {
-      setClaimError(err.message)
-    } finally {
-      setClaiming(false)
+      await navigator.clipboard.writeText(user.uid)
+      setUidCopied(true)
+      setTimeout(() => setUidCopied(false), 2000)
+    } catch {
+      // Clipboard API недоступен (http, старый браузер) — uid всё равно виден на экране.
+      setUidCopied(false)
     }
   }
 
@@ -165,14 +164,18 @@ export default function Profile() {
         </div>
       </div>
 
-      {!isAdmin && (
-        <div>
-          <button type="button" onClick={handleClaimAdmin} disabled={claiming}>
-            Стать администратором
-          </button>
-          {claimError && <p className="error">{claimError}</p>}
-        </div>
-      )}
+      <h3>Мой ID</h3>
+      <div className="uid-block">
+        <code className="uid-block__value">{user?.uid}</code>
+        <button type="button" onClick={handleCopyUid}>
+          {uidCopied ? 'Скопировано' : 'Копировать'}
+        </button>
+      </div>
+      <p className="uid-block__hint">
+        {isAdmin
+          ? 'У вас права администратора.'
+          : 'Права администратора выдаются вручную: этот ID нужно добавить в массив uids документа settings/admins в консоли Firestore.'}
+      </p>
 
       <h3>Мои данные</h3>
       <form className="admin-form" onSubmit={handleSaveProfileData}>

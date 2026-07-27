@@ -33,6 +33,8 @@ async function main() {
         category: ex.category || null,
         instructions: (ex.instructions || []).join('\n'),
         imageUrl: ex.images?.[0] ? IMAGE_BASE + ex.images[0] : null,
+        // Оба кадра движения: клиент крутит их по кругу вместо гифки.
+        imageUrls: (ex.images || []).map((path) => IMAGE_BASE + path),
         source: 'free-exercise-db',
       },
       { merge: true },
