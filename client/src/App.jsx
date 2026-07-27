@@ -19,6 +19,7 @@ import AdminHome from './pages/admin/AdminHome.jsx'
 import AdminExercises from './pages/admin/AdminExercises.jsx'
 import AdminPrograms from './pages/admin/AdminPrograms.jsx'
 import NotFound from './pages/NotFound.jsx'
+import TrainerChat from './pages/TrainerChat.jsx'
 
 export default function App() {
   return (
@@ -62,6 +63,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <AiWorkoutBuilder />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/workouts/chat"
+            element={
+              <ProtectedRoute>
+                <TrainerChat />
               </ProtectedRoute>
             }
           />

@@ -4,6 +4,7 @@ import { api } from '../api/firestore.js'
 import { exerciseName, translateEquipment, translateMuscle } from '../utils/translate.js'
 import { emptyFilters, filterExercises } from '../utils/exerciseFilters.js'
 import ExerciseFilterBar from '../components/ExerciseFilterBar.jsx'
+import BackLink from '../components/BackLink.jsx'
 
 export default function WorkoutBuilder() {
   const { id } = useParams()
@@ -75,6 +76,7 @@ export default function WorkoutBuilder() {
 
   return (
     <section>
+      <BackLink fallback="/workouts" label="К тренировкам" />
       <h2>{isEdit ? 'Редактировать тренировку' : 'Собрать тренировку'}</h2>
 
       <form className="admin-form" onSubmit={handleSubmit}>

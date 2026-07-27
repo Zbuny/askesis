@@ -56,3 +56,22 @@ export async function generateWorkoutPlan({ profile, exercises }) {
   if (!response.ok) throw new Error(data.error || `Ошибка ${response.status}`)
   return data
 }
+
+export async function askTrainer(messages) {
+  if (!WORKER_URL) {
+    throw new Error('ИИ-помощник не настроен: пропишите VITE_AI_WORKER_URL в client/.env (см. worker/README.md)')
+  }
+  const user = auth.currentUser
+  if (!user) throw new Error('Требуется авторизация')
+
+  const token = await user.getIdToken()
+  const response = await fetch(`${WORKER_URL.replace(/\/$/, '')}/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ messages }),
+  })
+
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(data.error || `Ошибка ${response.status}`)
+  return data.reply
+}

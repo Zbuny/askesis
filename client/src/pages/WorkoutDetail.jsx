@@ -1,12 +1,19 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api/firestore.js'
 import { formatDuration, useWorkoutTimer } from '../hooks/useWorkoutTimer.js'
+import { entrySets, formatEntry } from '../utils/workoutLog.js'
+import { exerciseName } from '../utils/translate.js'
+import ExerciseAnimation from '../components/ExerciseAnimation.jsx'
+import BackLink from '../components/BackLink.jsx'
+
+const emptySet = () => ({ weight: '', reps: '' })
 
 export default function WorkoutDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [workout, setWorkout] = useState(null)
+  const [exercises, setExercises] = useState({})
   const [history, setHistory] = useState([])
   const [results, setResults] = useState({})
   const [error, setError] = useState(null)
@@ -28,36 +35,83 @@ export default function WorkoutDetail() {
   }
 
   useEffect(() => {
-    Promise.all([api.getWorkout({ id }), loadHistory()]).then(([w, loadedHistory]) => {
-      setWorkout(w)
-      const lastEntries = new Map((loadedHistory?.[0]?.entries || []).map((e) => [e.exerciseId, e]))
-      const initialResults = {}
-      w.items.forEach((item) => {
-        const last = lastEntries.get(item.exerciseId)
-        initialResults[item.exerciseId] = {
-          weight: last ? String(last.weight) : '',
-          reps: last ? String(last.reps) : String(item.targetReps || ''),
-        }
+    Promise.all([api.getWorkout({ id }), loadHistory()])
+      .then(([w, loadedHistory]) => {
+        setWorkout(w)
+
+        // Подставляем прошлый результат по каждому подходу — так проще
+        // ориентироваться, с каким весом заходить сегодня.
+        const lastEntries = new Map((loadedHistory?.[0]?.entries || []).map((e) => [e.exerciseId, e]))
+        const initial = {}
+        w.items.forEach((item) => {
+          const lastSets = entrySets(lastEntries.get(item.exerciseId))
+          const count = Math.max(item.targetSets || 1, lastSets.length, 1)
+          // Ничего не подставляем «из цели»: пустой подход должен означать
+          // «не делал». Цель показываем плейсхолдером.
+          initial[item.exerciseId] = Array.from({ length: count }, (_, i) => ({
+            weight: lastSets[i] ? String(lastSets[i].weight) : '',
+            reps: lastSets[i] ? String(lastSets[i].reps) : '',
+          }))
+        })
+        setResults(initial)
+
+        // Картинка и ссылка «как выполнять» — тянем только нужные упражнения,
+        // а не всю библиотеку из 873 документов.
+        Promise.all(
+          w.items.map((item) =>
+            api.getExercise({ id: item.exerciseId }).catch(() => null),
+          ),
+        ).then((list) => {
+          const byId = {}
+          list.forEach((ex) => {
+            if (ex) byId[ex.id] = ex
+          })
+          setExercises(byId)
+        })
       })
-      setResults(initialResults)
-    }).catch((e) => setError(e.message))
+      .catch((e) => setError(e.message))
   }, [id])
 
-  function updateResult(exerciseId, field, value) {
-    setResults({ ...results, [exerciseId]: { ...results[exerciseId], [field]: value } })
+  function updateSet(exerciseId, index, field, value) {
+    setResults((prev) => ({
+      ...prev,
+      [exerciseId]: prev[exerciseId].map((set, i) => (i === index ? { ...set, [field]: value } : set)),
+    }))
+  }
+
+  function addSet(exerciseId) {
+    setResults((prev) => ({ ...prev, [exerciseId]: [...prev[exerciseId], emptySet()] }))
+  }
+
+  function removeSet(exerciseId, index) {
+    setResults((prev) => ({
+      ...prev,
+      [exerciseId]: prev[exerciseId].filter((_, i) => i !== index),
+    }))
   }
 
   async function handleLogSession(e) {
     e.preventDefault()
     setError(null)
-    setSaving(true)
-    try {
-      const entries = workout.items.map((item) => ({
+
+    const entries = workout.items
+      .map((item) => ({
         exerciseId: item.exerciseId,
         exerciseName: item.exerciseName,
-        weight: Number(results[item.exerciseId]?.weight) || 0,
-        reps: Number(results[item.exerciseId]?.reps) || 0,
+        // Пустые подходы не записываем — упражнение могли пропустить.
+        sets: (results[item.exerciseId] || [])
+          .filter((set) => set.weight !== '' || set.reps !== '')
+          .map((set) => ({ weight: Number(set.weight) || 0, reps: Number(set.reps) || 0 })),
       }))
+      .filter((entry) => entry.sets.length > 0)
+
+    if (entries.length === 0) {
+      setError('Заполните хотя бы один подход')
+      return
+    }
+
+    setSaving(true)
+    try {
       await api.logWorkoutSession({
         workoutId: id,
         date: new Date().toISOString(),
@@ -96,11 +150,12 @@ export default function WorkoutDetail() {
     }
   }
 
-  if (error) return <p>Ошибка: {error}</p>
+  if (error && !workout) return <p>Ошибка: {error}</p>
   if (!workout) return <p>Загрузка...</p>
 
   return (
     <section>
+      <BackLink fallback="/workouts" label="К тренировкам" />
       <h2>{workout.title}</h2>
       <div className="admin-list__actions">
         <button type="button" onClick={() => navigate(`/workouts/${id}/edit`)}>Редактировать</button>
@@ -129,33 +184,86 @@ export default function WorkoutDetail() {
         )}
       </div>
 
-      <form className="admin-form" onSubmit={handleLogSession}>
-        <ul className="admin-list">
-          {workout.items.map((item) => (
-            <li key={item.exerciseId}>
-              <span>{item.exerciseName} <small>(цель: {item.targetSets}×{item.targetReps})</small></span>
-              <span className="admin-list__actions">
-                <input
-                  type="number"
-                  className="number-input"
-                  placeholder="кг"
-                  value={results[item.exerciseId]?.weight ?? ''}
-                  onChange={(e) => updateResult(item.exerciseId, 'weight', e.target.value)}
-                />
-                кг ×
-                <input
-                  type="number"
-                  className="number-input"
-                  placeholder="повт."
-                  value={results[item.exerciseId]?.reps ?? ''}
-                  onChange={(e) => updateResult(item.exerciseId, 'reps', e.target.value)}
-                />
-              </span>
-            </li>
-          ))}
-        </ul>
+      <form onSubmit={handleLogSession}>
+        {workout.items.map((item) => {
+          const ex = exercises[item.exerciseId]
+          const sets = results[item.exerciseId] || []
+          return (
+            <div className="log-exercise" key={item.exerciseId}>
+              <div className="log-exercise__head">
+                <Link to={`/exercises/${item.exerciseId}`} className="log-exercise__media">
+                  {ex?.imageUrl ? (
+                    <ExerciseAnimation exercise={ex} alt={exerciseName(ex)} animate={false} />
+                  ) : (
+                    <span className="log-exercise__media-empty" aria-hidden="true" />
+                  )}
+                </Link>
+
+                <div className="log-exercise__info">
+                  <Link to={`/exercises/${item.exerciseId}`} className="log-exercise__name">
+                    {ex ? exerciseName(ex) : item.exerciseName}
+                  </Link>
+                  <span className="log-exercise__target">
+                    Цель: {item.targetSets} подхода × {item.targetReps} повторений
+                  </span>
+                  <Link to={`/exercises/${item.exerciseId}`} className="log-exercise__how">
+                    Как выполнять →
+                  </Link>
+                </div>
+              </div>
+
+              <div className="log-sets">
+                {sets.map((set, i) => (
+                  <div className="log-set" key={i}>
+                    <span className="log-set__num">{i + 1}</span>
+                    <label className="log-set__field">
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        step="0.5"
+                        placeholder="0"
+                        value={set.weight}
+                        onChange={(e) => updateSet(item.exerciseId, i, 'weight', e.target.value)}
+                      />
+                      <span>кг</span>
+                    </label>
+                    <label className="log-set__field">
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min="0"
+                        placeholder={String(item.targetReps || '')}
+                        value={set.reps}
+                        onChange={(e) => updateSet(item.exerciseId, i, 'reps', e.target.value)}
+                      />
+                      <span>повт.</span>
+                    </label>
+                    <button
+                      type="button"
+                      className="log-set__remove"
+                      onClick={() => removeSet(item.exerciseId, i)}
+                      title="Убрать подход"
+                      aria-label={`Убрать подход ${i + 1}`}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                <button type="button" className="log-sets__add" onClick={() => addSet(item.exerciseId)}>
+                  + подход
+                </button>
+              </div>
+            </div>
+          )
+        })}
+
+        {error && <p className="error">{error}</p>}
+
         <div className="admin-form__actions">
-          <button type="submit" disabled={saving}>Записать сегодняшнюю тренировку</button>
+          <button type="submit" className="button" disabled={saving}>
+            {saving ? 'Сохраняем...' : 'Записать сегодняшнюю тренировку'}
+          </button>
         </div>
       </form>
 
@@ -169,7 +277,7 @@ export default function WorkoutDetail() {
           </time>
           <ul>
             {session.entries.map((entry, i) => (
-              <li key={i}>{entry.exerciseName}: {entry.weight} кг × {entry.reps}</li>
+              <li key={i}>{entry.exerciseName}: {formatEntry(entry)}</li>
             ))}
           </ul>
         </div>

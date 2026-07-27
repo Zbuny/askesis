@@ -4,6 +4,7 @@ import { api } from '../api/firestore.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { exerciseName } from '../utils/translate.js'
 import { programItems } from '../utils/programItems.js'
+import BackLink from '../components/BackLink.jsx'
 
 export default function ProgramDetail() {
   const { id } = useParams()
@@ -43,6 +44,7 @@ export default function ProgramDetail() {
 
   return (
     <section>
+      <BackLink fallback="/programs" label="К программам" />
       <h2>{program.title}</h2>
       <p>{program.level} · {program.duration}</p>
       <p>{program.description}</p>

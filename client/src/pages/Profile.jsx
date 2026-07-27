@@ -4,6 +4,7 @@ import { api } from '../api/firestore.js'
 import ProgressChart from '../components/ProgressChart.jsx'
 import TrainingHeatmap from '../components/TrainingHeatmap.jsx'
 import { pluralRu } from '../utils/translate.js'
+import { entryTopWeight, sessionVolume } from '../utils/workoutLog.js'
 
 const emptyProfileData = { weight: '', height: '', age: '' }
 
@@ -35,7 +36,7 @@ export default function Profile() {
   const stats = useMemo(() => {
     const totalSessions = history.length
     const totalVolume = history.reduce(
-      (sum, session) => sum + session.entries.reduce((s, e) => s + e.weight * e.reps, 0),
+      (sum, session) => sum + sessionVolume(session),
       0,
     )
     const lastSession = history[0]?.date
@@ -84,9 +85,10 @@ export default function Profile() {
     const map = new Map()
     history.forEach((session) => {
       session.entries.forEach((entry) => {
-        if (!entry.weight) return
+        const top = entryTopWeight(entry)
+        if (!top) return
         if (!map.has(entry.exerciseId)) map.set(entry.exerciseId, { name: entry.exerciseName, points: [] })
-        map.get(entry.exerciseId).points.push({ date: session.date, value: entry.weight })
+        map.get(entry.exerciseId).points.push({ date: session.date, value: top })
       })
     })
     const series = [...map.entries()].map(([exerciseId, s]) => ({
@@ -171,11 +173,7 @@ export default function Profile() {
           {uidCopied ? 'Скопировано' : 'Копировать'}
         </button>
       </div>
-      <p className="uid-block__hint">
-        {isAdmin
-          ? 'У вас права администратора.'
-          : 'Права администратора выдаются вручную: этот ID нужно добавить в массив uids документа settings/admins в консоли Firestore.'}
-      </p>
+      {isAdmin && <p className="uid-block__hint">У вас права администратора.</p>}
 
       <h3>Мои данные</h3>
       <form className="admin-form" onSubmit={handleSaveProfileData}>

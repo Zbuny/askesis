@@ -24,6 +24,7 @@ export default function Workouts() {
       <div className="hero__actions">
         <Link to="/workouts/new" className="button">+ Собрать тренировку</Link>
         <Link to="/workouts/ai" className="button--ghost">Собрать с ИИ-тренером</Link>
+        <Link to="/workouts/chat" className="button--ghost">Спросить тренера</Link>
       </div>
 
       {workouts.length === 0 && <p>Пока нет ни одной тренировки.</p>}

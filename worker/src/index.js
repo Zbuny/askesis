@@ -176,6 +176,61 @@ function sanitizeProfile(raw) {
   }
 }
 
+const CHAT_SYSTEM_PROMPT = `Ты — тренер по силовой и общей физической подготовке в приложении Askesis.
+
+Отвечай на русском, по делу, без воды. Разбираешься в построении сплитов, подборе объёма и интенсивности, технике упражнений, восстановлении и питании вокруг тренировок.
+
+Правила:
+- Отвечай только на вопросы про тренировки, технику, программы, восстановление и питание. На всё остальное коротко отвечай, что помогаешь только с тренировками.
+- Не ставишь диагнозы и не назначаешь лечение. При жалобах на боль — советуй обратиться к врачу.
+- Если человеку нужна готовая программа целиком, подскажи, что её можно собрать в разделе «ИИ-тренер» по кнопке «Собрать программу».
+- Держись в пределах 200 слов, если не просят подробнее.`
+
+const MAX_CHAT_MESSAGES = 20
+const MAX_CHAT_CHARS = 1500
+
+function sanitizeChatMessages(raw) {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+    .slice(-MAX_CHAT_MESSAGES)
+    .map((m) => ({ role: m.role, content: m.content.slice(0, MAX_CHAT_CHARS) }))
+}
+
+async function handleChat(body, env, origin) {
+  const messages = sanitizeChatMessages(body.messages)
+  if (messages.length === 0) return json({ error: 'Пустой запрос' }, 400, origin)
+  if (messages[messages.length - 1].role !== 'user') {
+    return json({ error: 'Последнее сообщение должно быть от пользователя' }, 400, origin)
+  }
+
+  const response = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${env.GROQ_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+      temperature: 0.6,
+      max_tokens: 900,
+      messages: [{ role: 'system', content: CHAT_SYSTEM_PROMPT }, ...messages],
+    }),
+  })
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '')
+    console.log('groq chat error', response.status, detail.slice(0, 500))
+    return json({ error: `Groq вернул ошибку ${response.status}` }, 502, origin)
+  }
+
+  const data = await response.json()
+  const reply = data?.choices?.[0]?.message?.content
+  if (!reply) return json({ error: 'Пустой ответ модели' }, 502, origin)
+
+  return json({ reply: reply.slice(0, 4000) }, 200, origin)
+}
+
 export default {
   async fetch(request, env) {
     const origin = request.headers.get('Origin') || ''
@@ -206,6 +261,10 @@ export default {
       body = await request.json()
     } catch {
       return json({ error: 'Некорректный JSON' }, 400, origin)
+    }
+
+    if (new URL(request.url).pathname === '/chat') {
+      return handleChat(body, env, origin)
     }
 
     const candidates = sanitizeCandidates(body.candidates)

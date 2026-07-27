@@ -4,6 +4,7 @@ import { api } from '../api/firestore.js'
 import { generateWorkoutPlan } from '../api/ai.js'
 import { exerciseName, translateEquipment } from '../utils/translate.js'
 import { uniqueValues } from '../utils/exerciseFilters.js'
+import BackLink from '../components/BackLink.jsx'
 
 const GOALS = [
   'Набрать мышечную массу',
@@ -99,6 +100,7 @@ export default function AiWorkoutBuilder() {
 
   return (
     <section>
+      <BackLink fallback="/workouts" label="К тренировкам" />
       <h2>ИИ-тренер</h2>
       <p>Ответьте на пять вопросов — и получите программу, собранную из упражнений вашей библиотеки.</p>
 

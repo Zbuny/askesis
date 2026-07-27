@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { api } from '../api/firestore.js'
 import ExerciseAnimation from '../components/ExerciseAnimation.jsx'
+import BackLink from '../components/BackLink.jsx'
 import {
   exerciseInstructions,
   exerciseName,
@@ -34,7 +35,7 @@ export default function ExerciseDetail() {
 
   return (
     <section className="exercise-detail">
-      <Link to="/exercises" className="button--ghost exercise-detail__back">← К библиотеке упражнений</Link>
+      <BackLink fallback="/exercises" label="К библиотеке" />
 
       <div className="exercise-detail__layout">
         {exercise.imageUrl && (

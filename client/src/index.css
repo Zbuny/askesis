@@ -1761,6 +1761,378 @@ textarea:focus-visible {
   color: var(--gold-bright);
 }
 
+/* ---------- Чат с тренером ---------- */
+
+.chat-page__lead {
+  color: var(--text-muted);
+  max-width: 640px;
+}
+
+.chat-page__lead a {
+  color: var(--gold);
+}
+
+.chat-feed {
+  margin: 1.5rem 0 1rem;
+  padding: 1.25rem;
+  min-height: 320px;
+  max-height: 56vh;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.chat-empty {
+  margin: auto 0;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.chat-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: center;
+  margin-top: 1rem;
+}
+
+.chat-suggestions button {
+  padding: 0.6rem 1rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: none;
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 0.84rem;
+  cursor: pointer;
+  transition: border-color 0.2s var(--ease), color 0.2s var(--ease);
+}
+
+.chat-suggestions button:hover {
+  border-color: var(--gold);
+  color: var(--gold-bright);
+}
+
+.chat-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-width: 88%;
+}
+
+.chat-msg--user {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.chat-msg__author {
+  font-family: var(--font-display);
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-faint);
+}
+
+.chat-msg__body {
+  padding: 0.85rem 1.05rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  font-size: 0.92rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.chat-msg--user .chat-msg__body {
+  background: rgba(185, 152, 94, 0.09);
+  border-color: rgba(185, 152, 94, 0.35);
+}
+
+.chat-typing {
+  display: flex;
+  gap: 0.3rem;
+  align-items: center;
+}
+
+.chat-typing span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-faint);
+  animation: chat-blink 1.2s infinite;
+}
+
+.chat-typing span:nth-child(2) { animation-delay: 0.2s; }
+.chat-typing span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes chat-blink {
+  0%, 60%, 100% { opacity: 0.25; }
+  30% { opacity: 1; }
+}
+
+.chat-input {
+  display: flex;
+  gap: 0.7rem;
+  align-items: flex-end;
+}
+
+.chat-input textarea {
+  flex: 1;
+  resize: vertical;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.chat-input textarea:focus {
+  outline: none;
+  border-color: var(--gold);
+}
+
+.chat-input button {
+  padding: 0.85rem 1.5rem;
+  border: 1px solid #ffffff;
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, #ffffff 0%, #ece7db 100%);
+  color: var(--accent-contrast);
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: background 0.25s var(--ease), opacity 0.2s var(--ease);
+}
+
+.chat-input button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.chat-input button:not(:disabled):hover {
+  background: linear-gradient(180deg, var(--gold-bright) 0%, #c2a066 100%);
+}
+
+@media (max-width: 640px) {
+  .chat-msg {
+    max-width: 100%;
+  }
+
+  .chat-input {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* ---------- Навигация назад ---------- */
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 1.25rem;
+  padding: 0.5rem 0.9rem 0.5rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text-muted);
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: border-color 0.2s var(--ease), color 0.2s var(--ease), transform 0.2s var(--ease);
+}
+
+.back-link:hover {
+  border-color: var(--gold);
+  color: var(--gold-bright);
+  transform: translateX(-2px);
+}
+
+/* На сенсорных устройствах основной способ — свайп от левого края,
+   кнопка остаётся как подстраховка, но занимает меньше места. */
+@media (pointer: coarse) {
+  .back-link {
+    margin-bottom: 1rem;
+    padding: 0.45rem 0.8rem 0.45rem 0.6rem;
+  }
+}
+
+/* ---------- Лог тренировки по подходам ---------- */
+
+.log-exercise {
+  margin: 1.25rem 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.log-exercise__head {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem 1.1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.log-exercise__media {
+  flex: 0 0 84px;
+  width: 84px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #000;
+  line-height: 0;
+}
+
+.log-exercise__media-empty {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: var(--bg);
+}
+
+.log-exercise__info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.log-exercise__name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.98rem;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.log-exercise__name:hover {
+  color: var(--gold-bright);
+}
+
+.log-exercise__target {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.log-exercise__how {
+  font-size: 0.76rem;
+  color: var(--gold);
+  text-decoration: none;
+  width: fit-content;
+}
+
+.log-exercise__how:hover {
+  color: var(--gold-bright);
+  text-decoration: underline;
+}
+
+.log-sets {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: var(--border);
+}
+
+.log-set {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.65rem 1.1rem;
+  background: var(--bg);
+}
+
+.log-set__num {
+  flex: 0 0 1.6rem;
+  height: 1.6rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.log-set__field {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.log-set__field input {
+  width: 4.6rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.log-set__field input:focus {
+  outline: none;
+  border-color: var(--gold);
+}
+
+.log-set__field span {
+  font-size: 0.76rem;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.log-set__remove {
+  margin-left: auto;
+  width: 1.8rem;
+  height: 1.8rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text-faint);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+
+.log-set__remove:hover {
+  color: var(--danger);
+  border-color: var(--border-strong);
+}
+
+.log-sets__add {
+  padding: 0.6rem 1.1rem;
+  border: none;
+  background: var(--bg);
+  color: var(--text-muted);
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-align: left;
+  cursor: pointer;
+  transition: color 0.2s var(--ease);
+}
+
+.log-sets__add:hover {
+  color: var(--gold-bright);
+}
+
 /* ---------- UID / права админа ---------- */
 
 .uid-block {
@@ -2142,6 +2514,20 @@ textarea:focus-visible {
 
   .exercise-detail__media .exercise-anim {
     max-width: 280px;
+  }
+
+  .log-set {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .log-set__field input {
+    width: 4rem;
+  }
+
+  .log-exercise__media {
+    flex-basis: 64px;
+    width: 64px;
   }
 
   .admin-checkbox-grid {
