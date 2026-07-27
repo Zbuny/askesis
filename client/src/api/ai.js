@@ -31,7 +31,7 @@ function pickCandidates(exercises, equipment) {
   return picked
 }
 
-export async function generateWorkoutPlan({ profile, exercises }) {
+async function requestPlan(payload, exercises, equipment) {
   if (!WORKER_URL) {
     throw new Error('ИИ-помощник не настроен: пропишите VITE_AI_WORKER_URL в client/.env (см. worker/README.md)')
   }
@@ -39,7 +39,7 @@ export async function generateWorkoutPlan({ profile, exercises }) {
   if (!user) throw new Error('Требуется авторизация')
 
   const token = await user.getIdToken()
-  const candidates = pickCandidates(exercises, profile.equipment).map((ex) => ({
+  const candidates = pickCandidates(exercises, equipment).map((ex) => ({
     id: ex.id,
     name: ex.nameRu || ex.name,
     muscleGroup: ex.muscleGroup,
@@ -49,12 +49,22 @@ export async function generateWorkoutPlan({ profile, exercises }) {
   const response = await fetch(WORKER_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ profile, candidates }),
+    body: JSON.stringify({ ...payload, candidates }),
   })
 
   const data = await response.json().catch(() => ({}))
   if (!response.ok) throw new Error(data.error || `Ошибка ${response.status}`)
   return data
+}
+
+export function generateWorkoutPlan({ profile, exercises }) {
+  return requestPlan({ profile }, exercises, profile.equipment)
+}
+
+// Собирает программу из уже состоявшегося диалога: инвентарь заранее
+// неизвестен, поэтому подборку упражнений не сужаем.
+export function planFromChat({ messages, exercises }) {
+  return requestPlan({ conversation: messages }, exercises, null)
 }
 
 export async function askTrainer(messages) {

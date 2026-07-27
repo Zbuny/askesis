@@ -146,6 +146,34 @@ ${catalogue}
 - В summary на русском объясни логику программы в 2-3 предложениях.`
 }
 
+// Превращает свободный диалог в ту же задачу, что решает пошаговый мастер:
+// подобрать упражнения ИЗ БИБЛИОТЕКИ под уже обсуждённый план.
+function buildPromptFromChat(conversation, candidates) {
+  const catalogue = candidates
+    .map((ex) => `${ex.id} | ${ex.name} | ${ex.muscleGroup || '-'} | ${ex.equipment || '-'}`)
+    .join('\n')
+
+  const dialogue = conversation
+    .map((m) => `${m.role === 'user' ? 'Пользователь' : 'Тренер'}: ${m.content}`)
+    .join('\n\n')
+
+  return `Ниже диалог пользователя с тренером. Собери программу тренировок, которая соответствует тому, о чём договорились в диалоге.
+
+Диалог:
+${dialogue}
+
+Доступные упражнения (формат: id | название | группа мышц | инвентарь):
+${catalogue}
+
+Требования к ответу:
+- Опирайся на план из диалога: те же дни, тот же принцип разбивки.
+- Используй ТОЛЬКО id из списка выше. Не придумывай новые id.
+- Если в диалоге упражнения названы иначе, подбери ближайшие по смыслу из списка.
+- Не больше ${MAX_WORKOUTS} тренировок, в каждой 4-7 упражнений.
+- Названия тренировок — на русском, коротко (например «День 1 — Верх тела»).
+- В summary на русском в 2-3 предложениях объясни, как программа отражает договорённости.`
+}
+
 function sanitizeCandidates(raw) {
   if (!Array.isArray(raw)) return []
   return raw
@@ -271,7 +299,13 @@ export default {
     if (candidates.length === 0) {
       return json({ error: 'Не передан список упражнений' }, 400, origin)
     }
-    const profile = sanitizeProfile(body.profile)
+    // Программу можно собрать двумя путями: из ответов мастера или из
+    // свободного диалога в чате. Дальше обработка общая — та же схема
+    // ответа и та же отбраковка несуществующих id.
+    const conversation = sanitizeChatMessages(body.conversation)
+    const prompt = conversation.length
+      ? buildPromptFromChat(conversation, candidates)
+      : buildPrompt(sanitizeProfile(body.profile), candidates)
 
     const model = env.GROQ_MODEL || 'llama-3.3-70b-versatile'
     const groqResponse = await fetch(GROQ_URL, {
@@ -288,7 +322,7 @@ export default {
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: buildPrompt(profile, candidates) },
+          { role: 'user', content: prompt },
         ],
       }),
     })

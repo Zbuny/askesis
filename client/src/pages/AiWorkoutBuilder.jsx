@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { api } from '../api/firestore.js'
 import { generateWorkoutPlan } from '../api/ai.js'
-import { exerciseName, translateEquipment } from '../utils/translate.js'
+import { translateEquipment } from '../utils/translate.js'
 import { uniqueValues } from '../utils/exerciseFilters.js'
 import BackLink from '../components/BackLink.jsx'
+import GeneratedPlan from '../components/GeneratedPlan.jsx'
 
 const GOALS = [
   'Набрать мышечную массу',
@@ -19,7 +19,6 @@ const LEVELS = ['Начинающий', 'Средний', 'Продвинуты�
 const STEPS = ['Цель', 'Уровень', 'График', 'Инвентарь', 'Ограничения']
 
 export default function AiWorkoutBuilder() {
-  const navigate = useNavigate()
   const [exercises, setExercises] = useState([])
   const [step, setStep] = useState(0)
   const [profile, setProfile] = useState({
@@ -31,8 +30,6 @@ export default function AiWorkoutBuilder() {
   })
   const [plan, setPlan] = useState(null)
   const [generating, setGenerating] = useState(false)
-  const [savingIndex, setSavingIndex] = useState(null)
-  const [savedTitles, setSavedTitles] = useState([])
   const [error, setError] = useState(null)
 
   useEffect(() => {
@@ -73,28 +70,6 @@ export default function AiWorkoutBuilder() {
       setError(err.message)
     } finally {
       setGenerating(false)
-    }
-  }
-
-  async function handleSaveWorkout(workout, index) {
-    setError(null)
-    setSavingIndex(index)
-    try {
-      const items = workout.items.map((item) => {
-        const ex = exerciseById.get(item.exerciseId)
-        return {
-          exerciseId: item.exerciseId,
-          exerciseName: ex ? exerciseName(ex) : item.exerciseId,
-          targetSets: item.targetSets,
-          targetReps: item.targetReps,
-        }
-      })
-      await api.createWorkout({ title: workout.title, items })
-      setSavedTitles((prev) => [...prev, workout.title])
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setSavingIndex(null)
     }
   }
 
@@ -216,44 +191,7 @@ export default function AiWorkoutBuilder() {
 
       {error && <p className="error">{error}</p>}
 
-      {plan && (
-        <>
-          <h3>Ваша программа</h3>
-          <p>{plan.summary}</p>
-          {plan.workouts.map((workout, index) => (
-            <div key={workout.title + index} className="plan-card">
-              <h4>{workout.title}</h4>
-              <ul>
-                {workout.items.map((item) => {
-                  const ex = exerciseById.get(item.exerciseId)
-                  return (
-                    <li key={item.exerciseId}>
-                      {ex ? exerciseName(ex) : item.exerciseId}
-                      <small>{item.targetSets}×{item.targetReps}</small>
-                    </li>
-                  )
-                })}
-              </ul>
-              {savedTitles.includes(workout.title) ? (
-                <span className="eyebrow">Сохранено</span>
-              ) : (
-                <button
-                  type="button"
-                  disabled={savingIndex === index}
-                  onClick={() => handleSaveWorkout(workout, index)}
-                >
-                  {savingIndex === index ? 'Сохраняем...' : 'Сохранить в мои тренировки'}
-                </button>
-              )}
-            </div>
-          ))}
-          {savedTitles.length > 0 && (
-            <button type="button" className="button" onClick={() => navigate('/workouts')}>
-              Перейти к моим тренировкам
-            </button>
-          )}
-        </>
-      )}
+      {plan && <GeneratedPlan plan={plan} exerciseById={exerciseById} />}
     </section>
   )
 }
