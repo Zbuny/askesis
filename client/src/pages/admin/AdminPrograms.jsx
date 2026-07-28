@@ -83,6 +83,10 @@ export default function AdminPrograms() {
       description: program.description || '',
       items: programItems(program),
     })
+    // Список программ — внизу страницы, форма — вверху, а между ними
+    // библиотека упражнений. Без прокрутки форма меняется незаметно,
+    // и кажется, что кнопка ничего не делает.
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   function addExercise(ex) {
