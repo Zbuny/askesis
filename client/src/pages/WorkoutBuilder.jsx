@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api/firestore.js'
 import { exerciseName, translateEquipment, translateMuscle } from '../utils/translate.js'
 import { emptyFilters, filterExercises } from '../utils/exerciseFilters.js'
 import ExerciseFilterBar from '../components/ExerciseFilterBar.jsx'
 import BackLink from '../components/BackLink.jsx'
+import ExerciseAnimation from '../components/ExerciseAnimation.jsx'
 
 export default function WorkoutBuilder() {
   const { id } = useParams()
@@ -35,6 +36,13 @@ export default function WorkoutBuilder() {
   }, [id, isEdit])
 
   const filtered = useMemo(() => filterExercises(exercises, filters), [exercises, filters])
+
+  const exerciseById = useMemo(() => new Map(exercises.map((ex) => [ex.id, ex])), [exercises])
+
+  // Показываем список порциями: 873 карточки с картинками разом рисовать
+  // незачем, а при смене фильтра счётчик сбрасывается на первую порцию.
+  const [visibleCount, setVisibleCount] = useState(40)
+  useEffect(() => setVisibleCount(40), [filters])
 
   function addExercise(ex) {
     if (items.some((item) => item.exerciseId === ex.id)) return
@@ -87,7 +95,18 @@ export default function WorkoutBuilder() {
         <ul className="admin-list">
           {items.map((item) => (
             <li key={item.exerciseId}>
-              <span>{item.exerciseName}</span>
+              <span className="picked">
+                {exerciseById.get(item.exerciseId)?.imageUrl && (
+                  <span className="picked__media">
+                    <ExerciseAnimation
+                      exercise={exerciseById.get(item.exerciseId)}
+                      alt={item.exerciseName}
+                      animate={false}
+                    />
+                  </span>
+                )}
+                {item.exerciseName}
+              </span>
               <span className="admin-list__actions">
                 <input
                   type="number"
@@ -121,14 +140,35 @@ export default function WorkoutBuilder() {
 
       <h3>Библиотека упражнений</h3>
       <ExerciseFilterBar exercises={exercises} filters={filters} onChange={setFilters} />
-      <ul className="admin-list">
-        {filtered.map((ex) => (
-          <li key={ex.id}>
-            <span>{exerciseName(ex)} <small>{translateMuscle(ex.muscleGroup)} · {translateEquipment(ex.equipment)}</small></span>
-            <button type="button" onClick={() => addExercise(ex)}>Добавить</button>
-          </li>
-        ))}
+      <p className="picker__count">Найдено: {filtered.length}</p>
+      <ul className="picker">
+        {filtered.slice(0, visibleCount).map((ex) => {
+          const added = items.some((item) => item.exerciseId === ex.id)
+          return (
+            <li key={ex.id} className={`picker__item${added ? ' is-added' : ''}`}>
+              <Link to={`/exercises/${ex.id}`} className="picker__media" title="Открыть упражнение">
+                {ex.imageUrl ? (
+                  <ExerciseAnimation exercise={ex} alt={exerciseName(ex)} animate={false} />
+                ) : (
+                  <span className="picker__media-empty" aria-hidden="true" />
+                )}
+              </Link>
+              <div className="picker__info">
+                <span className="picker__name">{exerciseName(ex)}</span>
+                <small>{translateMuscle(ex.muscleGroup)} · {translateEquipment(ex.equipment)}</small>
+              </div>
+              <button type="button" onClick={() => addExercise(ex)} disabled={added}>
+                {added ? 'Добавлено' : 'Добавить'}
+              </button>
+            </li>
+          )
+        })}
       </ul>
+      {visibleCount < filtered.length && (
+        <button type="button" className="picker__more" onClick={() => setVisibleCount(visibleCount + 40)}>
+          Показать ещё ({filtered.length - visibleCount})
+        </button>
+      )}
     </section>
   )
 }

@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { api } from '../api/firestore.js'
 import ExerciseAnimation from '../components/ExerciseAnimation.jsx'
 import BackLink from '../components/BackLink.jsx'
+import { exerciseFrames } from '../utils/exerciseFrames.js'
 import {
   exerciseInstructions,
   exerciseName,
@@ -11,6 +12,9 @@ import {
   translateLevel,
   translateMuscle,
 } from '../utils/translate.js'
+
+// В датасете два кадра на упражнение — это начало и конец движения.
+const PHASE_LABELS = ['Исходное положение', 'Конечное положение']
 
 export default function ExerciseDetail() {
   const { id } = useParams()
@@ -32,6 +36,7 @@ export default function ExerciseDetail() {
     .filter(Boolean)
 
   const secondary = (exercise.secondaryMuscles || []).map(translateMuscle)
+  const frames = exerciseFrames(exercise)
 
   return (
     <section className="exercise-detail">
@@ -41,6 +46,18 @@ export default function ExerciseDetail() {
         {exercise.imageUrl && (
           <div className="exercise-detail__media">
             <ExerciseAnimation exercise={exercise} alt={exerciseName(exercise)} />
+            <span className="exercise-detail__caption">Движение целиком</span>
+
+            {frames.length > 1 && (
+              <div className="exercise-phases">
+                {frames.map((src, i) => (
+                  <figure key={src}>
+                    <img src={src} alt={`${exerciseName(exercise)} — ${PHASE_LABELS[i]}`} loading="lazy" />
+                    <figcaption>{PHASE_LABELS[i]}</figcaption>
+                  </figure>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
