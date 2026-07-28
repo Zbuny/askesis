@@ -4,6 +4,7 @@ import { exerciseName, translateEquipment, translateMuscle } from '../../utils/t
 import { emptyFilters, filterExercises } from '../../utils/exerciseFilters.js'
 import { programItems } from '../../utils/programItems.js'
 import ExerciseFilterBar from '../../components/ExerciseFilterBar.jsx'
+import ExerciseAnimation from '../../components/ExerciseAnimation.jsx'
 
 const emptyForm = { id: null, title: '', level: '', duration: '', description: '', items: [] }
 
@@ -27,6 +28,10 @@ export default function AdminPrograms() {
   useEffect(load, [])
 
   const filtered = useMemo(() => filterExercises(exercises, filters), [exercises, filters])
+
+  // Как и в конструкторе: 873 карточки с картинками разом не рисуем.
+  const [visibleCount, setVisibleCount] = useState(40)
+  useEffect(() => setVisibleCount(40), [filters])
   const exerciseById = useMemo(() => new Map(exercises.map((ex) => [ex.id, ex])), [exercises])
 
   function startEdit(program) {
@@ -169,14 +174,35 @@ export default function AdminPrograms() {
 
       <h3>Библиотека упражнений</h3>
       <ExerciseFilterBar exercises={exercises} filters={filters} onChange={setFilters} />
-      <ul className="admin-list">
-        {filtered.map((ex) => (
-          <li key={ex.id}>
-            <span>{exerciseName(ex)} <small>{translateMuscle(ex.muscleGroup)} · {translateEquipment(ex.equipment)}</small></span>
-            <button type="button" onClick={() => addExercise(ex)}>Добавить</button>
-          </li>
-        ))}
+      <p className="picker__count">Найдено: {filtered.length}</p>
+      <ul className="picker">
+        {filtered.slice(0, visibleCount).map((ex) => {
+          const added = form.items.some((item) => item.exerciseId === ex.id)
+          return (
+            <li key={ex.id} className={`picker__item${added ? ' is-added' : ''}`}>
+              <span className="picker__media">
+                {ex.imageUrl ? (
+                  <ExerciseAnimation exercise={ex} alt={exerciseName(ex)} animate={false} />
+                ) : (
+                  <span className="picker__media-empty" aria-hidden="true" />
+                )}
+              </span>
+              <div className="picker__info">
+                <span className="picker__name">{exerciseName(ex)}</span>
+                <small>{translateMuscle(ex.muscleGroup)} · {translateEquipment(ex.equipment)}</small>
+              </div>
+              <button type="button" onClick={() => addExercise(ex)} disabled={added}>
+                {added ? 'Добавлено' : 'Добавить'}
+              </button>
+            </li>
+          )
+        })}
       </ul>
+      {visibleCount < filtered.length && (
+        <button type="button" className="picker__more" onClick={() => setVisibleCount(visibleCount + 40)}>
+          Показать ещё ({filtered.length - visibleCount})
+        </button>
+      )}
 
       <h3>Все программы</h3>
       <ul className="admin-list">
