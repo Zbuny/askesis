@@ -2,9 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api } from '../api/firestore.js'
 import ProgressChart from '../components/ProgressChart.jsx'
-import TrainingHeatmap from '../components/TrainingHeatmap.jsx'
+import TrainingCalendar from '../components/TrainingCalendar.jsx'
 import { pluralRu } from '../utils/translate.js'
 import { entryTopWeight, sessionVolume } from '../utils/workoutLog.js'
+import { calcBmi } from '../utils/bmi.js'
 
 const emptyProfileData = { weight: '', height: '', age: '' }
 
@@ -99,6 +100,11 @@ export default function Profile() {
     series.sort((a, b) => b.points.length - a.points.length)
     return series
   }, [history])
+
+  const bmi = useMemo(
+    () => calcBmi(profileData.weight, profileData.height),
+    [profileData.weight, profileData.height],
+  )
 
   const selectedSeries =
     exerciseSeries.find((s) => s.exerciseId === selectedExerciseId) || exerciseSeries[0]
@@ -208,6 +214,24 @@ export default function Profile() {
           <button type="submit" disabled={profileSaving}>Сохранить</button>
           {profileSaved && <span className="eyebrow">Сохранено</span>}
         </div>
+
+        {/* Считается на лету из полей выше, пока их печатают. */}
+        {bmi ? (
+          <div className={`bmi bmi--${bmi.tone}`}>
+            <div className="bmi__head">
+              <strong>{bmi.value}</strong>
+              <span>ИМТ · {bmi.label}</span>
+            </div>
+            <div className="bmi__scale">
+              <span className="bmi__marker" style={{ left: `${bmi.percent}%` }} />
+            </div>
+            <div className="bmi__legend">
+              <span>15</span><span>18.5</span><span>25</span><span>30</span><span>40</span>
+            </div>
+          </div>
+        ) : (
+          <p className="bmi__hint">Укажите вес и рост — посчитаем индекс массы тела.</p>
+        )}
       </form>
 
       <h3>Прогресс</h3>
@@ -228,7 +252,7 @@ export default function Profile() {
       </div>
 
       <h3>Когда вы тренировались</h3>
-      <TrainingHeatmap sessions={history} />
+      <TrainingCalendar sessions={history} />
 
       <h3>Время в зале</h3>
       {durationSeries.length === 0 && (

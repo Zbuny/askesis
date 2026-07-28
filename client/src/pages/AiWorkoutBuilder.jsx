@@ -5,6 +5,7 @@ import { translateEquipment } from '../utils/translate.js'
 import { uniqueValues } from '../utils/exerciseFilters.js'
 import BackLink from '../components/BackLink.jsx'
 import GeneratedPlan from '../components/GeneratedPlan.jsx'
+import { calcBmi } from '../utils/bmi.js'
 
 const GOALS = [
   'Набрать мышечную массу',
@@ -35,7 +36,16 @@ export default function AiWorkoutBuilder() {
   useEffect(() => {
     api.listExercises().then(setExercises).catch((e) => setError(e.message))
     api.getMyProfileData().then((data) => {
-      setProfile((prev) => ({ ...prev, age: data.age, weight: data.weight, height: data.height }))
+      // ИМТ передаём готовым числом: модель хуже считает его сама, а от
+      // него зависит и объём, и доля кардио в программе.
+      const bmi = calcBmi(data.weight, data.height)
+      setProfile((prev) => ({
+        ...prev,
+        age: data.age,
+        weight: data.weight,
+        height: data.height,
+        bmi: bmi ? `${bmi.value} (${bmi.label})` : '',
+      }))
     }).catch(() => {})
   }, [])
 

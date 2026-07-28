@@ -895,6 +895,46 @@ textarea:focus-visible {
   overflow: hidden;
 }
 
+.exercise-detail__caption {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+  text-align: center;
+}
+
+/* Помимо зацикленной анимации показываем обе фазы отдельными кадрами:
+   на «живой» смене не всегда видно, где начало, а где конец движения. */
+.exercise-phases {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.exercise-phases figure {
+  margin: 0;
+}
+
+.exercise-phases img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: contain;
+  background: #000;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.exercise-phases figcaption {
+  margin-top: 0.4rem;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
 .exercise-detail__info h2 {
   margin-bottom: 1.25rem;
 }
@@ -1452,61 +1492,341 @@ textarea:focus-visible {
 
 /* ---------- Training heatmap ---------- */
 
-.heatmap {
+/* ---------- Выбор упражнений с превью ---------- */
+
+.picker__count {
+  margin: 0 0 0.75rem;
+  font-size: 0.78rem;
+  color: var(--text-faint);
+}
+
+.picker {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.75rem;
+}
+
+.picker__item {
   display: flex;
-  gap: 0.5rem;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  transition: border-color 0.2s var(--ease);
+}
+
+.picker__item:hover {
+  border-color: var(--border-strong);
+}
+
+.picker__item.is-added {
+  border-color: rgba(185, 152, 94, 0.45);
+}
+
+.picker__media,
+.picked__media {
+  flex: 0 0 68px;
+  width: 68px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #000;
+  line-height: 0;
+}
+
+.picker__media-empty {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: var(--bg);
+}
+
+.picker__info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.picker__name {
+  font-size: 0.88rem;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.picker__info small {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+}
+
+.picker__item button {
+  flex-shrink: 0;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text-muted);
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: border-color 0.2s var(--ease), color 0.2s var(--ease);
+}
+
+.picker__item button:hover:not(:disabled) {
+  border-color: var(--gold);
+  color: var(--gold-bright);
+}
+
+.picker__item button:disabled {
+  border-color: transparent;
+  color: var(--gold);
+  cursor: default;
+}
+
+.picker__more {
+  display: block;
+  width: 100%;
+  margin-top: 1rem;
+  padding: 0.8rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text-muted);
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+.picker__more:hover {
+  border-color: var(--gold);
+  color: var(--gold-bright);
+}
+
+.picked {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
+}
+
+/* ---------- Индекс массы тела ---------- */
+
+.bmi {
+  margin-top: 1.25rem;
+  padding: 1rem 1.1rem 1.15rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+
+.bmi__head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.7rem;
+  margin-bottom: 0.9rem;
+}
+
+.bmi__head strong {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  color: var(--text);
+}
+
+.bmi__head span {
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+}
+
+/* Цветом подсвечиваем только само число — сайт остаётся монохромным. */
+.bmi--ok .bmi__head strong { color: var(--gold-bright); }
+.bmi--low .bmi__head strong,
+.bmi--warn .bmi__head strong { color: var(--silver); }
+.bmi--high .bmi__head strong { color: var(--danger); }
+
+.bmi__scale {
+  position: relative;
+  height: 5px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    rgba(201, 203, 209, 0.4) 0%,
+    rgba(201, 203, 209, 0.4) 14%,
+    var(--gold) 14%,
+    var(--gold) 40%,
+    rgba(201, 203, 209, 0.4) 40%,
+    rgba(201, 203, 209, 0.4) 60%,
+    rgba(185, 97, 91, 0.5) 60%,
+    rgba(185, 97, 91, 0.5) 100%
+  );
+}
+
+.bmi__marker {
+  position: absolute;
+  top: 50%;
+  width: 11px;
+  height: 11px;
+  margin-left: -5.5px;
+  border-radius: 50%;
+  background: var(--text);
+  border: 2px solid var(--bg);
+  transform: translateY(-50%);
+  transition: left 0.3s var(--ease);
+}
+
+.bmi__legend {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.4rem;
+  font-size: 0.62rem;
+  color: var(--text-faint);
+}
+
+.bmi__hint {
+  margin-top: 1rem;
+  font-size: 0.8rem;
+  color: var(--text-faint);
+}
+
+/* ---------- Календарь тренировок ---------- */
+
+.calendar {
   margin: 1.25rem 0;
   padding: 1.25rem;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  overflow-x: auto;
 }
 
-.heatmap__days {
-  display: grid;
-  grid-template-rows: repeat(7, 13px);
-  gap: 3px;
-  flex-shrink: 0;
-}
-
-.heatmap__days span {
-  font-size: 0.58rem;
-  line-height: 13px;
-  color: var(--text-faint);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.heatmap__grid {
+.calendar__head {
   display: flex;
-  gap: 3px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.1rem;
 }
 
-.heatmap__week {
+.calendar__month {
+  font-family: var(--font-display);
+  font-size: 0.86rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text);
+}
+
+.calendar__head button {
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: border-color 0.2s var(--ease), color 0.2s var(--ease);
+}
+
+.calendar__head button:hover:not(:disabled) {
+  border-color: var(--gold);
+  color: var(--gold-bright);
+}
+
+.calendar__head button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.calendar__weekdays,
+.calendar__grid {
   display: grid;
-  grid-template-rows: repeat(7, 13px);
-  gap: 3px;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
 }
 
-.heatmap__cell {
-  width: 13px;
-  height: 13px;
-  border-radius: 2px;
-  background: rgba(255, 255, 255, 0.055);
-  transition: background 0.2s var(--ease), transform 0.2s var(--ease);
+.calendar__weekdays {
+  margin-bottom: 6px;
 }
 
-.heatmap__cell.is-active {
+.calendar__weekdays span {
+  text-align: center;
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+}
+
+.calendar__cell {
+  position: relative;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.035);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  transition: background 0.2s var(--ease), color 0.2s var(--ease), transform 0.2s var(--ease);
+}
+
+.calendar__cell.is-empty {
+  background: none;
+}
+
+/* День с тренировкой — та же золотая заливка, что была в полосе. */
+.calendar__cell.is-active {
   background: var(--gold);
+  color: var(--accent-contrast);
+  font-weight: 600;
 }
 
-.heatmap__cell.is-future {
-  background: transparent;
+.calendar__cell.is-today {
+  border-color: var(--gold);
 }
 
-.heatmap__cell:hover:not(.is-future) {
-  transform: scale(1.25);
+.calendar__cell.is-future {
+  opacity: 0.35;
+}
+
+.calendar__cell:not(.is-empty):not(.is-future):hover {
+  transform: scale(1.07);
+}
+
+.calendar__badge {
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  font-size: 0.52rem;
+  font-weight: 600;
+  color: var(--accent-contrast);
+  opacity: 0.75;
+}
+
+.calendar__summary {
+  margin: 1rem 0 0;
+  font-size: 0.8rem;
+  color: var(--text-faint);
+}
+
+@media (max-width: 640px) {
+  .calendar {
+    padding: 1rem 0.75rem;
+  }
+
+  .calendar__cell {
+    font-size: 0.72rem;
+  }
 }
 
 /* ---------- AI wizard ---------- */

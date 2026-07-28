@@ -133,6 +133,7 @@ function buildPrompt(profile, candidates) {
 - Доступный инвентарь: ${(profile.equipment || []).join(', ') || 'не указан'}
 - Ограничения и травмы: ${profile.limits || 'нет'}
 - Возраст: ${profile.age || 'не указан'}, вес: ${profile.weight || 'не указан'} кг, рост: ${profile.height || 'не указан'} см
+- Индекс массы тела: ${profile.bmi || 'не рассчитан'}
 
 Доступные упражнения (формат: id | название | группа мышц | инвентарь):
 ${catalogue}
@@ -201,6 +202,7 @@ function sanitizeProfile(raw) {
     age: text(profile.age, 10),
     weight: text(profile.weight, 10),
     height: text(profile.height, 10),
+    bmi: text(profile.bmi, 40),
   }
 }
 
