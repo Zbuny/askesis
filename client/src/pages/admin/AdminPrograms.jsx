@@ -2,9 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { api } from '../../api/firestore.js'
 import { exerciseName, translateEquipment, translateMuscle } from '../../utils/translate.js'
 import { emptyFilters, filterExercises } from '../../utils/exerciseFilters.js'
-import { programItems } from '../../utils/programItems.js'
+import { formatReps, programItems } from '../../utils/programItems.js'
 import ExerciseFilterBar from '../../components/ExerciseFilterBar.jsx'
 import ExerciseAnimation from '../../components/ExerciseAnimation.jsx'
+import { planFromChat } from '../../api/ai.js'
 
 const emptyForm = { id: null, title: '', level: '', duration: '', description: '', items: [] }
 
@@ -15,6 +16,9 @@ export default function AdminPrograms() {
   const [filters, setFilters] = useState(emptyFilters)
   const [error, setError] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [rawPlan, setRawPlan] = useState('')
+  const [parsing, setParsing] = useState(false)
+  const [parsed, setParsed] = useState(null)
 
   function load() {
     Promise.all([api.listPrograms(), api.listExercises()])
@@ -33,6 +37,42 @@ export default function AdminPrograms() {
   const [visibleCount, setVisibleCount] = useState(40)
   useEffect(() => setVisibleCount(40), [filters])
   const exerciseById = useMemo(() => new Map(exercises.map((ex) => [ex.id, ex])), [exercises])
+
+  // Разбор плана, вставленного текстом: модель раскладывает его на
+  // упражнения библиотеки, а админ проверяет и правит перед сохранением.
+  // Сразу в базу не пишем — программа видна всем, ошибку заметить важнее.
+  async function handleParse() {
+    setError(null)
+    setParsing(true)
+    setParsed(null)
+    try {
+      const result = await planFromChat({
+        messages: [{ role: 'user', content: rawPlan }],
+        exercises,
+      })
+      setParsed(result)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setParsing(false)
+    }
+  }
+
+  function applyParsed(workout) {
+    setForm((prev) => ({
+      ...prev,
+      title: prev.title || workout.title,
+      items: workout.items.map((item) => ({
+        exerciseId: item.exerciseId,
+        targetSets: item.targetSets,
+        targetReps: item.targetReps,
+        ...(item.targetRepsMax ? { targetRepsMax: item.targetRepsMax } : {}),
+      })),
+    }))
+    setParsed(null)
+    setRawPlan('')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   function startEdit(program) {
     setForm({
@@ -100,6 +140,56 @@ export default function AdminPrograms() {
   return (
     <section>
       <h2>Программы — админка</h2>
+
+      <div className="ai-import">
+        <div className="ai-import__head">
+          <span className="ai-import__badge">ИИ-помощник</span>
+          <p>Вставьте план текстом — разложим его на упражнения библиотеки и подставим в форму ниже.</p>
+        </div>
+        <textarea
+          rows={5}
+          placeholder={'День рук\nСгибания с гантелями 3 на 10\nЖим узким хватом 3 на 10\nРазгибания с канатом 3 на 8-10'}
+          value={rawPlan}
+          onChange={(e) => setRawPlan(e.target.value)}
+        />
+        <div className="ai-import__actions">
+          <button
+            type="button"
+            onClick={handleParse}
+            disabled={parsing || !rawPlan.trim() || exercises.length === 0}
+          >
+            {parsing ? 'Разбираем...' : 'Разобрать план'}
+          </button>
+          {rawPlan && !parsing && (
+            <button type="button" className="ai-import__clear" onClick={() => { setRawPlan(''); setParsed(null) }}>
+              Очистить
+            </button>
+          )}
+        </div>
+
+        {parsed && (
+          <div className="ai-import__result">
+            {parsed.summary && <p className="ai-import__summary">{parsed.summary}</p>}
+            {parsed.workouts.map((workout, i) => (
+              <div className="ai-import__card" key={workout.title + i}>
+                <strong>{workout.title}</strong>
+                <ul>
+                  {workout.items.map((item) => {
+                    const ex = exerciseById.get(item.exerciseId)
+                    return (
+                      <li key={item.exerciseId}>
+                        {ex ? exerciseName(ex) : item.exerciseId}
+                        <small>{item.targetSets}×{formatReps(item)}</small>
+                      </li>
+                    )
+                  })}
+                </ul>
+                <button type="button" onClick={() => applyParsed(workout)}>Подставить в форму</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       <form className="admin-form" onSubmit={handleSubmit}>
         <input

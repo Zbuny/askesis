@@ -647,6 +647,22 @@ textarea:focus-visible {
   transition: border-color 0.25s var(--ease), background 0.25s var(--ease), transform 150ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+.program-card__badge {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid rgba(185, 152, 94, 0.45);
+  border-radius: 999px;
+  background: rgba(185, 152, 94, 0.12);
+  color: var(--gold-bright);
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
 .program-card:hover {
   border-color: var(--border-strong);
   background: var(--surface-hover);
@@ -2224,6 +2240,158 @@ textarea:focus-visible {
   .mobile-nav__beam.is-ready {
     transition: opacity 0.2s var(--ease);
   }
+}
+
+/* ---------- ИИ-помощник в админке ---------- */
+
+.ai-import {
+  margin: 1.5rem 0;
+  padding: 1.25rem;
+  border: 1px solid rgba(185, 152, 94, 0.25);
+  border-radius: var(--radius-lg);
+  background: rgba(185, 152, 94, 0.04);
+}
+
+.ai-import__head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.9rem;
+}
+
+.ai-import__badge {
+  padding: 0.25rem 0.65rem;
+  border: 1px solid rgba(185, 152, 94, 0.45);
+  border-radius: 999px;
+  color: var(--gold-bright);
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+}
+
+.ai-import__head p {
+  margin: 0;
+  flex: 1;
+  min-width: 240px;
+  font-size: 0.84rem;
+  color: var(--text-muted);
+}
+
+.ai-import textarea {
+  width: 100%;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.ai-import textarea:focus {
+  outline: none;
+  border-color: var(--gold);
+}
+
+.ai-import__actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 0.8rem;
+}
+
+.ai-import__actions button {
+  padding: 0.65rem 1.25rem;
+  border: 1px solid var(--gold);
+  border-radius: var(--radius);
+  background: rgba(185, 152, 94, 0.12);
+  color: var(--gold-bright);
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: background 0.2s var(--ease);
+}
+
+.ai-import__actions button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.ai-import__actions button:not(:disabled):hover {
+  background: rgba(185, 152, 94, 0.22);
+}
+
+.ai-import__clear {
+  border-color: var(--border-strong) !important;
+  background: none !important;
+  color: var(--text-muted) !important;
+}
+
+.ai-import__summary {
+  margin: 1rem 0 0.5rem;
+  font-size: 0.84rem;
+  color: var(--text-muted);
+}
+
+.ai-import__card {
+  margin-top: 0.75rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+
+.ai-import__card strong {
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+}
+
+.ai-import__card ul {
+  list-style: none;
+  padding: 0;
+  margin: 0.6rem 0 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.ai-import__card li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.ai-import__card li small {
+  color: var(--gold);
+  white-space: nowrap;
+}
+
+.ai-import__card button {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: border-color 0.2s var(--ease), color 0.2s var(--ease);
+}
+
+.ai-import__card button:hover {
+  border-color: var(--gold);
+  color: var(--gold-bright);
 }
 
 /* ---------- Кнопки ИИ-тренера ---------- */

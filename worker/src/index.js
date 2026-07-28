@@ -97,6 +97,8 @@ const RESPONSE_SCHEMA = {
                 exerciseId: { type: 'string' },
                 targetSets: { type: 'integer' },
                 targetReps: { type: 'integer' },
+                // Верхняя граница, если в плане диапазон вида «8-10».
+                targetRepsMax: { type: 'integer' },
               },
               required: ['exerciseId', 'targetSets', 'targetReps'],
             },
@@ -143,6 +145,7 @@ ${catalogue}
 - Используй ТОЛЬКО id из списка выше. Не придумывай новые id.
 - В каждой тренировке 4-7 упражнений, сбалансированных по группам мышц.
 - targetSets и targetReps подбирай под цель и уровень.
+- Если повторы заданы диапазоном («8-10»), укажи нижнюю границу в targetReps, верхнюю — в targetRepsMax.
 - Названия тренировок — на русском, коротко и по делу (например «День 1 — Верх тела»).
 - В summary на русском объясни логику программы в 2-3 предложениях.`
 }
@@ -170,6 +173,7 @@ ${catalogue}
 - Опирайся на план из диалога: те же дни, тот же принцип разбивки.
 - Используй ТОЛЬКО id из списка выше. Не придумывай новые id.
 - Если в диалоге упражнения названы иначе, подбери ближайшие по смыслу из списка.
+- Диапазон повторов («8-10») клади как targetReps=8 и targetRepsMax=10, сохраняя то, что указал человек.
 - Не больше ${MAX_WORKOUTS} тренировок, в каждой 4-7 упражнений.
 - Названия тренировок — на русском, коротко (например «День 1 — Верх тела»).
 - В summary на русском в 2-3 предложениях объясни, как программа отражает договорённости.`
@@ -397,11 +401,17 @@ export default {
         title: String(workout.title || 'Тренировка').slice(0, 120),
         items: (workout.items || [])
           .filter((item) => validIds.has(item.exerciseId))
-          .map((item) => ({
-            exerciseId: item.exerciseId,
-            targetSets: Math.min(Math.max(Number(item.targetSets) || 3, 1), 10),
-            targetReps: Math.min(Math.max(Number(item.targetReps) || 10, 1), 100),
-          })),
+          .map((item) => {
+            const reps = Math.min(Math.max(Number(item.targetReps) || 10, 1), 100)
+            const repsMax = Math.min(Math.max(Number(item.targetRepsMax) || 0, 0), 100)
+            return {
+              exerciseId: item.exerciseId,
+              targetSets: Math.min(Math.max(Number(item.targetSets) || 3, 1), 10),
+              targetReps: reps,
+              // Держим диапазон только если он осмысленный.
+              ...(repsMax > reps ? { targetRepsMax: repsMax } : {}),
+            }
+          }),
       }))
       .filter((workout) => workout.items.length > 0)
 

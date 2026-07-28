@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api/firestore.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { exerciseName } from '../utils/translate.js'
-import { programItems } from '../utils/programItems.js'
+import { formatReps, programItems } from '../utils/programItems.js'
 import BackLink from '../components/BackLink.jsx'
 
 export default function ProgramDetail() {
@@ -65,7 +65,7 @@ export default function ProgramDetail() {
             <li key={item.exerciseId}>
               <Link to={`/exercises/${item.exerciseId}`}>
                 <span className="program-exercise-list__name">{ex ? exerciseName(ex) : item.exerciseId}</span>
-                <small>{item.targetSets}×{item.targetReps}</small>
+                <small>{item.targetSets}×{formatReps(item)}</small>
               </Link>
             </li>
           )
