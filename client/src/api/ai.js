@@ -67,7 +67,7 @@ export function planFromChat({ messages, exercises }) {
   return requestPlan({ conversation: messages }, exercises, null)
 }
 
-export async function askTrainer(messages) {
+export async function askTrainer(messages, context) {
   if (!WORKER_URL) {
     throw new Error('ИИ-помощник не настроен: пропишите VITE_AI_WORKER_URL в client/.env (см. worker/README.md)')
   }
@@ -78,7 +78,7 @@ export async function askTrainer(messages) {
   const response = await fetch(`${WORKER_URL.replace(/\/$/, '')}/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ messages }),
+    body: JSON.stringify({ messages, context }),
   })
 
   const data = await response.json().catch(() => ({}))

@@ -5,12 +5,18 @@ import { api } from '../api/firestore.js'
 import { useAutoResize } from '../hooks/useAutoResize.js'
 import BackLink from '../components/BackLink.jsx'
 import GeneratedPlan from '../components/GeneratedPlan.jsx'
+import ChatAttachments, { buildContext } from '../components/ChatAttachments.jsx'
 
 const SUGGESTIONS = [
   { label: 'Сплит на 4 дня', prompt: 'Составь мне сплит на 4 дня' },
   { label: 'Замена упражнения', prompt: 'Чем заменить становую тягу при больной пояснице?' },
   { label: 'Отдых между подходами', prompt: 'Сколько отдыхать между подходами на массу?' },
   { label: 'Силовые и бег', prompt: 'Как совмещать силовые тренировки и бег?' },
+  {
+    label: 'Разобрать мой план',
+    prompt: 'Вот моя тренировка, разбери её и оформи списком «упражнение — подходы×повторы»:\n',
+    fill: true, // не отправляем сразу — человек дописывает свой план
+  },
 ]
 
 export default function TrainerChat() {
@@ -22,6 +28,9 @@ export default function TrainerChat() {
   const [plan, setPlan] = useState(null)
   const [building, setBuilding] = useState(false)
   const [focused, setFocused] = useState(false)
+  const [myWorkouts, setMyWorkouts] = useState([])
+  const [history, setHistory] = useState([])
+  const [attachments, setAttachments] = useState({ workoutIds: [], includeHistory: false })
   const feedRef = useRef(null)
   const { ref: textareaRef, adjust } = useAutoResize({ minHeight: 60, maxHeight: 200 })
 
@@ -30,9 +39,12 @@ export default function TrainerChat() {
   }, [messages, sending])
 
   // Библиотека нужна, только если пользователь решит сохранить план —
-  // тянем заранее, чтобы кнопка срабатывала без паузы.
+  // тянем заранее, чтобы кнопка срабатывала без паузы. Тренировки и лог
+  // нужны для панели «приложить свои данные».
   useEffect(() => {
     api.listExercises().then(setExercises).catch(() => {})
+    api.listMyWorkouts().then(setMyWorkouts).catch(() => {})
+    api.listWorkoutHistory({}).then(setHistory).catch(() => {})
   }, [])
 
   const exerciseById = useMemo(() => new Map(exercises.map((ex) => [ex.id, ex])), [exercises])
@@ -50,7 +62,7 @@ export default function TrainerChat() {
     setSending(true)
 
     try {
-      const reply = await askTrainer(next)
+      const reply = await askTrainer(next, buildContext(attachments, myWorkouts, history))
       setMessages([...next, { role: 'assistant', content: reply }])
     } catch (err) {
       setError(err.message)
@@ -131,6 +143,13 @@ export default function TrainerChat() {
         )}
       </div>
 
+      <ChatAttachments
+        value={attachments}
+        onChange={setAttachments}
+        workouts={myWorkouts}
+        history={history}
+      />
+
       <form className={`chat-composer ${focused ? 'is-focused' : ''}`} onSubmit={handleSubmit}>
         <textarea
           ref={textareaRef}
@@ -160,7 +179,15 @@ export default function TrainerChat() {
             key={s.prompt}
             type="button"
             style={{ animationDelay: `${i * 80}ms` }}
-            onClick={() => send(s.prompt)}
+            onClick={() => {
+              if (s.fill) {
+                setInput(s.prompt)
+                textareaRef.current?.focus()
+                requestAnimationFrame(adjust)
+              } else {
+                send(s.prompt)
+              }
+            }}
             disabled={sending}
           >
             {s.label}
