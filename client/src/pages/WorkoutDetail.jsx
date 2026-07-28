@@ -4,6 +4,7 @@ import { api } from '../api/firestore.js'
 import { formatDuration, useWorkoutTimer } from '../hooks/useWorkoutTimer.js'
 import { entrySets, formatEntry } from '../utils/workoutLog.js'
 import { exerciseName } from '../utils/translate.js'
+import { formatReps } from '../utils/programItems.js'
 import ExerciseAnimation from '../components/ExerciseAnimation.jsx'
 import BackLink from '../components/BackLink.jsx'
 
@@ -204,7 +205,7 @@ export default function WorkoutDetail() {
                     {ex ? exerciseName(ex) : item.exerciseName}
                   </Link>
                   <span className="log-exercise__target">
-                    Цель: {item.targetSets} подхода × {item.targetReps} повторений
+                    Цель: {item.targetSets} × {formatReps(item)}
                   </span>
                   <Link to={`/exercises/${item.exerciseId}`} className="log-exercise__how">
                     Как выполнять →

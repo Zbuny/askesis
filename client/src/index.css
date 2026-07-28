@@ -647,6 +647,22 @@ textarea:focus-visible {
   transition: border-color 0.25s var(--ease), background 0.25s var(--ease), transform 150ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+.program-card__badge {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid rgba(185, 152, 94, 0.45);
+  border-radius: 999px;
+  background: rgba(185, 152, 94, 0.12);
+  color: var(--gold-bright);
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
 .program-card:hover {
   border-color: var(--border-strong);
   background: var(--surface-hover);

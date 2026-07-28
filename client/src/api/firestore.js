@@ -93,7 +93,8 @@ export const api = {
           exerciseId: item.exerciseId,
           exerciseName: ex ? exerciseName(ex) : item.exerciseId,
           targetSets: item.targetSets || 3,
-          targetReps: item.targetReps || 10,
+          targetReps: item.targetReps ?? 10,
+          ...(item.targetRepsMax ? { targetRepsMax: item.targetRepsMax } : {}),
         }
       }),
     )
