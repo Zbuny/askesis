@@ -24,6 +24,10 @@ export default function AdminExercises() {
       instructions: ex.instructions || '',
       imageUrl: ex.imageUrl || '',
     })
+    // Список — все 873 упражнения подряд, форма — вверху страницы.
+    // Без прокрутки клик по «Изменить» в конце списка выглядит так,
+    // будто ничего не произошло.
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   async function handleSubmit(e) {
