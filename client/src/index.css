@@ -2226,6 +2226,156 @@ textarea:focus-visible {
   }
 }
 
+/* ---------- Кнопки ИИ-тренера ---------- */
+
+.ai-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1rem;
+  margin: 1.75rem 0 0.5rem;
+}
+
+/* Обводка — вращающийся конический градиент под маской: рамка «дышит»,
+   но фон карточки остаётся плотным, без свечения по всей площади. */
+.ai-action {
+  position: relative;
+  display: block;
+  padding: 1px;
+  border-radius: 14px;
+  text-decoration: none;
+  color: var(--text);
+  overflow: hidden;
+  isolation: isolate;
+  background: linear-gradient(var(--surface), var(--surface)) padding-box,
+    conic-gradient(
+      from var(--ai-angle, 0deg),
+      transparent 0deg,
+      rgba(185, 152, 94, 0.75) 60deg,
+      rgba(201, 203, 209, 0.45) 130deg,
+      transparent 200deg,
+      transparent 360deg
+    ) border-box;
+  border: 1px solid transparent;
+  animation: ai-spin 6s linear infinite;
+  transition: transform 0.25s var(--ease);
+}
+
+@property --ai-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes ai-spin {
+  to { --ai-angle: 360deg; }
+}
+
+.ai-action:hover {
+  transform: translateY(-2px);
+}
+
+/* Мягкое пятно под курсором — появляется только на наведении. */
+.ai-action__glow {
+  position: absolute;
+  inset: -40%;
+  background: radial-gradient(circle at 30% 30%, rgba(185, 152, 94, 0.22), transparent 60%);
+  opacity: 0;
+  transition: opacity 0.35s var(--ease);
+  pointer-events: none;
+}
+
+.ai-action:hover .ai-action__glow {
+  opacity: 1;
+}
+
+.ai-action__body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 1.05rem 1.15rem;
+  border-radius: 13px;
+  background: rgba(19, 19, 22, 0.92);
+  backdrop-filter: blur(10px);
+}
+
+.ai-action__icon {
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  border: 1px solid rgba(185, 152, 94, 0.3);
+  background: rgba(185, 152, 94, 0.09);
+  color: var(--gold-bright);
+}
+
+.ai-action__icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Иконка «искры» медленно поворачивается — намёк на генерацию. */
+.ai-action:hover .ai-action__icon svg {
+  animation: ai-pulse 1.6s var(--ease) infinite;
+}
+
+@keyframes ai-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+}
+
+.ai-action__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.ai-action__text strong {
+  font-family: var(--font-display);
+  font-size: 0.86rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.ai-action__text small {
+  font-size: 0.75rem;
+  color: var(--text-faint);
+  line-height: 1.35;
+}
+
+.ai-action__arrow {
+  color: var(--gold);
+  opacity: 0;
+  transform: translateX(-6px);
+  transition: opacity 0.25s var(--ease), transform 0.25s var(--ease);
+}
+
+.ai-action:hover .ai-action__arrow {
+  opacity: 1;
+  transform: none;
+}
+
+/* В Safari и старых движках @property нет — там просто статичная рамка. */
+@supports not (background: conic-gradient(from 0deg, red, blue)) {
+  .ai-action {
+    background: var(--surface);
+    border-color: rgba(185, 152, 94, 0.35);
+    animation: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-action,
+  .ai-action:hover .ai-action__icon svg {
+    animation: none;
+  }
+}
+
 /* ---------- Чат с тренером ---------- */
 
 .chat-page {
