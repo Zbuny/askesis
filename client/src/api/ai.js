@@ -67,6 +67,25 @@ export function planFromChat({ messages, exercises }) {
   return requestPlan({ conversation: messages }, exercises, null)
 }
 
+export async function scanFood(imageDataUrl) {
+  if (!WORKER_URL) {
+    throw new Error('ИИ-помощник не настроен: пропишите VITE_AI_WORKER_URL в client/.env (см. worker/README.md)')
+  }
+  const user = auth.currentUser
+  if (!user) throw new Error('Требуется авторизация')
+
+  const token = await user.getIdToken()
+  const response = await fetch(`${WORKER_URL.replace(/\/$/, '')}/food`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ image: imageDataUrl }),
+  })
+
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(data.error || `Ошибка ${response.status}`)
+  return data
+}
+
 export async function askTrainer(messages, context) {
   if (!WORKER_URL) {
     throw new Error('ИИ-помощник не настроен: пропишите VITE_AI_WORKER_URL в client/.env (см. worker/README.md)')

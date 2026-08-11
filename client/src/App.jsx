@@ -22,6 +22,7 @@ const WorkoutBuilder = lazy(() => import('./pages/WorkoutBuilder.jsx'))
 const AiWorkoutBuilder = lazy(() => import('./pages/AiWorkoutBuilder.jsx'))
 const WorkoutDetail = lazy(() => import('./pages/WorkoutDetail.jsx'))
 const TrainerChat = lazy(() => import('./pages/TrainerChat.jsx'))
+const FoodScanner = lazy(() => import('./pages/FoodScanner.jsx'))
 const AdminHome = lazy(() => import('./pages/admin/AdminHome.jsx'))
 const AdminExercises = lazy(() => import('./pages/admin/AdminExercises.jsx'))
 const AdminPrograms = lazy(() => import('./pages/admin/AdminPrograms.jsx'))
@@ -128,6 +129,14 @@ export default function App() {
                 element={
                   <ProtectedRoute>
                     <WorkoutBuilder />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/nutrition"
+                element={
+                  <ProtectedRoute>
+                    <FoodScanner />
                   </ProtectedRoute>
                 }
               />

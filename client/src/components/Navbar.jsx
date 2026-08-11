@@ -66,6 +66,7 @@ export default function Navbar() {
         {user ? (
           <>
             <NavLink to="/workouts" onClick={closeMenu}>Мои тренировки</NavLink>
+            <NavLink to="/nutrition" onClick={closeMenu}>Питание</NavLink>
             <NavLink to="/profile" onClick={closeMenu}>Профиль</NavLink>
             {isAdmin && <NavLink to="/admin" onClick={closeMenu}>Админка</NavLink>}
             <button onClick={() => { logout(); closeMenu() }}>Выйти</button>
