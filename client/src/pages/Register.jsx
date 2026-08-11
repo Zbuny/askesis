@@ -91,14 +91,15 @@ export default function Register() {
               <input
                 type="checkbox"
                 checked={consent}
-                onChange={(e) => setConsent(e.target.checked)}
+                onChange={(e) => {
+                  setConsent(e.target.checked)
+                  // Иначе упрёк «отметьте согласие» висит уже после того,
+                  // как человек его отметил.
+                  if (e.target.checked) setError(null)
+                }}
                 required
               />
-              <span>
-                Я согласен на обработку персональных данных: роста, веса, возраста, уровня подготовки,
-                а также тренировок и их истории. Они нужны, чтобы считать нагрузку и прогресс, видны
-                только мне и удаляются вместе с аккаунтом.
-              </span>
+              <span>Я согласен на обработку персональных данных</span>
             </label>
 
             <button type="submit" className="auth-card__submit" disabled={submitting}>
