@@ -4,6 +4,8 @@ import { exerciseName } from '../../utils/translate.js'
 import { formatReps, programItems } from '../../utils/programItems.js'
 import { useAsyncAction } from '../../hooks/useAsyncAction.js'
 import ExercisePicker from '../../components/ExercisePicker.jsx'
+import ConfirmDialog from '../../components/ConfirmDialog.jsx'
+import { useConfirm } from '../../hooks/useConfirm.js'
 import { planFromChat } from '../../api/ai.js'
 
 const emptyForm = { id: null, title: '', level: '', duration: '', description: '', recommended: false, items: [] }
@@ -13,6 +15,7 @@ export default function AdminPrograms() {
   const [exercises, setExercises] = useState([])
   const [form, setForm] = useState(emptyForm)
   const { busy: saving, error, setError, run } = useAsyncAction()
+  const { ask, confirmProps } = useConfirm()
   const [rawPlan, setRawPlan] = useState('')
   const { busy: parsing, error: parseError, run: runParse } = useAsyncAction()
   const [parsed, setParsed] = useState(null)
@@ -113,7 +116,11 @@ export default function AdminPrograms() {
   }
 
   async function handleDelete(id, title) {
-    if (!window.confirm(`Удалить программу «${title}»? Это действие необратимо.`)) return
+    const confirmed = await ask({
+      title: 'Удалить программу?',
+      message: `«${title}» исчезнет из каталога у всех пользователей. Тренировки, начатые из неё, останутся.`,
+    })
+    if (!confirmed) return
     try {
       await run(() => api.deleteProgram({ id }))
       load()
@@ -276,6 +283,8 @@ export default function AdminPrograms() {
           </li>
         ))}
       </ul>
+
+      <ConfirmDialog {...confirmProps} />
     </section>
   )
 }

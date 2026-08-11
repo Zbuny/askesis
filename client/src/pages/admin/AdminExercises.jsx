@@ -3,6 +3,8 @@ import { api } from '../../api/firestore.js'
 import { useAsyncAction } from '../../hooks/useAsyncAction.js'
 import { emptyFilters, filterExercises } from '../../utils/exerciseFilters.js'
 import ExerciseFilterBar from '../../components/ExerciseFilterBar.jsx'
+import ConfirmDialog from '../../components/ConfirmDialog.jsx'
+import { useConfirm } from '../../hooks/useConfirm.js'
 
 const emptyForm = { id: null, name: '', muscleGroup: '', equipment: '', instructions: '', imageUrl: '' }
 const PAGE_SIZE = 40
@@ -11,6 +13,7 @@ export default function AdminExercises() {
   const [exercises, setExercises] = useState([])
   const [form, setForm] = useState(emptyForm)
   const { busy: saving, error, setError, run } = useAsyncAction()
+  const { ask, confirmProps } = useConfirm()
 
   const [filters, setFilters] = useState(emptyFilters)
   const filtered = useMemo(() => filterExercises(exercises, filters), [exercises, filters])
@@ -57,7 +60,11 @@ export default function AdminExercises() {
   }
 
   async function handleDelete(id, name) {
-    if (!window.confirm(`Удалить упражнение «${name}»? Это действие необратимо.`)) return
+    const confirmed = await ask({
+      title: 'Удалить упражнение?',
+      message: `«${name}» исчезнет из библиотеки у всех пользователей.`,
+    })
+    if (!confirmed) return
     try {
       await run(() => api.deleteExercise({ id }))
       load()
@@ -131,6 +138,8 @@ export default function AdminExercises() {
           Показать ещё ({filtered.length - visibleCount})
         </button>
       )}
+
+      <ConfirmDialog {...confirmProps} />
     </section>
   )
 }

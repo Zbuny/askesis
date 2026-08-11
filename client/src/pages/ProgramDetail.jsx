@@ -6,6 +6,8 @@ import { useAsyncAction } from '../hooks/useAsyncAction.js'
 import { exerciseName } from '../utils/translate.js'
 import { formatReps, programItems } from '../utils/programItems.js'
 import BackLink from '../components/BackLink.jsx'
+import ConfirmDialog from '../components/ConfirmDialog.jsx'
+import { useConfirm } from '../hooks/useConfirm.js'
 
 export default function ProgramDetail() {
   const { id } = useParams()
@@ -16,6 +18,7 @@ export default function ProgramDetail() {
   const [existingWorkout, setExistingWorkout] = useState(null)
   const [loadError, setLoadError] = useState(null)
   const { busy: starting, error: startError, run } = useAsyncAction()
+  const { ask, confirmProps } = useConfirm()
 
   useEffect(() => {
     const tasks = [api.getProgram({ id }), api.listExercises()]
@@ -33,9 +36,13 @@ export default function ProgramDetail() {
     // Уже есть личная тренировка из этой программы — не плодим копии молча,
     // даём выбор: открыть существующую или всё же завести ещё одну.
     if (existingWorkout) {
-      const openExisting = window.confirm(
-        `Вы уже начинали эту программу — тренировка «${existingWorkout.title}» уже есть. Открыть её?\n\nНажмите «Отмена», чтобы создать ещё одну.`,
-      )
+      const openExisting = await ask({
+        title: 'Вы уже начинали эту программу',
+        message: `Тренировка «${existingWorkout.title}» уже есть в вашем списке.`,
+        confirmLabel: 'Открыть её',
+        cancelLabel: 'Создать ещё одну',
+        danger: false,
+      })
       if (openExisting) {
         navigate(`/workouts/${existingWorkout.id}`)
         return
@@ -84,6 +91,8 @@ export default function ProgramDetail() {
           )
         })}
       </ul>
+
+      <ConfirmDialog {...confirmProps} />
     </section>
   )
 }

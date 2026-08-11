@@ -10,6 +10,8 @@ import { formatReps } from '../utils/programItems.js'
 import { formatTarget, nextSessionTarget } from '../utils/progression.js'
 import ExerciseAnimation from '../components/ExerciseAnimation.jsx'
 import BackLink from '../components/BackLink.jsx'
+import ConfirmDialog from '../components/ConfirmDialog.jsx'
+import { useConfirm } from '../hooks/useConfirm.js'
 
 const emptySet = () => ({ weight: '', reps: '' })
 const HISTORY_PAGE_SIZE = 10
@@ -33,6 +35,7 @@ export default function WorkoutDetail() {
   const [deletingWorkout, setDeletingWorkout] = useState(false)
   const [deletingSessionId, setDeletingSessionId] = useState(null)
   const { startedAt, elapsedSeconds, start, reset } = useWorkoutTimer(id)
+  const { ask, confirmProps } = useConfirm()
 
   function loadHistory() {
     return api
@@ -199,7 +202,11 @@ export default function WorkoutDetail() {
   }
 
   async function handleDelete() {
-    if (!window.confirm(`Удалить тренировку «${workout.title}»? Это действие необратимо.`)) return
+    const confirmed = await ask({
+      title: 'Удалить тренировку?',
+      message: `«${workout.title}» и её настройки будут удалены. Записи о выполнении останутся в истории.`,
+    })
+    if (!confirmed) return
     setDeletingWorkout(true)
     try {
       await api.deleteWorkout({ id })
@@ -211,7 +218,11 @@ export default function WorkoutDetail() {
   }
 
   async function handleDeleteSession(sessionId) {
-    if (!window.confirm('Удалить эту запись о выполнении? Это действие необратимо.')) return
+    const confirmed = await ask({
+      title: 'Удалить запись?',
+      message: 'Запись о выполнении исчезнет из истории и перестанет учитываться в прогрессе.',
+    })
+    if (!confirmed) return
     setDeletingSessionId(sessionId)
     try {
       await api.deleteWorkoutLog({ id: sessionId })
@@ -396,6 +407,8 @@ export default function WorkoutDetail() {
           {loadingMoreHistory ? 'Загружаем...' : 'Показать ещё'}
         </button>
       )}
+
+      <ConfirmDialog {...confirmProps} />
     </section>
   )
 }

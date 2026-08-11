@@ -5,6 +5,8 @@ import { resizeImageToDataUrl } from '../utils/image.js'
 import { useAsyncAction } from '../hooks/useAsyncAction.js'
 import { friendlyErrorMessage } from '../utils/errors.js'
 import BackLink from '../components/BackLink.jsx'
+import ConfirmDialog from '../components/ConfirmDialog.jsx'
+import { useConfirm } from '../hooks/useConfirm.js'
 
 const emptyEntry = { name: '', calories: '', protein: '', fat: '', carbs: '' }
 // С запасом на день с большим числом приёмов пищи — todayTotals ниже должен
@@ -28,6 +30,7 @@ export default function FoodScanner() {
   const [entry, setEntry] = useState(null)
   const { busy: saving, error, setError, run } = useAsyncAction()
   const [deletingId, setDeletingId] = useState(null)
+  const { ask, confirmProps } = useConfirm()
   const [history, setHistory] = useState([])
   const [hasMoreHistory, setHasMoreHistory] = useState(false)
   const [loadingMoreHistory, setLoadingMoreHistory] = useState(false)
@@ -115,7 +118,11 @@ export default function FoodScanner() {
   }
 
   async function handleDelete(id) {
-    if (!window.confirm('Удалить эту запись о еде? Это действие необратимо.')) return
+    const confirmed = await ask({
+      title: 'Удалить запись?',
+      message: 'Блюдо перестанет учитываться в дневном итоге КБЖУ.',
+    })
+    if (!confirmed) return
     setDeletingId(id)
     try {
       await api.deleteFoodLog({ id })
@@ -249,6 +256,8 @@ export default function FoodScanner() {
           {loadingMoreHistory ? 'Загружаем...' : 'Показать ещё'}
         </button>
       )}
+
+      <ConfirmDialog {...confirmProps} />
     </section>
   )
 }

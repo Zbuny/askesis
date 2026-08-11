@@ -5,6 +5,8 @@ import { useAsyncAction } from '../hooks/useAsyncAction.js'
 import { friendlyErrorMessage } from '../utils/errors.js'
 import ProgressChart from '../components/ProgressChart.jsx'
 import TrainingCalendar from '../components/TrainingCalendar.jsx'
+import ConfirmDialog from '../components/ConfirmDialog.jsx'
+import { useConfirm } from '../hooks/useConfirm.js'
 import { pluralRu } from '../utils/translate.js'
 import { entryTopWeight, sessionVolume } from '../utils/workoutLog.js'
 import { calcBmi } from '../utils/bmi.js'
@@ -26,6 +28,7 @@ export default function Profile() {
   const [weightHistory, setWeightHistory] = useState([])
   const [weightEntry, setWeightEntry] = useState({ weight: '', date: todayStr() })
   const [deletingWeightId, setDeletingWeightId] = useState(null)
+  const { ask, confirmProps } = useConfirm()
 
   useEffect(() => {
     api.listWorkoutHistory({}).then(setHistory).catch((e) => setError(e.message))
@@ -169,7 +172,11 @@ export default function Profile() {
   }
 
   async function handleDeleteWeight(id) {
-    if (!window.confirm('Удалить эту запись веса? Это действие необратимо.')) return
+    const confirmed = await ask({
+      title: 'Удалить запись веса?',
+      message: 'Точка исчезнет с графика и из расчёта ИМТ.',
+    })
+    if (!confirmed) return
     setDeletingWeightId(id)
     try {
       await api.deleteWeightLog({ id })
@@ -395,6 +402,8 @@ export default function Profile() {
           ))}
         </div>
       </div>
+
+      <ConfirmDialog {...confirmProps} />
     </section>
   )
 }
