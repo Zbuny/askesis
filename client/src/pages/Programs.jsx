@@ -1,19 +1,9 @@
-import { useEffect, useState } from 'react'
 import { api } from '../api/firestore.js'
+import { useAsyncData } from '../hooks/useAsyncData.js'
 import ProgramCard from '../components/ProgramCard.jsx'
 
 export default function Programs() {
-  const [programs, setPrograms] = useState([])
-  const [error, setError] = useState(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    api
-      .listPrograms()
-      .then(setPrograms)
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false))
-  }, [])
+  const { data: programs, loading, error } = useAsyncData(api.listPrograms, [])
 
   if (error) return <p>Не удалось загрузить программы: {error}</p>
   if (loading) return <p>Загрузка...</p>

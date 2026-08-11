@@ -1,35 +1,38 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useAsyncAction } from '../hooks/useAsyncAction.js'
+import { friendlyErrorMessage } from '../utils/errors.js'
 
 export default function Login() {
   const { login, loginWithGoogle, resetPassword } = useAuth()
   const navigate = useNavigate()
+  // Адрес, с которого ProtectedRoute отправил сюда. Прямой заход на /login
+  // состояния не несёт — тогда как раньше уводим в профиль.
+  const redirectTo = useLocation().state?.from || '/profile'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState(null)
+  const { busy: submitting, error, setError, run } = useAsyncAction()
   const [showReset, setShowReset] = useState(false)
   const [resetSent, setResetSent] = useState(false)
   const [resetting, setResetting] = useState(false)
 
   async function handleSubmit(e) {
     e.preventDefault()
-    setError(null)
     try {
-      await login(email, password)
-      navigate('/profile')
-    } catch (err) {
-      setError(err.message)
+      await run(() => login(email, password))
+      navigate(redirectTo, { replace: true })
+    } catch {
+      // ошибка уже показана ниже через error
     }
   }
 
   async function handleGoogle() {
-    setError(null)
     try {
-      await loginWithGoogle()
-      navigate('/profile')
-    } catch (err) {
-      setError(err.message)
+      await run(() => loginWithGoogle())
+      navigate(redirectTo, { replace: true })
+    } catch {
+      // ошибка уже показана ниже через error
     }
   }
 
@@ -46,7 +49,7 @@ export default function Login() {
       await resetPassword(email)
       setResetSent(true)
     } catch (err) {
-      setError(err.message)
+      setError(friendlyErrorMessage(err))
     } finally {
       setResetting(false)
     }
@@ -73,7 +76,9 @@ export default function Login() {
               <span>Пароль</span>
               <input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
             </label>
-            <button type="submit" className="auth-card__submit">Войти</button>
+            <button type="submit" className="auth-card__submit" disabled={submitting}>
+              {submitting ? 'Входим...' : 'Войти'}
+            </button>
           </form>
 
           <p className="auth-card__footer">
@@ -105,7 +110,7 @@ export default function Login() {
 
           <div className="auth-card__divider"><span>или</span></div>
 
-          <button type="button" className="auth-card__google" onClick={handleGoogle}>
+          <button type="button" className="auth-card__google" onClick={handleGoogle} disabled={submitting}>
             Войти через Google
           </button>
 

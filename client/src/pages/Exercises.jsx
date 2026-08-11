@@ -1,27 +1,19 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/firestore.js'
+import { useAsyncData } from '../hooks/useAsyncData.js'
 import { exerciseName, translateEquipment, translateMuscle } from '../utils/translate.js'
 import { emptyFilters, filterExercises } from '../utils/exerciseFilters.js'
 import ExerciseFilterBar from '../components/ExerciseFilterBar.jsx'
 import ExerciseAnimation from '../components/ExerciseAnimation.jsx'
 
 export default function Exercises() {
-  const [exercises, setExercises] = useState([])
-  const [error, setError] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const { data, loading, error } = useAsyncData(api.listExercises, [])
+  const exercises = data || []
   const [filters, setFilters] = useState(emptyFilters)
   // В сетке крутим кадры только у карточки под курсором — иначе сотни
   // одновременных таймеров и предзагрузок вторых кадров.
   const [hoveredId, setHoveredId] = useState(null)
-
-  useEffect(() => {
-    api
-      .listExercises()
-      .then(setExercises)
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false))
-  }, [])
 
   const filtered = useMemo(() => filterExercises(exercises, filters), [exercises, filters])
 

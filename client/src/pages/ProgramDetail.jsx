@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api/firestore.js'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useAsyncAction } from '../hooks/useAsyncAction.js'
 import { exerciseName } from '../utils/translate.js'
 import { formatReps, programItems } from '../utils/programItems.js'
 import BackLink from '../components/BackLink.jsx'
@@ -12,31 +13,43 @@ export default function ProgramDetail() {
   const { user } = useAuth()
   const [program, setProgram] = useState(null)
   const [exercises, setExercises] = useState([])
-  const [error, setError] = useState(null)
-  const [starting, setStarting] = useState(false)
+  const [existingWorkout, setExistingWorkout] = useState(null)
+  const [loadError, setLoadError] = useState(null)
+  const { busy: starting, error: startError, run } = useAsyncAction()
 
   useEffect(() => {
-    Promise.all([api.getProgram({ id }), api.listExercises()])
-      .then(([programData, exerciseList]) => {
+    const tasks = [api.getProgram({ id }), api.listExercises()]
+    if (user) tasks.push(api.findWorkoutFromProgram({ programId: id }))
+    Promise.all(tasks)
+      .then(([programData, exerciseList, workout]) => {
         setProgram(programData)
         setExercises(exerciseList)
+        setExistingWorkout(workout || null)
       })
-      .catch((e) => setError(e.message))
-  }, [id])
+      .catch((e) => setLoadError(e.message))
+  }, [id, user])
 
   async function handleStart() {
-    setError(null)
-    setStarting(true)
+    // Уже есть личная тренировка из этой программы — не плодим копии молча,
+    // даём выбор: открыть существующую или всё же завести ещё одну.
+    if (existingWorkout) {
+      const openExisting = window.confirm(
+        `Вы уже начинали эту программу — тренировка «${existingWorkout.title}» уже есть. Открыть её?\n\nНажмите «Отмена», чтобы создать ещё одну.`,
+      )
+      if (openExisting) {
+        navigate(`/workouts/${existingWorkout.id}`)
+        return
+      }
+    }
     try {
-      const result = await api.startProgram({ programId: id })
+      const result = await run(() => api.startProgram({ programId: id }))
       navigate(`/workouts/${result.id}`)
-    } catch (err) {
-      setError(err.message)
-      setStarting(false)
+    } catch {
+      // ошибка уже показана ниже через startError
     }
   }
 
-  if (error) return <p>Ошибка: {error}</p>
+  if (loadError) return <p>Ошибка: {loadError}</p>
   if (!program) return <p>Загрузка...</p>
 
   const exerciseById = new Map(exercises.map((ex) => [ex.id, ex]))
@@ -51,12 +64,12 @@ export default function ProgramDetail() {
 
       {user ? (
         <button type="button" className="button" onClick={handleStart} disabled={starting || items.length === 0}>
-          {starting ? 'Создаём тренировку...' : 'Начать программу'}
+          {starting ? 'Создаём тренировку...' : existingWorkout ? 'Открыть или начать заново' : 'Начать программу'}
         </button>
       ) : (
         <p><Link to="/login">Войдите</Link>, чтобы начать эту программу.</p>
       )}
-      {error && <p className="error">{error}</p>}
+      {startError && <p className="error">{startError}</p>}
 
       <ul className="program-exercise-list">
         {items.map((item) => {

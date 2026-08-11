@@ -1,19 +1,11 @@
-import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/firestore.js'
+import { useAsyncData } from '../hooks/useAsyncData.js'
+import TiltCard from '../components/TiltCard.jsx'
+import { pluralRu } from '../utils/translate.js'
 
 export default function Workouts() {
-  const [workouts, setWorkouts] = useState([])
-  const [error, setError] = useState(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    api
-      .listMyWorkouts()
-      .then(setWorkouts)
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false))
-  }, [])
+  const { data: workouts, loading, error } = useAsyncData(api.listMyWorkouts, [])
 
   if (error) return <p>Ошибка: {error}</p>
   if (loading) return <p>Загрузка...</p>
@@ -63,14 +55,17 @@ export default function Workouts() {
 
       {workouts.length === 0 && <p>Пока нет ни одной тренировки.</p>}
 
-      <ul className="admin-list">
-        {workouts.map((w) => (
-          <li key={w.id}>
-            <Link to={`/workouts/${w.id}`}>{w.title}</Link>
-            <span>{w.items?.length || 0} упражнений</span>
-          </li>
-        ))}
-      </ul>
+      <div className="program-grid">
+        {workouts.map((w) => {
+          const count = w.items?.length || 0
+          return (
+            <TiltCard as={Link} to={`/workouts/${w.id}`} className="program-card" key={w.id}>
+              <h3>{w.title}</h3>
+              <p>{count} {pluralRu(count, 'упражнение', 'упражнения', 'упражнений')}</p>
+            </TiltCard>
+          )
+        })}
+      </div>
     </section>
   )
 }
