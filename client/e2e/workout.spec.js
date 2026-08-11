@@ -8,21 +8,20 @@ test('сборка тренировки, лог выполнения и стат
   await page.goto('/workouts/new')
   await page.getByPlaceholder('Название тренировки').fill('E2E Тестовая тренировка')
 
-  await page.getByPlaceholder('Поиск упражнения...').fill('Push-Up')
-  await page.locator('.admin-list li', { hasText: 'Push-Up' }).first().getByRole('button', { name: 'Добавить' }).click()
+  await page.getByPlaceholder('Поиск по названию или группе мышц...').fill('Отжимания')
+  await page.locator('.picker__item').first().getByRole('button', { name: 'Добавить' }).click()
   await expect(page.getByText('Выбрано (1)')).toBeVisible()
 
   await page.getByRole('button', { name: 'Сохранить тренировку' }).click()
   await page.waitForURL(/\/workouts\/[^/]+$/)
 
-  const weightInput = page.locator('input[placeholder="кг"]').first()
-  const repsInput = page.locator('input[placeholder="повт."]').first()
-  await weightInput.fill('20')
-  await repsInput.fill('12')
+  const firstSet = page.locator('.log-set').first()
+  await firstSet.locator('input').nth(0).fill('20')
+  await firstSet.locator('input').nth(1).fill('12')
   await page.getByRole('button', { name: 'Записать сегодняшнюю тренировку' }).click()
 
-  await expect(page.getByText(/20 кг × 12/)).toBeVisible({ timeout: 10000 })
+  await expect(page.getByText(/20×12/)).toBeVisible({ timeout: 10000 })
 
   await page.goto('/profile')
-  await expect(page.locator('.stat-card').first().locator('strong')).toHaveText('1', { timeout: 10000 })
+  await expect(page.locator('.stat-card').first().locator('strong')).toHaveText('240', { timeout: 10000 })
 })

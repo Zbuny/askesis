@@ -15,6 +15,9 @@ test('админ может создать и удалить упражнени�
   const row = page.locator('.admin-list li', { hasText: uniqueName })
   await expect(row).toBeVisible({ timeout: 10000 })
 
+  // Удаление упражнения спрашивает подтверждение через window.confirm — без
+  // обработчика Playwright сам отклоняет нативный диалог.
+  page.once('dialog', (dialog) => dialog.accept())
   await row.getByRole('button', { name: 'Удалить' }).click()
   await expect(row).not.toBeVisible({ timeout: 15000 })
 })
