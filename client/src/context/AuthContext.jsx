@@ -9,12 +9,18 @@ import {
   signOut as firebaseSignOut,
   sendPasswordResetEmail,
 } from 'firebase/auth'
-import { doc, getDoc } from 'firebase/firestore'
-import { auth, db } from '../firebase.js'
+import { auth } from '../firebase.js'
 
 const AuthContext = createContext(null)
 
+// Провайдер монтируется на каждой странице, включая главную и вход, где
+// Firestore не нужен. Статический импорт затащил бы его SDK в стартовый
+// бандл, поэтому тянем модуль динамически — только когда есть кого проверять.
 async function checkIsAdmin(uid) {
+  const [{ doc, getDoc }, { db }] = await Promise.all([
+    import('firebase/firestore'),
+    import('../db.js'),
+  ])
   const snap = await getDoc(doc(db, 'settings', 'admins'))
   return snap.exists() && (snap.data().uids || []).includes(uid)
 }
