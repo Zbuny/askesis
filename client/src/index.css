@@ -4797,3 +4797,109 @@ button.calendar__cell {
 .dashboard__section-head a:hover {
   color: var(--gold-bright);
 }
+
+/* ---------- Bottom navigation (mobile) ---------- */
+
+/* На десктопе панели нет: там шапка со всеми разделами и мышь. */
+.bottom-nav,
+.bottom-sheet {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .bottom-nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    align-items: center;
+    background: rgba(8, 8, 10, 0.94);
+    backdrop-filter: blur(16px) saturate(140%);
+    border-top: 1px solid var(--border);
+    /* Жест «домой» на iPhone занимает полосу внизу — поднимаем панель над
+       ней, иначе нижний ряд кнопок физически не нажать. */
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  :root[data-theme='light'] .bottom-nav {
+    background: rgba(245, 244, 240, 0.95);
+  }
+
+  .bottom-nav__item {
+    display: grid;
+    justify-items: center;
+    gap: 0.2rem;
+    /* 56px — нижняя граница уверенного попадания пальцем. */
+    min-height: 56px;
+    padding: 0.5rem 0.25rem;
+    color: var(--text-faint);
+    font-size: 0.62rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    text-decoration: none;
+  }
+
+  .bottom-nav__item svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .bottom-nav__item.active {
+    color: var(--gold-bright);
+  }
+
+  .bottom-nav__action {
+    justify-self: center;
+    width: 52px;
+    height: 52px;
+    margin-top: -18px;
+    border: 0;
+    border-radius: 50%;
+    background: var(--gold);
+    color: var(--accent-contrast);
+    font-size: 1.6rem;
+    line-height: 1;
+    box-shadow: 0 10px 24px -10px rgba(185, 152, 94, 0.9);
+    transition: transform 0.2s var(--ease);
+  }
+
+  .bottom-nav__action.is-open {
+    transform: rotate(45deg);
+  }
+
+  .bottom-sheet {
+    position: fixed;
+    left: 0.75rem;
+    right: 0.75rem;
+    bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+    z-index: 31;
+    display: grid;
+    gap: 0.4rem;
+    padding: 0.6rem;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    box-shadow: 0 24px 60px -24px rgba(0, 0, 0, 0.8);
+  }
+
+  .bottom-sheet button {
+    width: 100%;
+    padding: 0.9rem 1rem;
+    text-align: left;
+  }
+
+  /* Панель перекрывает низ страницы — освобождаем под неё место, иначе
+     последний блок и подвал оказываются под ней. */
+  .app {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bottom-nav__action {
+    transition: none;
+  }
+}

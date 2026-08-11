@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import Navbar from './components/Navbar.jsx'
 import Footer from './components/Footer.jsx'
+import BottomNav from './components/BottomNav.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import AdminRoute from './components/AdminRoute.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
@@ -188,6 +189,7 @@ export default function App() {
         </ErrorBoundary>
       </main>
       <Footer />
+      <BottomNav />
     </div>
   )
 }
