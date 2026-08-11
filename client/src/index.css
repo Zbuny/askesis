@@ -1411,6 +1411,28 @@ textarea:focus-visible {
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.3) inset, 0 20px 40px -14px rgba(185, 152, 94, 0.6);
 }
 
+/* Согласие на обработку персональных данных при регистрации. */
+.consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  margin-top: 1.1rem;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  text-align: left;
+  cursor: pointer;
+}
+
+.consent input {
+  flex: none;
+  width: 1.05rem;
+  height: 1.05rem;
+  margin-top: 0.12rem;
+  accent-color: var(--gold-bright);
+  cursor: pointer;
+}
+
 .auth-card__divider {
   display: flex;
   align-items: center;

@@ -1,33 +1,64 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useAsyncAction } from '../hooks/useAsyncAction.js'
 
 export default function Register() {
   const { register, loginWithGoogle } = useAuth()
   const navigate = useNavigate()
+  // См. Login.jsx: возвращаем туда, откуда человека увели на авторизацию.
+  const redirectTo = useLocation().state?.from || '/profile'
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState(null)
+  const [consent, setConsent] = useState(false)
+  const { busy: submitting, error, setError, run } = useAsyncAction()
+
+  // Отметку о согласии ставим один раз и только если её ещё нет: через
+  // «Войти через Google» на эту страницу заходит и тот, кто регистрировался
+  // раньше, — его исходную дату затирать нельзя.
+  // Firestore тянем динамически: страница входа не должна тащить его SDK
+  // в стартовый бандл (см. AuthContext).
+  async function recordConsent() {
+    try {
+      const { api } = await import('../api/firestore.js')
+      const profile = await api.getMyProfileData()
+      if (profile.dataConsentAt) return
+      await api.updateMyProfileData({ dataConsentAt: new Date().toISOString() })
+    } catch {
+      // Аккаунт уже создан, и галочку человек поставил — не ломаем вход
+      // из-за неудачной записи отметки.
+    }
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
-    setError(null)
     try {
-      await register(name, email, password)
-      navigate('/profile')
-    } catch (err) {
-      setError(err.message)
+      await run(async () => {
+        await register(name, email, password)
+        await recordConsent()
+      })
+      navigate(redirectTo, { replace: true })
+    } catch {
+      // ошибка уже показана ниже через error
     }
   }
 
   async function handleGoogle() {
-    setError(null)
+    // Кнопка Google живёт вне формы, поэтому required у чекбокса её не
+    // прикрывает — проверяем согласие сами.
+    if (!consent) {
+      setError('Отметьте согласие на обработку персональных данных')
+      return
+    }
     try {
-      await loginWithGoogle()
-      navigate('/profile')
-    } catch (err) {
-      setError(err.message)
+      await run(async () => {
+        await loginWithGoogle()
+        await recordConsent()
+      })
+      navigate(redirectTo, { replace: true })
+    } catch {
+      // ошибка уже показана ниже через error
     }
   }
 
@@ -56,12 +87,28 @@ export default function Register() {
               <span>Пароль</span>
               <input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
             </label>
-            <button type="submit" className="auth-card__submit">Создать аккаунт</button>
+            <label className="consent">
+              <input
+                type="checkbox"
+                checked={consent}
+                onChange={(e) => setConsent(e.target.checked)}
+                required
+              />
+              <span>
+                Я согласен на обработку персональных данных: роста, веса, возраста, уровня подготовки,
+                а также тренировок и их истории. Они нужны, чтобы считать нагрузку и прогресс, видны
+                только мне и удаляются вместе с аккаунтом.
+              </span>
+            </label>
+
+            <button type="submit" className="auth-card__submit" disabled={submitting}>
+              {submitting ? 'Создаём...' : 'Создать аккаунт'}
+            </button>
           </form>
 
           <div className="auth-card__divider"><span>или</span></div>
 
-          <button type="button" className="auth-card__google" onClick={handleGoogle}>
+          <button type="button" className="auth-card__google" onClick={handleGoogle} disabled={submitting}>
             Войти через Google
           </button>
 
