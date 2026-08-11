@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "dev:emulator": "vite --mode emulator --port 5174"
   },
   "dependencies": {
     "firebase": "^11.0.2",

@@ -2,14 +2,19 @@ export function uniqueEmail(prefix) {
   return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 10000)}@example.com`
 }
 
-export const ADMIN_EMAIL = 'test-askesis2@example.com'
+// Аккаунты живут в эмуляторе и создаются заново при каждом прогоне
+// (scripts/seedEmulator.js). Пароль в открытом виде здесь ничего не
+// открывает: за пределами этой машины таких пользователей не существует.
+export const ADMIN_EMAIL = 'admin@askesis.test'
 export const ADMIN_PASSWORD = 'password123'
 
-// Тесты идут против боевого Firebase, а не эмулятора: вход и регистрация
-// упираются в сеть, и при прогоне всей пачки подряд ответ изредка приходит
-// дольше стандартных 30 секунд. Держим отдельный запас здесь, чтобы
-// случайная задержка сети не выглядела как падение сценария.
-const AUTH_TIMEOUT = 60_000
+export const USER_EMAIL = 'user@askesis.test'
+export const USER_PASSWORD = 'password123'
+
+// Вход идёт в эмулятор Auth и обычно занимает доли секунды, но на холодном
+// старте в CI первый запрос ждёт, пока эмулятор прогреется. Запас взят с
+// расчётом на это, а не на сеть.
+const AUTH_TIMEOUT = 30_000
 
 export async function register(page, { name, email, password }) {
   await page.goto('/register')

@@ -1,12 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { login, ADMIN_EMAIL, ADMIN_PASSWORD } from './helpers.js'
 
-// Тестовый аккаунт намеренно лишён прав администратора (см. коммит
-// «revokeAdmin.js — отзыв прав по email; убран тестовый аккаунт из
-// админов»), поэтому сценарий больше не на чем прогнать: для него нужен
-// живой админ, а держать такого в общедоступном репозитории незачем.
-// Проверка админских правил осталась в firestore-tests/rules.test.js.
-test.skip('админ может создать и удалить упражнение через админку', async ({ page }) => {
+test('админ может создать и удалить упражнение через админку', async ({ page }) => {
   await login(page, { email: ADMIN_EMAIL, password: ADMIN_PASSWORD })
   await expect(page.getByRole('link', { name: 'Админка' })).toBeVisible()
 
