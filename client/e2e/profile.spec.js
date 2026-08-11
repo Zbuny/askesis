@@ -35,9 +35,10 @@ test('запись веса и история веса в профиле', async
   await page.reload()
   await expect(page.locator('.history-list').getByText('82 кг')).toBeVisible({ timeout: 20000 })
 
-  // Удаление веса спрашивает подтверждение через window.confirm — без
-  // обработчика Playwright сам отклоняет нативный диалог.
-  page.once('dialog', (dialog) => dialog.accept())
-  await page.getByRole('button', { name: 'Удалить' }).click()
+  // Подтверждение удаления — свой диалог, а не window.confirm: нажимаем
+  // кнопку внутри него.
+  await page.getByRole('button', { name: 'Удалить' }).first().click()
+  await expect(page.getByRole('heading', { name: 'Удалить запись веса?' })).toBeVisible()
+  await page.locator('.confirm').getByRole('button', { name: 'Удалить' }).click()
   await expect(page.locator('.history-list')).toHaveCount(0, { timeout: 10000 })
 })

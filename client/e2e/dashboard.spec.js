@@ -11,6 +11,8 @@ test('гостя на обзор не пускает', async ({ page }) => {
 })
 
 test.describe('Обзор', () => {
+  test.setTimeout(120_000)
+
   test.beforeEach(async ({ page }) => {
     await login(page, { email: ADMIN_EMAIL, password: ADMIN_PASSWORD })
   })

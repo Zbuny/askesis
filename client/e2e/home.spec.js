@@ -16,5 +16,8 @@ test('навигация по верхнему меню', async ({ page }) => {
   await page.goto('/')
   await page.locator('.navbar__links').getByRole('link', { name: 'Упражнения' }).click()
   await expect(page).toHaveURL(/\/exercises/)
-  await expect(page.getByRole('heading', { name: 'Библиотека упражнений' })).toBeVisible({ timeout: 10000 })
+  // Каталог — 873 документа, и на холодном кэше страница поднимается около
+  // пяти секунд. При прогоне всей пачки подряд бывает и дольше, поэтому
+  // запас здесь больше, чем кажется нужным на глаз.
+  await expect(page.getByRole('heading', { name: 'Библиотека упражнений' })).toBeVisible({ timeout: 30000 })
 })
