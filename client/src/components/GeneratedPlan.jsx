@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/firestore.js'
 import { exerciseName } from '../utils/translate.js'
+import { classifyReps } from '../utils/repRanges.js'
+import { itemReps } from '../utils/workoutAnalysis.js'
 
 // Разбор и сохранение программы, которую собрала модель. Используется и
 // пошаговым мастером, и чатом — сохранение должно вести себя одинаково.
@@ -93,9 +95,15 @@ export default function GeneratedPlan({ plan, exerciseById, heading = 'Ваша 
           <ul>
             {workout.items.map((item) => {
               const ex = exerciseById.get(item.exerciseId)
+              const zone = classifyReps(itemReps(item))
               return (
                 <li key={item.exerciseId}>
                   {ex ? exerciseName(ex) : item.exerciseId}
+                  {zone && (
+                    <span className={`rep-zone rep-zone--${zone.tone}`} title={zone.hint}>
+                      {zone.label}
+                    </span>
+                  )}
                   <small>{item.targetSets}×{item.targetReps}</small>
                 </li>
               )

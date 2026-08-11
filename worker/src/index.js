@@ -121,6 +121,19 @@ ${JSON.stringify(RESPONSE_SCHEMA)}
 Пример формы ответа:
 {"summary":"текст","workouts":[{"title":"День 1 — Верх тела","items":[{"exerciseId":"Barbell_Squat","targetSets":4,"targetReps":8}]}]}`
 
+// Единый свод правил по диапазонам повторений — по нему работают и мастер,
+// и чат. Та же модель посчитана на клиенте в client/src/utils/repRanges.js,
+// поэтому разбор нагрузки в конструкторе и совет ИИ не должны расходиться.
+const REP_RANGE_RULES = `Как выбирать повторения и подходы:
+- Рост мышц одинаков в окне 6-30 повторений при равном числе подходов, если подход доведён близко до отказа. Схема «3-6 на силу, 8-12 на массу, 15-20 на рельеф» верна лишь отчасти — опирайся на окно 6-30.
+- Всем, у кого уже есть опыт тренировок (уровень «Средний» или «Продвинутый»), по умолчанию ставь 6-8 повторений: мышцы растут так же, а вместе с ними растут силовые, и до отказа дойти всё ещё просто.
+- Начинающим ставь 8-15 повторений: пока техника не автоматическая, до отказа безопаснее доходить на умеренных весах.
+- 15-30 повторений назначай только при ограничениях (высокое давление, проблемы с сердцем, суставы, нет тяжёлых снарядов): рост тот же, но жжение останавливает раньше отказа.
+- Меньше 6 повторений — только под силовую цель и с бóльшим числом подходов: такой подход даёт меньше стимула (3 подхода по 10 ≈ 5 подходов по 3).
+- Больше 30 повторений не назначай: до отказа такой подход почти не доводят.
+- Держи 10-20 подходов на мышечную группу в неделю и не больше 12 подходов на группу за одну тренировку.
+- Прогрессия — двойная: человек набирает повторы до верхней границы диапазона с одним весом, и только когда все рабочие подходы сделаны на верхней границе, вес растёт (штанга +2.5 кг, крупные группы +5 кг, гантели +2 кг), а повторы возвращаются к нижней границе. Не советуй прибавлять вес по календарю.`
+
 function buildPrompt(profile, candidates) {
   const catalogue = candidates
     .map((ex) => `${ex.id} | ${ex.name} | ${ex.muscleGroup || '-'} | ${ex.equipment || '-'}`)
@@ -144,10 +157,12 @@ ${catalogue}
 - Составь ровно ${profile.daysPerWeek || 3} тренировок (не больше ${MAX_WORKOUTS}).
 - Используй ТОЛЬКО id из списка выше. Не придумывай новые id.
 - В каждой тренировке 4-7 упражнений, сбалансированных по группам мышц.
-- targetSets и targetReps подбирай под цель и уровень.
+- targetSets и targetReps подбирай по правилам ниже, с поправкой на цель и ограничения.
 - Если повторы заданы диапазоном («8-10»), укажи нижнюю границу в targetReps, верхнюю — в targetRepsMax.
 - Названия тренировок — на русском, коротко и по делу (например «День 1 — Верх тела»).
-- В summary на русском объясни логику программы в 2-3 предложениях.`
+- В summary на русском объясни логику программы в 2-3 предложениях, включая то, почему выбран такой диапазон повторений.
+
+${REP_RANGE_RULES}`
 }
 
 // Превращает свободный диалог в ту же задачу, что решает пошаговый мастер:
@@ -174,9 +189,12 @@ ${catalogue}
 - Используй ТОЛЬКО id из списка выше. Не придумывай новые id.
 - Если в диалоге упражнения названы иначе, подбери ближайшие по смыслу из списка.
 - Диапазон повторов («8-10») клади как targetReps=8 и targetRepsMax=10, сохраняя то, что указал человек.
+- Если про повторы в диалоге не договаривались — ставь их по правилам ниже.
 - Не больше ${MAX_WORKOUTS} тренировок, в каждой 4-7 упражнений.
 - Названия тренировок — на русском, коротко (например «День 1 — Верх тела»).
-- В summary на русском в 2-3 предложениях объясни, как программа отражает договорённости.`
+- В summary на русском в 2-3 предложениях объясни, как программа отражает договорённости.
+
+${REP_RANGE_RULES}`
 }
 
 function sanitizeCandidates(raw) {
@@ -219,7 +237,9 @@ const CHAT_SYSTEM_PROMPT = `Ты — тренер по силовой и общ�
 - Не ставишь диагнозы и не назначаешь лечение. При жалобах на боль — советуй обратиться к врачу.
 - Если пользователь прислал свою программу текстом, разбери её и предложи готовый вариант списком «упражнение — подходы×повторы»: ниже есть кнопка, которая сохранит разобранное в его тренировки.
 - Если приложены сохранённые тренировки или история весов — опирайся на них: предлагай конкретные веса и замены, а не общие слова.
-- Держись в пределах 250 слов, если не просят подробнее.`
+- Держись в пределах 250 слов, если не просят подробнее.
+
+${REP_RANGE_RULES}`
 
 const MAX_CHAT_MESSAGES = 20
 const MAX_CHAT_CHARS = 1500
@@ -305,6 +325,102 @@ async function handleChat(body, env, origin) {
   return json({ reply: reply.slice(0, 4000) }, 200, origin)
 }
 
+const FOOD_SCHEMA = {
+  type: 'object',
+  properties: {
+    name: { type: 'string' },
+    calories: { type: 'number' },
+    protein: { type: 'number' },
+    fat: { type: 'number' },
+    carbs: { type: 'number' },
+  },
+  required: ['name', 'calories', 'protein', 'fat', 'carbs'],
+}
+
+const FOOD_SYSTEM_PROMPT = `Ты — нутрициолог. Тебе присылают фото еды, а ты оцениваешь её примерный состав на глаз, как опытный специалист по питанию. Отвечай ТОЛЬКО валидным JSON без markdown-обёрток и пояснений, строго по схеме:
+${JSON.stringify(FOOD_SCHEMA)}
+
+Правила:
+- Оцени калорийность и БЖУ для ВСЕЙ порции, которая видна на фото целиком, а не на 100 грамм.
+- name — короткое название блюда на русском (например «Куриная грудка с рисом и овощами»).
+- calories — целое число в ккал, protein/fat/carbs — граммы, можно с одним знаком после запятой.
+- Если на фото несколько разных блюд или продуктов — просуммируй их в одну оценку.
+- Если еды на фото не видно совсем, всё равно верни JSON с name="Не удалось распознать еду" и нулевыми значениями.
+- Это грубая визуальная оценка, а не лабораторный анализ — не пиши оговорок в самом JSON, просто дай лучшую оценку.`
+
+// Не гоняем через воркер огромные фото: держим payload в разумных пределах
+// по стоимости токенов и по времени ответа модели.
+const MAX_IMAGE_CHARS = 3_000_000
+
+function sanitizeFoodEstimate(raw) {
+  const value = raw && typeof raw === 'object' ? raw : {}
+  const num = (v, max) => Math.min(Math.max(Number(v) || 0, 0), max)
+  return {
+    name: String(value.name || 'Блюдо').slice(0, 120),
+    calories: Math.round(num(value.calories, 5000)),
+    protein: Math.round(num(value.protein, 500) * 10) / 10,
+    fat: Math.round(num(value.fat, 500) * 10) / 10,
+    carbs: Math.round(num(value.carbs, 500) * 10) / 10,
+  }
+}
+
+async function handleFoodScan(body, env, origin) {
+  const image = typeof body.image === 'string' ? body.image : ''
+  if (!image.startsWith('data:image/')) {
+    return json({ error: 'Нужно фото еды' }, 400, origin)
+  }
+  if (image.length > MAX_IMAGE_CHARS) {
+    return json({ error: 'Фото слишком большое, попробуйте снимок поменьше' }, 400, origin)
+  }
+
+  const response = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${env.GROQ_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: env.GROQ_VISION_MODEL || 'qwen/qwen3.6-27b',
+      temperature: 0.2,
+      max_tokens: 600,
+      // Модель поддерживает режим рассуждений (thinking), но он съедает
+      // max_tokens ещё до JSON-ответа — для простой оценки КБЖУ он не нужен.
+      reasoning_effort: 'none',
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: FOOD_SYSTEM_PROMPT },
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'Оцени КБЖУ этого блюда.' },
+            { type: 'image_url', image_url: { url: image } },
+          ],
+        },
+      ],
+    }),
+  })
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '')
+    console.log('groq food error', response.status, detail.slice(0, 500))
+    const message = detail.slice(0, 400) || response.status
+    return json({ error: `Groq вернул ошибку ${response.status}: ${message}` }, 502, origin)
+  }
+
+  const data = await response.json()
+  const text = data?.choices?.[0]?.message?.content
+  if (!text) return json({ error: 'Пустой ответ модели' }, 502, origin)
+
+  let estimate
+  try {
+    estimate = JSON.parse(text)
+  } catch {
+    return json({ error: 'Модель вернула некорректный JSON' }, 502, origin)
+  }
+
+  return json(sanitizeFoodEstimate(estimate), 200, origin)
+}
+
 export default {
   async fetch(request, env) {
     const origin = request.headers.get('Origin') || ''
@@ -337,8 +453,12 @@ export default {
       return json({ error: 'Некорректный JSON' }, 400, origin)
     }
 
-    if (new URL(request.url).pathname === '/chat') {
+    const pathname = new URL(request.url).pathname
+    if (pathname === '/chat') {
       return handleChat(body, env, origin)
+    }
+    if (pathname === '/food') {
+      return handleFoodScan(body, env, origin)
     }
 
     const candidates = sanitizeCandidates(body.candidates)

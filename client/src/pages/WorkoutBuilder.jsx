@@ -1,26 +1,31 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api/firestore.js'
-import { exerciseName, translateEquipment, translateMuscle } from '../utils/translate.js'
-import { emptyFilters, filterExercises } from '../utils/exerciseFilters.js'
-import ExerciseFilterBar from '../components/ExerciseFilterBar.jsx'
+import { exerciseName } from '../utils/translate.js'
+import { useAsyncAction } from '../hooks/useAsyncAction.js'
+import ExercisePicker from '../components/ExercisePicker.jsx'
 import BackLink from '../components/BackLink.jsx'
 import ExerciseAnimation from '../components/ExerciseAnimation.jsx'
+import LoadAnalysis from '../components/LoadAnalysis.jsx'
+import { classifyReps } from '../utils/repRanges.js'
 
 export default function WorkoutBuilder() {
   const { id } = useParams()
   const isEdit = Boolean(id)
   const navigate = useNavigate()
   const [exercises, setExercises] = useState([])
-  const [filters, setFilters] = useState(emptyFilters)
   const [title, setTitle] = useState('')
   const [items, setItems] = useState([])
-  const [error, setError] = useState(null)
-  const [saving, setSaving] = useState(false)
+  const [loadError, setLoadError] = useState(null)
   const [loading, setLoading] = useState(isEdit)
+  const [level, setLevel] = useState('')
+  const { busy: saving, error, setError, run } = useAsyncAction()
 
   useEffect(() => {
-    api.listExercises().then(setExercises).catch((e) => setError(e.message))
+    api.listExercises().then(setExercises).catch((e) => setLoadError(e.message))
+    // Уровень нужен только для подсказки о диапазоне повторений — если его
+    // не удалось прочитать, конструктор всё равно должен работать.
+    api.getMyProfileData().then((data) => setLevel(data.level || '')).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -31,18 +36,12 @@ export default function WorkoutBuilder() {
         setTitle(w.title || '')
         setItems(w.items || [])
       })
-      .catch((e) => setError(e.message))
+      .catch((e) => setLoadError(e.message))
       .finally(() => setLoading(false))
   }, [id, isEdit])
 
-  const filtered = useMemo(() => filterExercises(exercises, filters), [exercises, filters])
-
   const exerciseById = useMemo(() => new Map(exercises.map((ex) => [ex.id, ex])), [exercises])
-
-  // Показываем список порциями: 873 карточки с картинками разом рисовать
-  // незачем, а при смене фильтра счётчик сбрасывается на первую порцию.
-  const [visibleCount, setVisibleCount] = useState(40)
-  useEffect(() => setVisibleCount(40), [filters])
+  const addedIds = useMemo(() => new Set(items.map((item) => item.exerciseId)), [items])
 
   function addExercise(ex) {
     if (items.some((item) => item.exerciseId === ex.id)) return
@@ -59,27 +58,24 @@ export default function WorkoutBuilder() {
 
   async function handleSubmit(e) {
     e.preventDefault()
-    setError(null)
     if (!title || items.length === 0) {
       setError('Укажите название и добавьте хотя бы одно упражнение')
       return
     }
-    setSaving(true)
     try {
       if (isEdit) {
-        await api.updateWorkout({ id, title, items })
+        await run(() => api.updateWorkout({ id, title, items }))
         navigate(`/workouts/${id}`)
       } else {
-        const result = await api.createWorkout({ title, items })
+        const result = await run(() => api.createWorkout({ title, items }))
         navigate(`/workouts/${result.id}`)
       }
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setSaving(false)
+    } catch {
+      // ошибка уже показана ниже через error
     }
   }
 
+  if (loadError) return <p>Ошибка: {loadError}</p>
   if (loading) return <p>Загрузка...</p>
 
   return (
@@ -93,43 +89,55 @@ export default function WorkoutBuilder() {
         <h3>Выбрано ({items.length})</h3>
         {items.length === 0 && <p>Добавьте упражнения из списка ниже.</p>}
         <ul className="admin-list">
-          {items.map((item) => (
-            <li key={item.exerciseId}>
-              <span className="picked">
-                {exerciseById.get(item.exerciseId)?.imageUrl && (
-                  <span className="picked__media">
-                    <ExerciseAnimation
-                      exercise={exerciseById.get(item.exerciseId)}
-                      alt={item.exerciseName}
-                      animate={false}
-                    />
-                  </span>
-                )}
-                {item.exerciseName}
-              </span>
-              <span className="admin-list__actions">
-                <input
-                  type="number"
-                  min="1"
-                  className="number-input"
-                  value={item.targetSets}
-                  onChange={(e) => updateItem(item.exerciseId, 'targetSets', Number(e.target.value))}
-                  title="Подходы"
-                />
-                ×
-                <input
-                  type="number"
-                  min="1"
-                  className="number-input"
-                  value={item.targetReps}
-                  onChange={(e) => updateItem(item.exerciseId, 'targetReps', Number(e.target.value))}
-                  title="Повторы"
-                />
-                <button type="button" onClick={() => removeExercise(item.exerciseId)}>Убрать</button>
-              </span>
-            </li>
-          ))}
+          {items.map((item) => {
+            const zone = classifyReps(item.targetReps)
+            return (
+              <li key={item.exerciseId}>
+                <span className="picked">
+                  {exerciseById.get(item.exerciseId)?.imageUrl && (
+                    <span className="picked__media">
+                      <ExerciseAnimation
+                        exercise={exerciseById.get(item.exerciseId)}
+                        alt={item.exerciseName}
+                        animate={false}
+                      />
+                    </span>
+                  )}
+                  {item.exerciseName}
+                  {zone && (
+                    <span className={`rep-zone rep-zone--${zone.tone}`} title={zone.hint}>
+                      {zone.label}
+                    </span>
+                  )}
+                </span>
+                <span className="admin-list__actions">
+                  <input
+                    type="number"
+                    min="1"
+                    className="number-input"
+                    value={item.targetSets}
+                    onChange={(e) => updateItem(item.exerciseId, 'targetSets', Number(e.target.value))}
+                    title="Подходы"
+                    aria-label={`Подходы: ${item.exerciseName}`}
+                  />
+                  ×
+                  <input
+                    type="number"
+                    min="1"
+                    className="number-input"
+                    value={item.targetReps}
+                    onChange={(e) => updateItem(item.exerciseId, 'targetReps', Number(e.target.value))}
+                    title="Повторы"
+                    aria-label={`Повторы: ${item.exerciseName}`}
+                  />
+                  <button type="button" className="is-danger" onClick={() => removeExercise(item.exerciseId)}>Убрать</button>
+                </span>
+              </li>
+            )
+          })}
         </ul>
+
+        <LoadAnalysis items={items} exerciseById={exerciseById} level={level} />
 
         <div className="admin-form__actions">
           <button type="submit" disabled={saving}>{isEdit ? 'Сохранить изменения' : 'Сохранить тренировку'}</button>
@@ -138,37 +146,7 @@ export default function WorkoutBuilder() {
 
       {error && <p className="error">{error}</p>}
 
-      <h3>Библиотека упражнений</h3>
-      <ExerciseFilterBar exercises={exercises} filters={filters} onChange={setFilters} />
-      <p className="picker__count">Найдено: {filtered.length}</p>
-      <ul className="picker">
-        {filtered.slice(0, visibleCount).map((ex) => {
-          const added = items.some((item) => item.exerciseId === ex.id)
-          return (
-            <li key={ex.id} className={`picker__item${added ? ' is-added' : ''}`}>
-              <Link to={`/exercises/${ex.id}`} className="picker__media" title="Открыть упражнение">
-                {ex.imageUrl ? (
-                  <ExerciseAnimation exercise={ex} alt={exerciseName(ex)} animate={false} />
-                ) : (
-                  <span className="picker__media-empty" aria-hidden="true" />
-                )}
-              </Link>
-              <div className="picker__info">
-                <span className="picker__name">{exerciseName(ex)}</span>
-                <small>{translateMuscle(ex.muscleGroup)} · {translateEquipment(ex.equipment)}</small>
-              </div>
-              <button type="button" onClick={() => addExercise(ex)} disabled={added}>
-                {added ? 'Добавлено' : 'Добавить'}
-              </button>
-            </li>
-          )
-        })}
-      </ul>
-      {visibleCount < filtered.length && (
-        <button type="button" className="picker__more" onClick={() => setVisibleCount(visibleCount + 40)}>
-          Показать ещё ({filtered.length - visibleCount})
-        </button>
-      )}
+      <ExercisePicker exercises={exercises} addedIds={addedIds} onAdd={addExercise} />
     </section>
   )
 }

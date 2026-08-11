@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api/firestore.js'
 import { formatDuration, useWorkoutTimer } from '../hooks/useWorkoutTimer.js'
+import { useAsyncAction } from '../hooks/useAsyncAction.js'
+import { friendlyErrorMessage } from '../utils/errors.js'
 import { entrySets, formatEntry } from '../utils/workoutLog.js'
 import { exerciseName } from '../utils/translate.js'
 import { formatReps } from '../utils/programItems.js'
+import { formatTarget, nextSessionTarget } from '../utils/progression.js'
 import ExerciseAnimation from '../components/ExerciseAnimation.jsx'
 import BackLink from '../components/BackLink.jsx'
 
@@ -17,9 +20,11 @@ export default function WorkoutDetail() {
   const [exercises, setExercises] = useState({})
   const [history, setHistory] = useState([])
   const [results, setResults] = useState({})
-  const [error, setError] = useState(null)
-  const [saving, setSaving] = useState(false)
+  const [level, setLevel] = useState('')
+  const { busy: saving, error, setError, run } = useAsyncAction()
   const [duplicating, setDuplicating] = useState(false)
+  const [deletingWorkout, setDeletingWorkout] = useState(false)
+  const [deletingSessionId, setDeletingSessionId] = useState(null)
   const { startedAt, elapsedSeconds, start, reset } = useWorkoutTimer(id)
 
   function loadHistory() {
@@ -34,6 +39,11 @@ export default function WorkoutDetail() {
         return []
       })
   }
+
+  useEffect(() => {
+    // Уровень задаёт шаг прибавки веса; без него считаем по среднему.
+    api.getMyProfileData().then((data) => setLevel(data.level || '')).catch(() => {})
+  }, [])
 
   useEffect(() => {
     Promise.all([api.getWorkout({ id }), loadHistory()])
@@ -73,6 +83,40 @@ export default function WorkoutDetail() {
       .catch((e) => setError(e.message))
   }, [id])
 
+  // Что ставить сегодня — считаем из последней записи по этой же тренировке:
+  // добрал верх диапазона во всех подходах — вес растёт, нет — добираем повторы.
+  const targets = useMemo(() => {
+    const last = history[0]
+    const lastEntries = new Map((last?.entries || []).map((entry) => [entry.exerciseId, entry]))
+    const map = new Map()
+    ;(workout?.items || []).forEach((item) => {
+      map.set(
+        item.exerciseId,
+        nextSessionTarget({
+          item,
+          lastEntry: lastEntries.get(item.exerciseId),
+          lastDate: last?.date,
+          exercise: exercises[item.exerciseId],
+          level,
+        }),
+      )
+    })
+    return map
+  }, [workout, history, exercises, level])
+
+  function applyTarget(item) {
+    const target = targets.get(item.exerciseId)
+    if (!target) return
+    const count = Math.max(Number(item.targetSets) || 1, 1)
+    setResults((prev) => ({
+      ...prev,
+      [item.exerciseId]: Array.from({ length: count }, () => ({
+        weight: target.weight ? String(target.weight) : '',
+        reps: String(target.reps),
+      })),
+    }))
+  }
+
   function updateSet(exerciseId, index, field, value) {
     setResults((prev) => ({
       ...prev,
@@ -93,7 +137,6 @@ export default function WorkoutDetail() {
 
   async function handleLogSession(e) {
     e.preventDefault()
-    setError(null)
 
     const entries = workout.items
       .map((item) => ({
@@ -111,30 +154,45 @@ export default function WorkoutDetail() {
       return
     }
 
-    setSaving(true)
     try {
-      await api.logWorkoutSession({
-        workoutId: id,
-        date: new Date().toISOString(),
-        entries,
-        startedAt,
-        durationMinutes: startedAt ? Math.max(1, Math.round(elapsedSeconds / 60)) : null,
-      })
+      await run(() =>
+        api.logWorkoutSession({
+          workoutId: id,
+          date: new Date().toISOString(),
+          entries,
+          startedAt,
+          durationMinutes: startedAt ? Math.max(1, Math.round(elapsedSeconds / 60)) : null,
+        }),
+      )
       reset()
       loadHistory()
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setSaving(false)
+    } catch {
+      // ошибка уже показана ниже через error
     }
   }
 
   async function handleDelete() {
+    if (!window.confirm(`Удалить тренировку «${workout.title}»? Это действие необратимо.`)) return
+    setDeletingWorkout(true)
     try {
       await api.deleteWorkout({ id })
       navigate('/workouts')
     } catch (err) {
-      setError(err.message)
+      setError(friendlyErrorMessage(err))
+      setDeletingWorkout(false)
+    }
+  }
+
+  async function handleDeleteSession(sessionId) {
+    if (!window.confirm('Удалить эту запись о выполнении? Это действие необратимо.')) return
+    setDeletingSessionId(sessionId)
+    try {
+      await api.deleteWorkoutLog({ id: sessionId })
+      setHistory((prev) => prev.filter((s) => s.id !== sessionId))
+    } catch (err) {
+      setError(friendlyErrorMessage(err))
+    } finally {
+      setDeletingSessionId(null)
     }
   }
 
@@ -145,8 +203,7 @@ export default function WorkoutDetail() {
       const result = await api.duplicateWorkout({ id })
       navigate(`/workouts/${result.id}`)
     } catch (err) {
-      setError(err.message)
-    } finally {
+      setError(friendlyErrorMessage(err))
       setDuplicating(false)
     }
   }
@@ -163,7 +220,9 @@ export default function WorkoutDetail() {
         <button type="button" onClick={handleDuplicate} disabled={duplicating}>
           {duplicating ? 'Копируем...' : 'Скопировать как новую'}
         </button>
-        <button type="button" onClick={handleDelete}>Удалить тренировку</button>
+        <button type="button" className="is-danger" onClick={handleDelete} disabled={deletingWorkout}>
+          {deletingWorkout ? 'Удаляем...' : 'Удалить тренировку'}
+        </button>
       </div>
 
       <h3>Отметить выполнение</h3>
@@ -189,6 +248,7 @@ export default function WorkoutDetail() {
         {workout.items.map((item) => {
           const ex = exercises[item.exerciseId]
           const sets = results[item.exerciseId] || []
+          const target = targets.get(item.exerciseId)
           return (
             <div className="log-exercise" key={item.exerciseId}>
               <div className="log-exercise__head">
@@ -207,6 +267,17 @@ export default function WorkoutDetail() {
                   <span className="log-exercise__target">
                     Цель: {item.targetSets} × {formatReps(item)}
                   </span>
+                  {target && (
+                    <span className={`next-target next-target--${target.action}`}>
+                      <strong>Сегодня: {formatTarget(target)}</strong>
+                      {target.action !== 'start' && (
+                        <button type="button" onClick={() => applyTarget(item)}>
+                          Взять
+                        </button>
+                      )}
+                      <small>{target.hint}</small>
+                    </span>
+                  )}
                   <Link to={`/exercises/${item.exerciseId}`} className="log-exercise__how">
                     Как выполнять →
                   </Link>
@@ -272,10 +343,20 @@ export default function WorkoutDetail() {
       {history.length === 0 && <p>Пока нет записей о выполнении.</p>}
       {history.map((session) => (
         <div key={session.id} className="history-entry">
-          <time>
-            {new Date(session.date).toLocaleString('ru-RU')}
-            {session.durationMinutes ? ` · ${session.durationMinutes} мин в зале` : ''}
-          </time>
+          <div className="history-entry__row">
+            <time>
+              {new Date(session.date).toLocaleString('ru-RU')}
+              {session.durationMinutes ? ` · ${session.durationMinutes} мин в зале` : ''}
+            </time>
+            <button
+              type="button"
+              className="is-danger"
+              onClick={() => handleDeleteSession(session.id)}
+              disabled={deletingSessionId === session.id}
+            >
+              {deletingSessionId === session.id ? 'Удаляем...' : 'Удалить'}
+            </button>
+          </div>
           <ul>
             {session.entries.map((entry, i) => (
               <li key={i}>{entry.exerciseName}: {formatEntry(entry)}</li>

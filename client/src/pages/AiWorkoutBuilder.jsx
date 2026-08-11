@@ -6,6 +6,7 @@ import { uniqueValues } from '../utils/exerciseFilters.js'
 import BackLink from '../components/BackLink.jsx'
 import GeneratedPlan from '../components/GeneratedPlan.jsx'
 import { calcBmi } from '../utils/bmi.js'
+import { TRAINING_LEVELS } from '../utils/repRanges.js'
 
 const GOALS = [
   'Набрать мышечную массу',
@@ -14,8 +15,6 @@ const GOALS = [
   'Поддерживать форму',
   'Развить выносливость',
 ]
-
-const LEVELS = ['Начинающий', 'Средний', 'Продвинутый']
 
 const STEPS = ['Цель', 'Уровень', 'График', 'Инвентарь', 'Ограничения']
 
@@ -41,6 +40,9 @@ export default function AiWorkoutBuilder() {
       const bmi = calcBmi(data.weight, data.height)
       setProfile((prev) => ({
         ...prev,
+        // Уровень уже указан в профиле — не спрашиваем его второй раз,
+        // просто подставляем в мастер как выбранный.
+        level: prev.level || data.level || '',
         age: data.age,
         weight: data.weight,
         height: data.height,
@@ -72,7 +74,6 @@ export default function AiWorkoutBuilder() {
     setError(null)
     setGenerating(true)
     setPlan(null)
-    setSavedTitles([])
     try {
       const result = await generateWorkoutPlan({ profile, exercises })
       setPlan(result)
@@ -121,7 +122,7 @@ export default function AiWorkoutBuilder() {
           <>
             <h3>Ваш уровень подготовки?</h3>
             <div className="choice-grid">
-              {LEVELS.map((level) => (
+              {TRAINING_LEVELS.map((level) => (
                 <button
                   key={level}
                   type="button"

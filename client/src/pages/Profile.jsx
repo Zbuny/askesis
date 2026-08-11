@@ -1,34 +1,42 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api } from '../api/firestore.js'
+import { useAsyncAction } from '../hooks/useAsyncAction.js'
+import { friendlyErrorMessage } from '../utils/errors.js'
 import ProgressChart from '../components/ProgressChart.jsx'
 import TrainingCalendar from '../components/TrainingCalendar.jsx'
 import { pluralRu } from '../utils/translate.js'
 import { entryTopWeight, sessionVolume } from '../utils/workoutLog.js'
 import { calcBmi } from '../utils/bmi.js'
+import { TRAINING_LEVELS } from '../utils/repRanges.js'
 
-const emptyProfileData = { weight: '', height: '', age: '' }
+const emptyProfileData = { height: '', age: '', level: '' }
+const todayStr = () => new Date().toISOString().slice(0, 10)
 
 export default function Profile() {
   const { user, isAdmin } = useAuth()
   const [uidCopied, setUidCopied] = useState(false)
   const [history, setHistory] = useState([])
-  const [error, setError] = useState(null)
 
   const [profileData, setProfileData] = useState(emptyProfileData)
-  const [profileSaving, setProfileSaving] = useState(false)
+  const { busy: profileSaving, error, setError, run } = useAsyncAction()
   const [profileSaved, setProfileSaved] = useState(false)
   const [selectedExerciseId, setSelectedExerciseId] = useState('')
 
+  const [weightHistory, setWeightHistory] = useState([])
+  const [weightEntry, setWeightEntry] = useState({ weight: '', date: todayStr() })
+  const [deletingWeightId, setDeletingWeightId] = useState(null)
+
   useEffect(() => {
     api.listWorkoutHistory({}).then(setHistory).catch((e) => setError(e.message))
+    api.listWeightHistory().then(setWeightHistory).catch((e) => setError(e.message))
     api
       .getMyProfileData()
       .then((data) =>
         setProfileData({
-          weight: data.weight ?? '',
           height: data.height ?? '',
           age: data.age ?? '',
+          level: data.level ?? '',
         }),
       )
       .catch((e) => setError(e.message))
@@ -101,9 +109,19 @@ export default function Profile() {
     return series
   }, [history])
 
+  const latestWeight = weightHistory[0]?.weight
+
   const bmi = useMemo(
-    () => calcBmi(profileData.weight, profileData.height),
-    [profileData.weight, profileData.height],
+    () => calcBmi(latestWeight, profileData.height),
+    [latestWeight, profileData.height],
+  )
+
+  const weightSeries = useMemo(
+    () =>
+      [...weightHistory]
+        .sort((a, b) => new Date(a.date) - new Date(b.date))
+        .map((w) => ({ value: w.weight, label: new Date(w.date).toLocaleDateString('ru-RU') })),
+    [weightHistory],
   )
 
   const selectedSeries =
@@ -123,20 +141,43 @@ export default function Profile() {
 
   async function handleSaveProfileData(e) {
     e.preventDefault()
-    setError(null)
-    setProfileSaving(true)
     setProfileSaved(false)
     try {
-      await api.updateMyProfileData({
-        weight: profileData.weight === '' ? null : Number(profileData.weight),
-        height: profileData.height === '' ? null : Number(profileData.height),
-        age: profileData.age === '' ? null : Number(profileData.age),
-      })
+      await run(() =>
+        api.updateMyProfileData({
+          height: profileData.height === '' ? null : Number(profileData.height),
+          age: profileData.age === '' ? null : Number(profileData.age),
+          level: profileData.level || null,
+        }),
+      )
       setProfileSaved(true)
+    } catch {
+      // ошибка уже показана ниже через error
+    }
+  }
+
+  async function handleLogWeight(e) {
+    e.preventDefault()
+    if (!weightEntry.weight) return
+    try {
+      await run(() => api.logWeight({ weight: weightEntry.weight, date: weightEntry.date }))
+      setWeightEntry({ weight: '', date: todayStr() })
+      setWeightHistory(await api.listWeightHistory())
+    } catch {
+      // ошибка уже показана ниже через error
+    }
+  }
+
+  async function handleDeleteWeight(id) {
+    if (!window.confirm('Удалить эту запись веса? Это действие необратимо.')) return
+    setDeletingWeightId(id)
+    try {
+      await api.deleteWeightLog({ id })
+      setWeightHistory((prev) => prev.filter((w) => w.id !== id))
     } catch (err) {
-      setError(err.message)
+      setError(friendlyErrorMessage(err))
     } finally {
-      setProfileSaving(false)
+      setDeletingWeightId(null)
     }
   }
 
@@ -172,134 +213,188 @@ export default function Profile() {
         </div>
       </div>
 
-      <h3>Мой ID</h3>
-      <div className="uid-block">
-        <code className="uid-block__value">{user?.uid}</code>
-        <button type="button" onClick={handleCopyUid}>
-          {uidCopied ? 'Скопировано' : 'Копировать'}
-        </button>
-      </div>
-      {isAdmin && <p className="uid-block__hint">У вас права администратора.</p>}
+      <div className="profile-layout">
+        <div className="profile-sidebar">
+          <h3>Мой ID</h3>
+          <div className="uid-block">
+            <code className="uid-block__value">{user?.uid}</code>
+            <button type="button" onClick={handleCopyUid}>
+              {uidCopied ? 'Скопировано' : 'Копировать'}
+            </button>
+          </div>
+          {isAdmin && <p className="uid-block__hint">У вас права администратора.</p>}
 
-      <h3>Мои данные</h3>
-      <form className="admin-form" onSubmit={handleSaveProfileData}>
-        <input
-          type="number"
-          placeholder="Вес, кг"
-          value={profileData.weight}
-          onChange={(e) => {
-            setProfileSaved(false)
-            setProfileData({ ...profileData, weight: e.target.value })
-          }}
-        />
-        <input
-          type="number"
-          placeholder="Рост, см"
-          value={profileData.height}
-          onChange={(e) => {
-            setProfileSaved(false)
-            setProfileData({ ...profileData, height: e.target.value })
-          }}
-        />
-        <input
-          type="number"
-          placeholder="Возраст"
-          value={profileData.age}
-          onChange={(e) => {
-            setProfileSaved(false)
-            setProfileData({ ...profileData, age: e.target.value })
-          }}
-        />
-        <div className="admin-form__actions">
-          <button type="submit" disabled={profileSaving}>Сохранить</button>
-          {profileSaved && <span className="eyebrow">Сохранено</span>}
+          <h3>Мои данные</h3>
+          <form className="admin-form" onSubmit={handleSaveProfileData}>
+            <input
+              type="number"
+              placeholder="Рост, см"
+              value={profileData.height}
+              onChange={(e) => {
+                setProfileSaved(false)
+                setProfileData({ ...profileData, height: e.target.value })
+              }}
+            />
+            <input
+              type="number"
+              placeholder="Возраст"
+              value={profileData.age}
+              onChange={(e) => {
+                setProfileSaved(false)
+                setProfileData({ ...profileData, age: e.target.value })
+              }}
+            />
+            {/* От уровня зависят и рекомендованный диапазон повторений,
+                и шаг прибавки веса — поэтому спрашиваем его один раз здесь. */}
+            <select
+              value={profileData.level}
+              onChange={(e) => {
+                setProfileSaved(false)
+                setProfileData({ ...profileData, level: e.target.value })
+              }}
+              aria-label="Уровень подготовки"
+            >
+              <option value="">Уровень подготовки</option>
+              {TRAINING_LEVELS.map((level) => (
+                <option key={level} value={level}>{level}</option>
+              ))}
+            </select>
+            <div className="admin-form__actions">
+              <button type="submit" disabled={profileSaving}>Сохранить</button>
+              {profileSaved && <span className="eyebrow">Сохранено</span>}
+            </div>
+          </form>
+
+          <h3>Вес</h3>
+          {error && <p className="error">{error}</p>}
+          <form className="admin-form" onSubmit={handleLogWeight}>
+            <input
+              type="number"
+              placeholder="Вес, кг"
+              value={weightEntry.weight}
+              onChange={(e) => setWeightEntry({ ...weightEntry, weight: e.target.value })}
+            />
+            <input
+              type="date"
+              value={weightEntry.date}
+              max={todayStr()}
+              onChange={(e) => setWeightEntry({ ...weightEntry, date: e.target.value })}
+            />
+            <div className="admin-form__actions">
+              <button type="submit" disabled={profileSaving || !weightEntry.weight}>Записать</button>
+            </div>
+          </form>
+
+          {bmi ? (
+            <div className={`bmi bmi--${bmi.tone}`}>
+              <div className="bmi__head">
+                <strong>{bmi.value}</strong>
+                <span>ИМТ · {bmi.label}</span>
+              </div>
+              <div className="bmi__scale">
+                <span className="bmi__marker" style={{ left: `${bmi.percent}%` }} />
+              </div>
+              <div className="bmi__legend">
+                <span>15</span><span>18.5</span><span>25</span><span>30</span><span>40</span>
+              </div>
+            </div>
+          ) : (
+            <p className="bmi__hint">Запишите вес и укажите рост выше — посчитаем индекс массы тела.</p>
+          )}
+
+          {weightSeries.length === 0 && <p>Пока нет записей веса — добавьте первую выше.</p>}
+          {weightSeries.length > 0 && <ProgressChart points={weightSeries} unit="кг" />}
+
+          {weightHistory.length > 0 && (
+            <div className="history-list">
+              {weightHistory.slice(0, 10).map((entry) => (
+                <div key={entry.id} className="history-entry">
+                  <time>{new Date(entry.date).toLocaleDateString('ru-RU')}</time>
+                  <div className="history-entry__row">
+                    <p>{entry.weight} кг</p>
+                    <button
+                      type="button"
+                      className="is-danger"
+                      onClick={() => handleDeleteWeight(entry.id)}
+                      disabled={deletingWeightId === entry.id}
+                    >
+                      {deletingWeightId === entry.id ? 'Удаляем...' : 'Удалить'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Считается на лету из полей выше, пока их печатают. */}
-        {bmi ? (
-          <div className={`bmi bmi--${bmi.tone}`}>
-            <div className="bmi__head">
-              <strong>{bmi.value}</strong>
-              <span>ИМТ · {bmi.label}</span>
+        <div className="profile-content">
+          <h3>Прогресс</h3>
+          <div className="stat-cards">
+            <div className="stat-card">
+              <strong>{stats.totalVolume.toLocaleString('ru-RU')}</strong>
+              кг суммарного объёма
             </div>
-            <div className="bmi__scale">
-              <span className="bmi__marker" style={{ left: `${bmi.percent}%` }} />
+            <div className="stat-card">
+              <strong>{stats.lastSession ? new Date(stats.lastSession).toLocaleDateString('ru-RU') : '—'}</strong>
+              последняя тренировка
             </div>
-            <div className="bmi__legend">
-              <span>15</span><span>18.5</span><span>25</span><span>30</span><span>40</span>
+            <div className="stat-card">
+              <strong>{stats.streak}</strong>
+              {pluralRu(stats.streak, 'неделя', 'недели', 'недель')} подряд
             </div>
           </div>
-        ) : (
-          <p className="bmi__hint">Укажите вес и рост — посчитаем индекс массы тела.</p>
-        )}
-      </form>
 
-      <h3>Прогресс</h3>
-      {error && <p className="error">{error}</p>}
-      <div className="stat-cards">
-        <div className="stat-card">
-          <strong>{stats.totalVolume.toLocaleString('ru-RU')}</strong>
-          кг суммарного объёма
-        </div>
-        <div className="stat-card">
-          <strong>{stats.lastSession ? new Date(stats.lastSession).toLocaleDateString('ru-RU') : '—'}</strong>
-          последняя тренировка
-        </div>
-        <div className="stat-card">
-          <strong>{stats.streak}</strong>
-          {pluralRu(stats.streak, 'неделя', 'недели', 'недель')} подряд
+          <h3>Когда вы тренировались</h3>
+          <TrainingCalendar sessions={history} />
+
+          <h3>Время в зале</h3>
+          {durationSeries.length === 0 && (
+            <p>Пока нет данных — засеките время кнопкой «Начать тренировку» на странице тренировки.</p>
+          )}
+          {durationSeries.length > 0 && (
+            <ProgressChart
+              points={durationSeries.map((p) => ({
+                value: p.value,
+                label: new Date(p.date).toLocaleDateString('ru-RU'),
+              }))}
+              unit="мин"
+            />
+          )}
+
+          <h3>Прогресс по упражнению</h3>
+          {exerciseSeries.length === 0 && (
+            <p>Пока нет данных для графика — запишите вес хотя бы в одной тренировке.</p>
+          )}
+          {selectedSeries && (
+            <>
+              <select
+                className="progress-chart-select"
+                value={selectedSeries.exerciseId}
+                onChange={(e) => setSelectedExerciseId(e.target.value)}
+              >
+                {exerciseSeries.map((s) => (
+                  <option key={s.exerciseId} value={s.exerciseId}>{s.name}</option>
+                ))}
+              </select>
+              <ProgressChart
+                points={selectedSeries.points.map((p) => ({
+                  value: p.value,
+                  label: new Date(p.date).toLocaleDateString('ru-RU'),
+                }))}
+              />
+            </>
+          )}
+
+          <h3>Последние тренировки</h3>
+          {history.length === 0 && <p>Пока нет записей — начните с раздела «Мои тренировки».</p>}
+          {history.slice(0, 5).map((session) => (
+            <div key={session.id} className="history-entry">
+              <time>{new Date(session.date).toLocaleString('ru-RU')}</time>
+              <p>{session.workoutTitle}</p>
+            </div>
+          ))}
         </div>
       </div>
-
-      <h3>Когда вы тренировались</h3>
-      <TrainingCalendar sessions={history} />
-
-      <h3>Время в зале</h3>
-      {durationSeries.length === 0 && (
-        <p>Пока нет данных — засеките время кнопкой «Начать тренировку» на странице тренировки.</p>
-      )}
-      {durationSeries.length > 0 && (
-        <ProgressChart
-          points={durationSeries.map((p) => ({
-            value: p.value,
-            label: new Date(p.date).toLocaleDateString('ru-RU'),
-          }))}
-          unit="мин"
-        />
-      )}
-
-      <h3>Прогресс по упражнению</h3>
-      {exerciseSeries.length === 0 && (
-        <p>Пока нет данных для графика — запишите вес хотя бы в одной тренировке.</p>
-      )}
-      {selectedSeries && (
-        <>
-          <select
-            className="progress-chart-select"
-            value={selectedSeries.exerciseId}
-            onChange={(e) => setSelectedExerciseId(e.target.value)}
-          >
-            {exerciseSeries.map((s) => (
-              <option key={s.exerciseId} value={s.exerciseId}>{s.name}</option>
-            ))}
-          </select>
-          <ProgressChart
-            points={selectedSeries.points.map((p) => ({
-              value: p.value,
-              label: new Date(p.date).toLocaleDateString('ru-RU'),
-            }))}
-          />
-        </>
-      )}
-
-      <h3>Последние тренировки</h3>
-      {history.length === 0 && <p>Пока нет записей — начните с раздела «Мои тренировки».</p>}
-      {history.slice(0, 5).map((session) => (
-        <div key={session.id} className="history-entry">
-          <time>{new Date(session.date).toLocaleString('ru-RU')}</time>
-          <p>{session.workoutTitle}</p>
-        </div>
-      ))}
     </section>
   )
 }
