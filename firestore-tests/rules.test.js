@@ -253,6 +253,11 @@ describe('форма лога выполнения', () => {
     const entries = [{ exerciseId: 'ex1', exerciseName: 'x'.repeat(100000), sets: [{ weight: 60, reps: 8 }] }]
     await assertFails(setDoc(doc(alice(), 'workoutLogs', 'bad'), { ...workoutLog(), entries }))
   })
+
+  it('отметка о взятой рекомендации сохраняется', async () => {
+    const entries = [{ exerciseId: 'ex1', exerciseName: 'Жим лёжа', sets: [{ weight: 60, reps: 8 }], followedTarget: true }]
+    await assertSucceeds(setDoc(doc(alice(), 'workoutLogs', 'ok'), { ...workoutLog(), entries }))
+  })
 })
 
 describe('вес и профиль', () => {

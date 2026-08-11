@@ -23,6 +23,10 @@ export default function WorkoutDetail() {
   const [hasMoreHistory, setHasMoreHistory] = useState(false)
   const [loadingMoreHistory, setLoadingMoreHistory] = useState(false)
   const [results, setResults] = useState({})
+  // Упражнения, где человек взял предложенный вес кнопкой «Взять». Отметка
+  // уходит в журнал: без следа в данных награду за выполненную рекомендацию
+  // не начислить, ведь XP считается из истории, а не копится счётчиком.
+  const [followed, setFollowed] = useState(new Set())
   const [level, setLevel] = useState('')
   const { busy: saving, error, setError, run } = useAsyncAction()
   const [duplicating, setDuplicating] = useState(false)
@@ -135,6 +139,7 @@ export default function WorkoutDetail() {
         reps: String(target.reps),
       })),
     }))
+    setFollowed((prev) => new Set(prev).add(item.exerciseId))
   }
 
   function updateSet(exerciseId, index, field, value) {
@@ -166,6 +171,7 @@ export default function WorkoutDetail() {
         sets: (results[item.exerciseId] || [])
           .filter((set) => set.weight !== '' || set.reps !== '')
           .map((set) => ({ weight: Number(set.weight) || 0, reps: Number(set.reps) || 0 })),
+        ...(followed.has(item.exerciseId) ? { followedTarget: true } : {}),
       }))
       .filter((entry) => entry.sets.length > 0)
 
@@ -185,6 +191,7 @@ export default function WorkoutDetail() {
         }),
       )
       reset()
+      setFollowed(new Set())
       loadHistory()
     } catch {
       // ошибка уже показана ниже через error
