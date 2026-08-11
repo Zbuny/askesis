@@ -1,0 +1,16 @@
+{
+  "name": "askesis-firestore-tests",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Тесты правил Firestore. Гоняются против эмулятора — боевая база не затрагивается.",
+  "scripts": {
+    "test": "firebase emulators:exec --only firestore --project demo-askesis --config ../firebase.json \"vitest run\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.0",
+    "firebase": "^12.17.1",
+    "firebase-tools": "^15.26.0",
+    "vitest": "^4.1.10"
+  }
+}

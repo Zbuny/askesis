@@ -21,8 +21,15 @@ async function checkIsAdmin(uid) {
     import('firebase/firestore'),
     import('../db.js'),
   ])
-  const snap = await getDoc(doc(db, 'settings', 'admins'))
-  return snap.exists() && (snap.data().uids || []).includes(uid)
+  try {
+    const snap = await getDoc(doc(db, 'settings', 'admins'))
+    return snap.exists() && (snap.data().uids || []).includes(uid)
+  } catch {
+    // Правила пускают на чтение этого документа только тех, кто уже в
+    // списке — обычному пользователю придёт permission-denied, и это
+    // ожидаемое «не админ», а не сбой.
+    return false
+  }
 }
 
 export function AuthProvider({ children }) {
