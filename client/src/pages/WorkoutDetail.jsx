@@ -12,6 +12,7 @@ import ExerciseAnimation from '../components/ExerciseAnimation.jsx'
 import BackLink from '../components/BackLink.jsx'
 
 const emptySet = () => ({ weight: '', reps: '' })
+const HISTORY_PAGE_SIZE = 10
 
 export default function WorkoutDetail() {
   const { id } = useParams()
@@ -19,6 +20,8 @@ export default function WorkoutDetail() {
   const [workout, setWorkout] = useState(null)
   const [exercises, setExercises] = useState({})
   const [history, setHistory] = useState([])
+  const [hasMoreHistory, setHasMoreHistory] = useState(false)
+  const [loadingMoreHistory, setLoadingMoreHistory] = useState(false)
   const [results, setResults] = useState({})
   const [level, setLevel] = useState('')
   const { busy: saving, error, setError, run } = useAsyncAction()
@@ -29,15 +32,31 @@ export default function WorkoutDetail() {
 
   function loadHistory() {
     return api
-      .listWorkoutHistory({ workoutId: id })
+      .listWorkoutHistory({ workoutId: id, pageSize: HISTORY_PAGE_SIZE })
       .then((sessions) => {
         setHistory(sessions)
+        setHasMoreHistory(sessions.length === HISTORY_PAGE_SIZE)
         return sessions
       })
       .catch((e) => {
         setError(e.message)
         return []
       })
+  }
+
+  async function loadMoreHistory() {
+    const last = history[history.length - 1]
+    if (!last) return
+    setLoadingMoreHistory(true)
+    try {
+      const more = await api.listWorkoutHistory({ workoutId: id, pageSize: HISTORY_PAGE_SIZE, after: last.date })
+      setHistory((prev) => [...prev, ...more])
+      setHasMoreHistory(more.length === HISTORY_PAGE_SIZE)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setLoadingMoreHistory(false)
+    }
   }
 
   useEffect(() => {
@@ -66,19 +85,20 @@ export default function WorkoutDetail() {
         })
         setResults(initial)
 
-        // Картинка и ссылка «как выполнять» — тянем только нужные упражнения,
-        // а не всю библиотеку из 873 документов.
-        Promise.all(
-          w.items.map((item) =>
-            api.getExercise({ id: item.exerciseId }).catch(() => null),
-          ),
-        ).then((list) => {
-          const byId = {}
-          list.forEach((ex) => {
-            if (ex) byId[ex.id] = ex
+        // Картинка и ссылка «как выполнять» — берём из уже закэшированного
+        // каталога (см. api/cache.js), а не читаем каждое упражнение
+        // отдельным запросом: список кэшируется на сутки и общий для всех
+        // страниц, так что здесь это обычно вообще без обращения к сети.
+        api
+          .listExercises()
+          .then((list) => {
+            const byId = {}
+            list.forEach((ex) => {
+              byId[ex.id] = ex
+            })
+            setExercises(byId)
           })
-          setExercises(byId)
-        })
+          .catch(() => {})
       })
       .catch((e) => setError(e.message))
   }, [id])
@@ -364,6 +384,11 @@ export default function WorkoutDetail() {
           </ul>
         </div>
       ))}
+      {hasMoreHistory && (
+        <button type="button" className="picker__more" onClick={loadMoreHistory} disabled={loadingMoreHistory}>
+          {loadingMoreHistory ? 'Загружаем...' : 'Показать ещё'}
+        </button>
+      )}
     </section>
   )
 }

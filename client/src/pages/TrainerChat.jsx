@@ -44,7 +44,9 @@ export default function TrainerChat() {
   useEffect(() => {
     api.listExercises().then(setExercises).catch(() => {})
     api.listMyWorkouts().then(setMyWorkouts).catch(() => {})
-    api.listWorkoutHistory({}).then(setHistory).catch(() => {})
+    // ИИ смотрит на недавнюю форму, а не на всю историю с первого дня —
+    // ограничиваем окно, чтобы не тащить в промпт годы записей.
+    api.listWorkoutHistory({ pageSize: 20 }).then(setHistory).catch(() => {})
   }, [])
 
   const exerciseById = useMemo(() => new Map(exercises.map((ex) => [ex.id, ex])), [exercises])
