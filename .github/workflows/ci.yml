@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# E2E-тесты сюда намеренно не включены: они ходят в боевой Firebase-проект и
+# создают там тестовых пользователей и записи. Гонять их на каждый push —
+# значит держать в секретах ключи от продакшена и засорять базу. Локально они
+# по-прежнему запускаются через `npm run test:e2e`.
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - run: npm ci
+
+      - name: Линтер
+        run: npm run lint
+
+      - name: Юнит-тесты
+        run: npm test
+
+      - name: Сборка
+        # Firebase-конфиг подставляется на этапе сборки. В CI настоящие
+        # значения не нужны — проверяем, что код компилируется, а не что он
+        # достучится до базы. Ключи Firebase и так публичны (они уезжают в
+        # бандл), доступ ограничивают правила Firestore, а не их секретность.
+        run: npm run build
+        env:
+          VITE_FIREBASE_API_KEY: ci-build-placeholder
+          VITE_FIREBASE_AUTH_DOMAIN: ci-build-placeholder
+          VITE_FIREBASE_PROJECT_ID: ci-build-placeholder
+          VITE_FIREBASE_STORAGE_BUCKET: ci-build-placeholder
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ci-build-placeholder
+          VITE_FIREBASE_APP_ID: ci-build-placeholder
+
+  # Правила Firestore — единственное место, где живут права доступа: Cloud
+  # Functions на Spark-плане недоступны, клиент ходит в базу напрямую. Поэтому
+  # они проверяются отдельной job против эмулятора, на выдуманном проекте
+  # demo-askesis — боевая база не затрагивается.
+  rules:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: firestore-tests
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: firestore-tests/package-lock.json
+
+      # Эмулятору Firestore нужен JDK 21+ — без него firebase-tools
+      # отказывается стартовать.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - run: npm ci
+
+      - name: Тесты правил Firestore
+        run: npm test
