@@ -9,6 +9,7 @@ export default function Footer() {
           <p>Система дисциплины и прогресса для тех, кто выбирает контроль над собой.</p>
         </div>
         <nav className="footer__links">
+          <Link to="/dashboard">Обзор</Link>
           <Link to="/programs">Программы</Link>
           <Link to="/exercises">Упражнения</Link>
           <Link to="/workouts">Тренировки</Link>

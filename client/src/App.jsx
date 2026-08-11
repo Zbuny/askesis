@@ -10,6 +10,7 @@ import Home from './pages/Home.jsx'
 // Главная — единственная страница в основном бандле: с неё начинают все, и
 // ждать ради неё второй сетевой запрос незачем. Остальные экраны грузятся по
 // переходу, поэтому первый рендер не тащит за собой ни админку, ни ИИ-тренера.
+const Dashboard = lazy(() => import('./pages/Dashboard.jsx'))
 const Programs = lazy(() => import('./pages/Programs.jsx'))
 const ProgramDetail = lazy(() => import('./pages/ProgramDetail.jsx'))
 const Exercises = lazy(() => import('./pages/Exercises.jsx'))
@@ -129,6 +130,14 @@ export default function App() {
                 element={
                   <ProtectedRoute>
                     <WorkoutBuilder />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/dashboard"
+                element={
+                  <ProtectedRoute>
+                    <Dashboard />
                   </ProtectedRoute>
                 }
               />

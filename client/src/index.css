@@ -4270,3 +4270,263 @@ textarea:focus-visible {
     justify-self: start;
   }
 }
+
+/* ---------- Skeletons ---------- */
+
+/* Пустой экран во время загрузки не даёт понять, сколько ждать и что
+   появится. Каркас той же формы, что и будущий контент, отвечает на оба
+   вопроса и убирает скачок вёрстки при подстановке данных. */
+/* Фон задаётся полупрозрачной заливкой, а не var(--surface): в светлой теме
+   surface — чистый белый на почти белом фоне страницы, и каркас пропадал
+   с экрана вовсе. */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.05);
+  margin-bottom: 1.25rem;
+}
+
+:root[data-theme='light'] .skeleton {
+  background: rgba(10, 9, 6, 0.06);
+}
+
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+  animation: skeleton-sweep 1.4s infinite;
+}
+
+:root[data-theme='light'] .skeleton::after {
+  background: linear-gradient(90deg, transparent, rgba(10, 9, 6, 0.05), transparent);
+}
+
+@keyframes skeleton-sweep {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+.skeleton--hero { height: 220px; }
+.skeleton--card { height: 130px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after { animation: none; }
+}
+
+/* ---------- Dashboard ---------- */
+
+.dashboard h3 {
+  margin: 2.5rem 0 1rem;
+}
+
+.level-row {
+  display: grid;
+  gap: 0.6rem;
+  margin-bottom: 1.25rem;
+}
+
+.level-row__info {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+}
+
+.level-row__info strong {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  color: var(--text);
+}
+
+.level-row__info span {
+  color: var(--gold-bright);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.level-row__xp {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.level-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+:root[data-theme='light'] .level-bar {
+  background: rgba(10, 9, 6, 0.1);
+}
+
+.level-bar--slim {
+  height: 4px;
+  margin-top: 0.6rem;
+}
+
+.level-bar__fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--gold), var(--gold-bright));
+  transition: width 0.6s var(--ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .level-bar__fill { transition: none; }
+}
+
+.streak-line {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.streak-line strong {
+  color: var(--gold-bright);
+  font-family: var(--font-display);
+}
+
+/* Карточка «сегодня» — единственный крупный акцент экрана. */
+.today-card {
+  padding: 2rem 2.25rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(185, 152, 94, 0.35);
+  background: linear-gradient(150deg, rgba(185, 152, 94, 0.1), rgba(255, 255, 255, 0.02));
+}
+
+:root[data-theme='light'] .today-card {
+  background: linear-gradient(150deg, rgba(163, 128, 63, 0.1), rgba(10, 9, 6, 0.02));
+  border-color: rgba(163, 128, 63, 0.32);
+}
+
+.today-card h3 {
+  margin: 0.5rem 0 0.35rem;
+  font-size: 1.6rem;
+}
+
+.today-card__muscles {
+  margin: 0 0 0.35rem;
+  color: var(--text-muted);
+}
+
+.today-card__meta,
+.today-card__last,
+.today-card__next,
+.today-card__done {
+  margin: 0 0 0.35rem;
+  color: var(--text-faint);
+  font-size: 0.85rem;
+}
+
+.today-card__done {
+  color: var(--gold-bright);
+}
+
+.today-card__cta {
+  margin-top: 1.25rem;
+  display: inline-block;
+}
+
+.week-grid,
+.record-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.85rem;
+}
+
+.record-card {
+  display: grid;
+  gap: 0.3rem;
+  padding: 1.1rem 1.25rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.record-card__name {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.record-card strong {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+}
+
+.record-card__gain {
+  color: var(--gold-bright);
+  font-size: 0.8rem;
+}
+
+.record-card__gain--first {
+  color: var(--text-faint);
+}
+
+.record-card time {
+  color: var(--text-faint);
+  font-size: 0.75rem;
+}
+
+.achievement-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+/* Незакрытые значки приглушены, а не спрятаны: видно, что ещё можно взять. */
+.achievement {
+  padding: 1rem 1.15rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  opacity: 0.55;
+}
+
+.achievement.is-unlocked {
+  opacity: 1;
+  border-color: rgba(185, 152, 94, 0.4);
+  background: linear-gradient(150deg, rgba(185, 152, 94, 0.09), transparent);
+}
+
+:root[data-theme='light'] .achievement.is-unlocked {
+  border-color: rgba(163, 128, 63, 0.36);
+}
+
+.achievement__title {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  margin-bottom: 0.2rem;
+}
+
+.achievement__hint {
+  display: block;
+  color: var(--text-faint);
+  font-size: 0.75rem;
+}
+
+.dashboard__empty {
+  margin-top: 2rem;
+  color: var(--text-muted);
+}
+
+@media (max-width: 640px) {
+  .today-card {
+    padding: 1.5rem 1.25rem;
+  }
+
+  .today-card h3 {
+    font-size: 1.35rem;
+  }
+
+  .today-card__cta {
+    display: block;
+    text-align: center;
+  }
+}
