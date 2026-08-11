@@ -1,23 +1,20 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../../api/firestore.js'
-import { exerciseName, translateEquipment, translateMuscle } from '../../utils/translate.js'
-import { emptyFilters, filterExercises } from '../../utils/exerciseFilters.js'
+import { exerciseName } from '../../utils/translate.js'
 import { formatReps, programItems } from '../../utils/programItems.js'
-import ExerciseFilterBar from '../../components/ExerciseFilterBar.jsx'
-import ExerciseAnimation from '../../components/ExerciseAnimation.jsx'
+import { useAsyncAction } from '../../hooks/useAsyncAction.js'
+import ExercisePicker from '../../components/ExercisePicker.jsx'
 import { planFromChat } from '../../api/ai.js'
 
-const emptyForm = { id: null, title: '', level: '', duration: '', description: '', items: [] }
+const emptyForm = { id: null, title: '', level: '', duration: '', description: '', recommended: false, items: [] }
 
 export default function AdminPrograms() {
   const [programs, setPrograms] = useState([])
   const [exercises, setExercises] = useState([])
   const [form, setForm] = useState(emptyForm)
-  const [filters, setFilters] = useState(emptyFilters)
-  const [error, setError] = useState(null)
-  const [saving, setSaving] = useState(false)
+  const { busy: saving, error, setError, run } = useAsyncAction()
   const [rawPlan, setRawPlan] = useState('')
-  const [parsing, setParsing] = useState(false)
+  const { busy: parsing, error: parseError, run: runParse } = useAsyncAction()
   const [parsed, setParsed] = useState(null)
 
   function load() {
@@ -31,30 +28,21 @@ export default function AdminPrograms() {
 
   useEffect(load, [])
 
-  const filtered = useMemo(() => filterExercises(exercises, filters), [exercises, filters])
-
-  // Как и в конструкторе: 873 карточки с картинками разом не рисуем.
-  const [visibleCount, setVisibleCount] = useState(40)
-  useEffect(() => setVisibleCount(40), [filters])
   const exerciseById = useMemo(() => new Map(exercises.map((ex) => [ex.id, ex])), [exercises])
+  const addedIds = useMemo(() => new Set(form.items.map((item) => item.exerciseId)), [form.items])
 
   // Разбор плана, вставленного текстом: модель раскладывает его на
   // упражнения библиотеки, а админ проверяет и правит перед сохранением.
   // Сразу в базу не пишем — программа видна всем, ошибку заметить важнее.
   async function handleParse() {
-    setError(null)
-    setParsing(true)
     setParsed(null)
     try {
-      const result = await planFromChat({
-        messages: [{ role: 'user', content: rawPlan }],
-        exercises,
-      })
+      const result = await runParse(() =>
+        planFromChat({ messages: [{ role: 'user', content: rawPlan }], exercises }),
+      )
       setParsed(result)
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setParsing(false)
+    } catch {
+      // ошибка уже показана ниже через parseError
     }
   }
 
@@ -81,6 +69,7 @@ export default function AdminPrograms() {
       level: program.level || '',
       duration: program.duration || '',
       description: program.description || '',
+      recommended: program.recommended || false,
       items: programItems(program),
     })
     // Список программ — внизу страницы, форма — вверху, а между ними
@@ -110,34 +99,26 @@ export default function AdminPrograms() {
 
   async function handleSubmit(e) {
     e.preventDefault()
-    setError(null)
     if (form.items.length === 0) {
       setError('Добавьте хотя бы одно упражнение')
       return
     }
-    setSaving(true)
     try {
-      if (form.id) {
-        await api.updateProgram(form)
-      } else {
-        await api.createProgram(form)
-      }
+      await run(() => (form.id ? api.updateProgram(form) : api.createProgram(form)))
       setForm(emptyForm)
       load()
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setSaving(false)
+    } catch {
+      // ошибка уже показана ниже через error
     }
   }
 
-  async function handleDelete(id) {
-    setError(null)
+  async function handleDelete(id, title) {
+    if (!window.confirm(`Удалить программу «${title}»? Это действие необратимо.`)) return
     try {
-      await api.deleteProgram({ id })
+      await run(() => api.deleteProgram({ id }))
       load()
-    } catch (err) {
-      setError(err.message)
+    } catch {
+      // ошибка уже показана ниже через error
     }
   }
 
@@ -170,6 +151,8 @@ export default function AdminPrograms() {
             </button>
           )}
         </div>
+
+        {parseError && <p className="error">{parseError}</p>}
 
         {parsed && (
           <div className="ai-import__result">
@@ -218,6 +201,14 @@ export default function AdminPrograms() {
           onChange={(e) => setForm({ ...form, description: e.target.value })}
           rows={3}
         />
+        <label className="checkbox-field">
+          <input
+            type="checkbox"
+            checked={form.recommended}
+            onChange={(e) => setForm({ ...form, recommended: e.target.checked })}
+          />
+          Советуем (бейдж в каталоге программ)
+        </label>
 
         <h3>Упражнения в программе ({form.items.length})</h3>
         {form.items.length === 0 && <p>Добавьте упражнения из списка ниже.</p>}
@@ -235,6 +226,7 @@ export default function AdminPrograms() {
                     value={item.targetSets}
                     onChange={(e) => updateItem(item.exerciseId, 'targetSets', Number(e.target.value))}
                     title="Подходы"
+                    aria-label={`Подходы: ${ex ? exerciseName(ex) : item.exerciseId}`}
                   />
                   ×
                   <input
@@ -244,8 +236,9 @@ export default function AdminPrograms() {
                     value={item.targetReps}
                     onChange={(e) => updateItem(item.exerciseId, 'targetReps', Number(e.target.value))}
                     title="Повторы"
+                    aria-label={`Повторы: ${ex ? exerciseName(ex) : item.exerciseId}`}
                   />
-                  <button type="button" onClick={() => removeExercise(item.exerciseId)}>Убрать</button>
+                  <button type="button" className="is-danger" onClick={() => removeExercise(item.exerciseId)}>Убрать</button>
                 </span>
               </li>
             )
@@ -266,46 +259,19 @@ export default function AdminPrograms() {
 
       {error && <p className="error">{error}</p>}
 
-      <h3>Библиотека упражнений</h3>
-      <ExerciseFilterBar exercises={exercises} filters={filters} onChange={setFilters} />
-      <p className="picker__count">Найдено: {filtered.length}</p>
-      <ul className="picker">
-        {filtered.slice(0, visibleCount).map((ex) => {
-          const added = form.items.some((item) => item.exerciseId === ex.id)
-          return (
-            <li key={ex.id} className={`picker__item${added ? ' is-added' : ''}`}>
-              <span className="picker__media">
-                {ex.imageUrl ? (
-                  <ExerciseAnimation exercise={ex} alt={exerciseName(ex)} animate={false} />
-                ) : (
-                  <span className="picker__media-empty" aria-hidden="true" />
-                )}
-              </span>
-              <div className="picker__info">
-                <span className="picker__name">{exerciseName(ex)}</span>
-                <small>{translateMuscle(ex.muscleGroup)} · {translateEquipment(ex.equipment)}</small>
-              </div>
-              <button type="button" onClick={() => addExercise(ex)} disabled={added}>
-                {added ? 'Добавлено' : 'Добавить'}
-              </button>
-            </li>
-          )
-        })}
-      </ul>
-      {visibleCount < filtered.length && (
-        <button type="button" className="picker__more" onClick={() => setVisibleCount(visibleCount + 40)}>
-          Показать ещё ({filtered.length - visibleCount})
-        </button>
-      )}
+      <ExercisePicker exercises={exercises} addedIds={addedIds} onAdd={addExercise} />
 
       <h3>Все программы</h3>
       <ul className="admin-list">
         {programs.map((p) => (
           <li key={p.id}>
-            <span>{p.title} <small>({p.level})</small></span>
+            <span>
+              {p.title} <small>({p.level})</small>
+              {p.recommended && <span className="badge-recommended">Советуем</span>}
+            </span>
             <span className="admin-list__actions">
               <button type="button" onClick={() => startEdit(p)}>Изменить</button>
-              <button type="button" onClick={() => handleDelete(p.id)}>Удалить</button>
+              <button type="button" className="is-danger" onClick={() => handleDelete(p.id, p.title)}>Удалить</button>
             </span>
           </li>
         ))}
