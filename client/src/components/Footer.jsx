@@ -13,6 +13,7 @@ export default function Footer() {
           <Link to="/programs">Программы</Link>
           <Link to="/exercises">Упражнения</Link>
           <Link to="/workouts">Тренировки</Link>
+          <Link to="/statistics">Статистика</Link>
           <Link to="/nutrition">Питание</Link>
           <Link to="/profile">Профиль</Link>
         </nav>

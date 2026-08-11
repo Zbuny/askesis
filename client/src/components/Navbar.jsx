@@ -67,6 +67,7 @@ export default function Navbar() {
           <>
             <NavLink to="/dashboard" onClick={closeMenu}>Обзор</NavLink>
             <NavLink to="/workouts" onClick={closeMenu}>Мои тренировки</NavLink>
+            <NavLink to="/statistics" onClick={closeMenu}>Статистика</NavLink>
             <NavLink to="/nutrition" onClick={closeMenu}>Питание</NavLink>
             <NavLink to="/profile" onClick={closeMenu}>Профиль</NavLink>
             {isAdmin && <NavLink to="/admin" onClick={closeMenu}>Админка</NavLink>}

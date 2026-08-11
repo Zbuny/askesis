@@ -33,22 +33,20 @@ export default function Dashboard() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    // Дашборд читает всё сразу, но каждый запрос ограничен: истории хватает
-    // недавней, каталог берётся из кэша.
-    Promise.all([
-      api.listWorkoutHistory({ pageSize: 200 }),
-      api.listMyWorkouts(),
-      api.listFoodHistory({ pageSize: 100 }).catch(() => []),
-      api.listExercises().catch(() => []),
-    ])
-      .then(([loadedHistory, loadedWorkouts, loadedFood, loadedExercises]) => {
+    // Ждём только то, без чего экран бессмысленен. Каталог упражнений на
+    // холодном кэше — это 873 документа, и он нужен лишь для подписи групп
+    // мышц под названием тренировки: ради неё держать человека на каркасе
+    // незачем, поэтому он и питание догружаются отдельно.
+    Promise.all([api.listWorkoutHistory({ pageSize: 200 }), api.listMyWorkouts()])
+      .then(([loadedHistory, loadedWorkouts]) => {
         setHistory(loadedHistory)
         setWorkouts(loadedWorkouts)
-        setFoodLogs(loadedFood)
-        setExercises(loadedExercises)
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false))
+
+    api.listFoodHistory({ pageSize: 100 }).then(setFoodLogs).catch(() => {})
+    api.listExercises().then(setExercises).catch(() => {})
   }, [])
 
   const exerciseById = useMemo(() => new Map(exercises.map((ex) => [ex.id, ex])), [exercises])
@@ -161,7 +159,10 @@ export default function Dashboard() {
         )}
       </div>
 
-      <h3>Эта неделя</h3>
+      <div className="dashboard__section-head">
+        <h3>Эта неделя</h3>
+        <Link to="/statistics">Вся статистика →</Link>
+      </div>
       <div className="week-grid">
         <div className="glass-card">
           <strong>{summary.week.done} / {summary.week.goal}</strong>
