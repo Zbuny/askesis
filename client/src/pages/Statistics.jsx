@@ -73,6 +73,22 @@ export default function Statistics() {
   const muscles = useMemo(() => muscleVolume(scoped, exerciseById), [scoped, exerciseById])
   const available = useMemo(() => trainedExercises(history), [history])
 
+  // Длительность есть не у каждой тренировки: таймер включают не всегда.
+  // Считаем график только по тем, где он был, — иначе провалы к нулю
+  // читались бы как «тренировка на ноль минут».
+  const durationSeries = useMemo(
+    () =>
+      scoped
+        .filter((session) => Number(session.durationMinutes) > 0)
+        .map((session) => ({
+          value: Number(session.durationMinutes),
+          label: new Date(session.date).toLocaleDateString('ru-RU'),
+          date: session.date,
+        }))
+        .sort((a, b) => new Date(a.date) - new Date(b.date)),
+    [scoped],
+  )
+
   const currentExerciseId = exerciseId || available[0]?.exerciseId || ''
   const series = useMemo(() => strengthSeries(history, currentExerciseId), [history, currentExerciseId])
   const day = useMemo(
@@ -152,6 +168,10 @@ export default function Statistics() {
           <strong>{stats.volume.toLocaleString('ru-RU')}</strong>
           <span>кг объёма</span>
         </div>
+        <div className="glass-card">
+          <strong>{stats.avgMinutes || '—'}</strong>
+          <span>минут в среднем</span>
+        </div>
       </div>
 
       <h3>Календарь активности</h3>
@@ -206,6 +226,16 @@ export default function Statistics() {
         </>
       )}
 
+      <h3>Время в зале</h3>
+      {durationSeries.length < 2 ? (
+        <p>
+          Засекайте время кнопкой «Начать тренировку» на странице тренировки — по
+          двум замерам и больше здесь появится график.
+        </p>
+      ) : (
+        <ProgressChart points={durationSeries} unit="мин" />
+      )}
+
       <h3>Объём по группам мышц</h3>
       {muscles.length === 0 ? (
         <p>За выбранный период записей нет.</p>
@@ -256,6 +286,19 @@ export default function Statistics() {
           })}
         </div>
       )}
+
+      <h3>Последние тренировки</h3>
+      <div className="history-list">
+        {history.slice(0, 5).map((session) => (
+          <div key={session.id} className="history-entry">
+            <time>
+              {new Date(session.date).toLocaleString('ru-RU')}
+              {session.durationMinutes ? ` · ${session.durationMinutes} мин` : ''}
+            </time>
+            <p>{session.workoutTitle}</p>
+          </div>
+        ))}
+      </div>
 
       <ConfirmDialog {...confirmProps} />
     </section>

@@ -3,11 +3,11 @@ import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api/firestore.js'
 import { aiConfigured, generateWorkoutPlan } from '../api/ai.js'
 import { useAsyncAction } from '../hooks/useAsyncAction.js'
-import { translateEquipment } from '../utils/translate.js'
 import { uniqueValues } from '../utils/exerciseFilters.js'
 import { TRAINING_LEVELS } from '../utils/repRanges.js'
 import { buildStarterPlan } from '../utils/starterPlan.js'
 import GeneratedPlan from '../components/GeneratedPlan.jsx'
+import EquipmentPicker from '../components/EquipmentPicker.jsx'
 
 // Первый экран после регистрации. Отвечает не на вопрос «расскажите о себе»,
 // а на вопрос «что мне делать»: анкета нужна ровно затем, чтобы в конце
@@ -41,15 +41,6 @@ export default function Onboarding() {
 
   const equipmentOptions = useMemo(() => uniqueValues(exercises, 'equipment'), [exercises])
   const exerciseById = useMemo(() => new Map(exercises.map((ex) => [ex.id, ex])), [exercises])
-
-  function toggleEquipment(value) {
-    setAnswers((prev) => ({
-      ...prev,
-      equipment: prev.equipment.includes(value)
-        ? prev.equipment.filter((item) => item !== value)
-        : [...prev.equipment, value],
-    }))
-  }
 
   const canAdvance =
     (step === 0 && answers.goal) ||
@@ -203,23 +194,12 @@ export default function Onboarding() {
 
         {step === 3 && (
           <>
-            <h3>Что есть из инвентаря?</h3>
-            {equipmentOptions.length === 0 ? (
-              <p>Загружаем библиотеку...</p>
-            ) : (
-              <div className="choice-grid">
-                {equipmentOptions.map((value) => (
-                  <button
-                    key={value}
-                    type="button"
-                    className={answers.equipment.includes(value) ? 'choice is-selected' : 'choice'}
-                    onClick={() => toggleEquipment(value)}
-                  >
-                    {translateEquipment(value)}
-                  </button>
-                ))}
-              </div>
-            )}
+            <h3>Где и чем будете тренироваться?</h3>
+            <EquipmentPicker
+              available={equipmentOptions}
+              selected={answers.equipment}
+              onChange={(equipment) => setAnswers({ ...answers, equipment })}
+            />
           </>
         )}
 

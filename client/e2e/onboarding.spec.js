@@ -23,7 +23,11 @@ test('анкета после регистрации доводит до пер�
   await page.getByRole('button', { name: '3', exact: true }).click()
   await page.getByRole('button', { name: 'Дальше' }).click()
 
-  await page.getByRole('button', { name: 'Свой вес' }).click()
+  // Ради этой кнопки шаг и переделан: в зале человек иначе отмечает
+  // одиннадцать галочек по одной. Набор должен проставить их разом.
+  await page.getByRole('button', { name: 'Тренажёрный зал' }).click()
+  await expect(page.locator('.choice.is-selected')).toHaveCount(3)
+
   await page.getByRole('button', { name: 'Собрать программу' }).click()
 
   await expect(page.getByRole('heading', { name: 'Ваша первая программа' })).toBeVisible({ timeout: 15000 })

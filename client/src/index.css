@@ -5280,6 +5280,63 @@ button.calendar__cell {
   }
 }
 
+/* ---------- Выбор инвентаря ---------- */
+
+.equipment__presets {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.6rem;
+}
+
+.equipment__preset {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-body);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s var(--ease), background 0.2s var(--ease);
+}
+
+.equipment__preset strong {
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+}
+
+.equipment__preset span {
+  font-size: 0.74rem;
+  line-height: 1.45;
+  color: var(--text-faint);
+}
+
+.equipment__preset:hover {
+  border-color: var(--text-faint);
+}
+
+.equipment__preset.is-selected {
+  border-color: var(--gold);
+  background: rgba(185, 152, 94, 0.1);
+}
+
+.equipment__preset.is-selected strong {
+  color: var(--gold-bright);
+}
+
+/* Разделитель говорит, что наборы — это не всё: ниже те же галочки, и их
+   никто не отменял. Без подписи второй блок читается как дубль. */
+.equipment__divider {
+  display: block;
+  margin: 1.25rem 0 0.75rem;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-faint);
+}
+
 /* ---------- Онбординг ---------- */
 
 .onboarding {

@@ -33,6 +33,8 @@ test('сборка тренировки, лог выполнения и стат
   // не сделаны все три подхода, поэтому в следующий раз тот же вес.
   await expect(review.locator('.review__next')).toHaveText('20 кг × 12')
 
-  await page.goto('/profile')
-  await expect(page.locator('.stat-card').first().locator('strong')).toHaveText('240', { timeout: 10000 })
+  // Итоги живут на «Статистике», а не в профиле: профиль — это данные о
+  // себе. 20 кг × 12 повторений = 240 кг объёма.
+  await page.goto('/statistics')
+  await expect(page.locator('.kpi-grid').getByText('240')).toBeVisible({ timeout: 10000 })
 })

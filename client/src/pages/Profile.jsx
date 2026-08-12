@@ -1,17 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api } from '../api/firestore.js'
 import { useAsyncAction } from '../hooks/useAsyncAction.js'
 import { friendlyErrorMessage } from '../utils/errors.js'
 import ProgressChart from '../components/ProgressChart.jsx'
-import TrainingCalendar from '../components/TrainingCalendar.jsx'
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
 import { useConfirm } from '../hooks/useConfirm.js'
-import { pluralRu } from '../utils/translate.js'
-import { entryTopWeight, sessionVolume } from '../utils/workoutLog.js'
 import { calcBmi } from '../utils/bmi.js'
 import { TRAINING_LEVELS } from '../utils/repRanges.js'
 import { SEX_OPTIONS } from '../utils/nutrition.js'
+
+// Профиль — это данные о себе, и только они: кто я, какие у меня рост,
+// возраст, уровень и режим, сколько я вешу. Всё, что считается из журнала
+// тренировок, живёт на «Статистике» — там для этого есть и период, и разбор
+// дня, и рекорды.
+//
+// Побочный, но важный эффект разделения: журнал здесь больше не читается.
+// Раньше страница тянула listWorkoutHistory({}) целиком — без пагинации, всю
+// историю до первого дня — ради четырёх чисел в шапке. На Spark-плане это
+// был самый дорогой экран приложения при том, что открывают его чаще других.
 
 const emptyProfileData = { height: '', age: '', level: '', daysPerWeek: '', sex: '' }
 const todayStr = () => new Date().toISOString().slice(0, 10)
@@ -19,7 +27,6 @@ const todayStr = () => new Date().toISOString().slice(0, 10)
 export default function Profile() {
   const { user, isAdmin } = useAuth()
   const [uidCopied, setUidCopied] = useState(false)
-  const [history, setHistory] = useState([])
 
   const [profileData, setProfileData] = useState(emptyProfileData)
   // Форма живёт до того, как приедут данные из Firestore: человек может
@@ -29,7 +36,6 @@ export default function Profile() {
   const editedRef = useRef(false)
   const { busy: profileSaving, error, setError, run } = useAsyncAction()
   const [profileSaved, setProfileSaved] = useState(false)
-  const [selectedExerciseId, setSelectedExerciseId] = useState('')
 
   const [weightHistory, setWeightHistory] = useState([])
   const [weightEntry, setWeightEntry] = useState({ weight: '', date: todayStr() })
@@ -37,7 +43,6 @@ export default function Profile() {
   const { ask, confirmProps } = useConfirm()
 
   useEffect(() => {
-    api.listWorkoutHistory({}).then(setHistory).catch((e) => setError(e.message))
     api.listWeightHistory().then(setWeightHistory).catch((e) => setError(e.message))
     api
       .getMyProfileData()
@@ -52,74 +57,7 @@ export default function Profile() {
         })
       })
       .catch((e) => setError(e.message))
-  }, [])
-
-  const stats = useMemo(() => {
-    const totalSessions = history.length
-    const totalVolume = history.reduce(
-      (sum, session) => sum + sessionVolume(session),
-      0,
-    )
-    const lastSession = history[0]?.date
-
-    const timed = history.filter((session) => session.durationMinutes > 0)
-    const totalMinutes = timed.reduce((sum, session) => sum + session.durationMinutes, 0)
-    const avgMinutes = timed.length ? Math.round(totalMinutes / timed.length) : 0
-
-    const monthAgo = new Date()
-    monthAgo.setDate(monthAgo.getDate() - 28)
-    const lastMonth = history.filter((session) => new Date(session.date) >= monthAgo)
-    const perWeek = (lastMonth.length / 4).toFixed(1)
-
-    // Серия — сколько недель подряд, считая от текущей, была хотя бы одна тренировка.
-    const weekKeys = new Set(
-      history.map((session) => {
-        const date = new Date(session.date)
-        const monday = new Date(date)
-        monday.setHours(0, 0, 0, 0)
-        monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7))
-        return monday.toDateString()
-      }),
-    )
-    let streak = 0
-    const cursor = new Date()
-    cursor.setHours(0, 0, 0, 0)
-    cursor.setDate(cursor.getDate() - ((cursor.getDay() + 6) % 7))
-    while (weekKeys.has(cursor.toDateString())) {
-      streak += 1
-      cursor.setDate(cursor.getDate() - 7)
-    }
-
-    return { totalSessions, totalVolume, lastSession, totalMinutes, avgMinutes, perWeek, streak }
-  }, [history])
-
-  const durationSeries = useMemo(
-    () =>
-      history
-        .filter((session) => session.durationMinutes > 0)
-        .map((session) => ({ date: session.date, value: session.durationMinutes }))
-        .sort((a, b) => new Date(a.date) - new Date(b.date)),
-    [history],
-  )
-
-  const exerciseSeries = useMemo(() => {
-    const map = new Map()
-    history.forEach((session) => {
-      session.entries.forEach((entry) => {
-        const top = entryTopWeight(entry)
-        if (!top) return
-        if (!map.has(entry.exerciseId)) map.set(entry.exerciseId, { name: entry.exerciseName, points: [] })
-        map.get(entry.exerciseId).points.push({ date: session.date, value: top })
-      })
-    })
-    const series = [...map.entries()].map(([exerciseId, s]) => ({
-      exerciseId,
-      name: s.name,
-      points: [...s.points].sort((a, b) => new Date(a.date) - new Date(b.date)),
-    }))
-    series.sort((a, b) => b.points.length - a.points.length)
-    return series
-  }, [history])
+  }, [setError])
 
   const latestWeight = weightHistory[0]?.weight
 
@@ -136,8 +74,12 @@ export default function Profile() {
     [weightHistory],
   )
 
-  const selectedSeries =
-    exerciseSeries.find((s) => s.exerciseId === selectedExerciseId) || exerciseSeries[0]
+  // Каждое поле помечает форму изменённой: см. editedRef выше.
+  function edit(patch) {
+    editedRef.current = true
+    setProfileSaved(false)
+    setProfileData((prev) => ({ ...prev, ...patch }))
+  }
 
   async function handleCopyUid() {
     if (!user?.uid) return
@@ -204,76 +146,40 @@ export default function Profile() {
       <div className="glass-hero">
         <div className="glass-hero__glow" aria-hidden="true" />
         <div className="glass-hero__content">
-          <span className="eyebrow">Askesis · Личный кабинет</span>
+          <span className="eyebrow">Askesis · Профиль</span>
           <h2>Привет, {user?.displayName || 'спортсмен'}</h2>
-          <p>{stats.streak > 0
-            ? `${stats.streak} ${pluralRu(stats.streak, 'неделя', 'недели', 'недель')} подряд без пропусков. Держите темп.`
-            : 'Запишите первую тренировку — статистика начнёт собираться сама.'}</p>
-
-          <div className="glass-cards">
-            <div className="glass-card">
-              <strong>{stats.totalSessions}</strong>
-              <span>тренировок</span>
-            </div>
-            <div className="glass-card">
-              <strong>{stats.perWeek}</strong>
-              <span>в неделю</span>
-            </div>
-            <div className="glass-card">
-              <strong>{Math.floor(stats.totalMinutes / 60)} ч</strong>
-              <span>в зале всего</span>
-            </div>
-            <div className="glass-card">
-              <strong>{stats.avgMinutes || '—'}{stats.avgMinutes ? ' мин' : ''}</strong>
-              <span>средняя тренировка</span>
-            </div>
-          </div>
+          <p>
+            Здесь только данные о вас — от них зависят диапазон повторений, шаг
+            прибавки веса, недельная цель и норма калорий.{' '}
+            <Link to="/statistics">Прогресс и графики — на «Статистике»</Link>.
+          </p>
         </div>
       </div>
 
+      {error && <p className="error">{error}</p>}
+
       <div className="profile-layout">
         <div className="profile-sidebar">
-          <h3>Мой ID</h3>
-          <div className="uid-block">
-            <code className="uid-block__value">{user?.uid}</code>
-            <button type="button" onClick={handleCopyUid}>
-              {uidCopied ? 'Скопировано' : 'Копировать'}
-            </button>
-          </div>
-          {isAdmin && <p className="uid-block__hint">У вас права администратора.</p>}
-
           <h3>Мои данные</h3>
           <form className="admin-form" onSubmit={handleSaveProfileData}>
             <input
               type="number"
               placeholder="Рост, см"
               value={profileData.height}
-              onChange={(e) => {
-                editedRef.current = true
-                setProfileSaved(false)
-                setProfileData({ ...profileData, height: e.target.value })
-              }}
+              onChange={(e) => edit({ height: e.target.value })}
             />
             <input
               type="number"
               placeholder="Возраст"
               value={profileData.age}
-              onChange={(e) => {
-                editedRef.current = true
-                setProfileSaved(false)
-                setProfileData({ ...profileData, age: e.target.value })
-              }}
+              onChange={(e) => edit({ age: e.target.value })}
             />
             {/* От уровня зависят и рекомендованный диапазон повторений,
                 и шаг прибавки веса — поэтому спрашиваем его один раз здесь. */}
             <select
               className={profileData.level ? undefined : 'is-placeholder'}
               value={profileData.level}
-              onChange={(e) => {
-                editedRef.current = true
-                setProfileSaved(false)
-                setProfileData({ ...profileData, level: e.target.value })
-              }}
+              onChange={(e) => edit({ level: e.target.value })}
               aria-label="Уровень подготовки"
             >
               <option value="">Уровень подготовки</option>
@@ -287,11 +193,7 @@ export default function Profile() {
             <select
               className={profileData.daysPerWeek ? undefined : 'is-placeholder'}
               value={profileData.daysPerWeek}
-              onChange={(e) => {
-                editedRef.current = true
-                setProfileSaved(false)
-                setProfileData({ ...profileData, daysPerWeek: e.target.value })
-              }}
+              onChange={(e) => edit({ daysPerWeek: e.target.value })}
               aria-label="Тренировок в неделю"
             >
               <option value="">Тренировок в неделю</option>
@@ -306,11 +208,7 @@ export default function Profile() {
             <select
               className={profileData.sex ? undefined : 'is-placeholder'}
               value={profileData.sex}
-              onChange={(e) => {
-                editedRef.current = true
-                setProfileSaved(false)
-                setProfileData({ ...profileData, sex: e.target.value })
-              }}
+              onChange={(e) => edit({ sex: e.target.value })}
               aria-label="Пол — для расчёта нормы калорий"
             >
               <option value="">Пол — для нормы калорий</option>
@@ -324,8 +222,20 @@ export default function Profile() {
             </div>
           </form>
 
+          <h3>Мой ID</h3>
+          <div className="uid-block">
+            <code className="uid-block__value">{user?.uid}</code>
+            <button type="button" onClick={handleCopyUid}>
+              {uidCopied ? 'Скопировано' : 'Копировать'}
+            </button>
+          </div>
+          <p className="uid-block__hint">
+            {isAdmin ? 'У вас права администратора.' : 'Нужен, только чтобы выдать права администратора.'}
+          </p>
+        </div>
+
+        <div className="profile-content">
           <h3>Вес</h3>
-          {error && <p className="error">{error}</p>}
           <form className="admin-form" onSubmit={handleLogWeight}>
             <input
               type="number"
@@ -358,11 +268,11 @@ export default function Profile() {
               </div>
             </div>
           ) : (
-            <p className="bmi__hint">Запишите вес и укажите рост выше — посчитаем индекс массы тела.</p>
+            <p className="bmi__hint">Запишите вес и укажите рост слева — посчитаем индекс массы тела.</p>
           )}
 
           {weightSeries.length === 0 && <p>Пока нет записей веса — добавьте первую выше.</p>}
-          {weightSeries.length > 0 && <ProgressChart points={weightSeries} unit="кг" />}
+          {weightSeries.length > 1 && <ProgressChart points={weightSeries} unit="кг" />}
 
           {weightHistory.length > 0 && (
             <div className="history-list">
@@ -384,74 +294,6 @@ export default function Profile() {
               ))}
             </div>
           )}
-        </div>
-
-        <div className="profile-content">
-          <h3>Прогресс</h3>
-          <div className="stat-cards">
-            <div className="stat-card">
-              <strong>{stats.totalVolume.toLocaleString('ru-RU')}</strong>
-              кг суммарного объёма
-            </div>
-            <div className="stat-card">
-              <strong>{stats.lastSession ? new Date(stats.lastSession).toLocaleDateString('ru-RU') : '—'}</strong>
-              последняя тренировка
-            </div>
-            <div className="stat-card">
-              <strong>{stats.streak}</strong>
-              {pluralRu(stats.streak, 'неделя', 'недели', 'недель')} подряд
-            </div>
-          </div>
-
-          <h3>Когда вы тренировались</h3>
-          <TrainingCalendar sessions={history} />
-
-          <h3>Время в зале</h3>
-          {durationSeries.length === 0 && (
-            <p>Пока нет данных — засеките время кнопкой «Начать тренировку» на странице тренировки.</p>
-          )}
-          {durationSeries.length > 0 && (
-            <ProgressChart
-              points={durationSeries.map((p) => ({
-                value: p.value,
-                label: new Date(p.date).toLocaleDateString('ru-RU'),
-              }))}
-              unit="мин"
-            />
-          )}
-
-          <h3>Прогресс по упражнению</h3>
-          {exerciseSeries.length === 0 && (
-            <p>Пока нет данных для графика — запишите вес хотя бы в одной тренировке.</p>
-          )}
-          {selectedSeries && (
-            <>
-              <select
-                className="progress-chart-select"
-                value={selectedSeries.exerciseId}
-                onChange={(e) => setSelectedExerciseId(e.target.value)}
-              >
-                {exerciseSeries.map((s) => (
-                  <option key={s.exerciseId} value={s.exerciseId}>{s.name}</option>
-                ))}
-              </select>
-              <ProgressChart
-                points={selectedSeries.points.map((p) => ({
-                  value: p.value,
-                  label: new Date(p.date).toLocaleDateString('ru-RU'),
-                }))}
-              />
-            </>
-          )}
-
-          <h3>Последние тренировки</h3>
-          {history.length === 0 && <p>Пока нет записей — начните с раздела «Мои тренировки».</p>}
-          {history.slice(0, 5).map((session) => (
-            <div key={session.id} className="history-entry">
-              <time>{new Date(session.date).toLocaleString('ru-RU')}</time>
-              <p>{session.workoutTitle}</p>
-            </div>
-          ))}
         </div>
       </div>
 
