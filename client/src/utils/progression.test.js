@@ -151,6 +151,103 @@ describe('nextSessionTarget', () => {
     expect(target.reps).toBe(13)
   })
 
+  it('при большом запасе до отказа поднимает вес, даже если повторы в середине диапазона', () => {
+    const target = nextSessionTarget({
+      item,
+      lastEntry: { ...entry([60, 7], [60, 7], [60, 7]), rir: 3 },
+      lastDate: daysAgo(7),
+      exercise: bench,
+      level: 'Средний',
+      now: today,
+    })
+
+    // Без RIR это был бы add-reps: до верха диапазона повтора не хватает.
+    expect(target.action).toBe('add-weight')
+    expect(target.weight).toBe(65)
+    expect(target.reps).toBe(6)
+  })
+
+  it('берёт двойной шаг, если верх диапазона взят с запасом', () => {
+    const target = nextSessionTarget({
+      item,
+      lastEntry: { ...entry([60, 8], [60, 8], [60, 8]), rir: 2 },
+      lastDate: daysAgo(7),
+      exercise: bench,
+      level: 'Средний',
+      now: today,
+    })
+
+    expect(target.action).toBe('add-weight')
+    expect(target.weight).toBe(65)
+  })
+
+  it('до отказа — шаг обычный', () => {
+    const target = nextSessionTarget({
+      item,
+      lastEntry: { ...entry([60, 8], [60, 8], [60, 8]), rir: 0 },
+      lastDate: daysAgo(7),
+      exercise: bench,
+      level: 'Средний',
+      now: today,
+    })
+
+    expect(target.weight).toBe(62.5)
+  })
+
+  it('просевшие повторы важнее заявленного запаса — это противоречивый ввод', () => {
+    const target = nextSessionTarget({
+      item,
+      lastEntry: { ...entry([60, 3], [60, 3], [60, 2]), rir: 3 },
+      lastDate: daysAgo(7),
+      exercise: bench,
+      level: 'Средний',
+      now: today,
+    })
+
+    expect(target.action).toBe('deload')
+  })
+
+  it('со своим весом не предлагает сделать меньше, чем в прошлый раз', () => {
+    const target = nextSessionTarget({
+      // План 6-8, а человек сделал 20: верхняя граница здесь не потолок —
+      // добавлять вместо неё нечего.
+      item: { targetSets: 3, targetReps: 6, targetRepsMax: 8 },
+      lastEntry: entry([0, 20], [0, 20], [0, 20]),
+      lastDate: daysAgo(7),
+      exercise: { muscleGroup: 'chest', equipment: 'body only' },
+      now: today,
+    })
+
+    expect(target.reps).toBe(21)
+    expect(target.hint).toContain('перерос')
+  })
+
+  it('со своим весом большой запас отправляет сразу к верху диапазона', () => {
+    const target = nextSessionTarget({
+      item: { targetSets: 3, targetReps: 10, targetRepsMax: 15 },
+      lastEntry: { ...entry([0, 11], [0, 11], [0, 11]), rir: 3 },
+      lastDate: daysAgo(7),
+      exercise: { muscleGroup: 'chest', equipment: 'body only' },
+      now: today,
+    })
+
+    expect(target.reps).toBe(15)
+  })
+
+  it('мусор в поле запаса игнорируется, как будто его не отмечали', () => {
+    const target = nextSessionTarget({
+      item,
+      lastEntry: { ...entry([60, 7], [60, 7], [60, 7]), rir: 99 },
+      lastDate: daysAgo(7),
+      exercise: bench,
+      level: 'Средний',
+      now: today,
+    })
+
+    expect(target.action).toBe('add-reps')
+    expect(target.rir).toBeNull()
+  })
+
   it('читает старые записи с одной парой «вес × повторы»', () => {
     const target = nextSessionTarget({
       item,
@@ -175,5 +272,9 @@ describe('formatTarget', () => {
 
   it('обходится без веса для упражнений со своим весом', () => {
     expect(formatTarget({ weight: 0, reps: 13, range: { min: 10, max: 15 } })).toBe('13-15 повт.')
+  })
+
+  it('переросшую диапазон цель показывает одним числом, а не «22-8»', () => {
+    expect(formatTarget({ weight: 0, reps: 22, range: { min: 6, max: 8 } })).toBe('22 повт.')
   })
 })

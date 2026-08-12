@@ -292,4 +292,60 @@ export const api = {
     await requireOwnDoc('foodLogs', id, 'Это не ваша запись')
     return remove('foodLogs', id)
   },
+
+  // личные цели («жим 100 кг»)
+  //
+  // Хранится только сама цель и точка отсчёта: факт достижения выводится из
+  // журнала (см. utils/goals.js) — отметка «взято», которую ставит клиент,
+  // рано или поздно разошлась бы с тем, что человек реально поднял.
+  listGoals: async () => {
+    const snap = await getDocs(
+      query(col('goals'), where('ownerId', '==', requireUid()), orderBy('createdAt', 'desc')),
+    )
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+  },
+  createGoal: async ({ exerciseId, exerciseName, targetWeight, targetReps, startScore }) => {
+    if (!exerciseId) throw new Error('Выберите упражнение')
+    const weight = Math.max(0, Number(targetWeight) || 0)
+    const reps = Math.max(1, Math.round(Number(targetReps) || 1))
+    if (weight <= 0 && reps <= 1) throw new Error('Укажите вес или число повторений')
+    return create('goals', {
+      ownerId: requireUid(),
+      exerciseId: String(exerciseId).slice(0, 200),
+      exerciseName: String(exerciseName || exerciseId).slice(0, 200),
+      targetWeight: weight,
+      targetReps: reps,
+      startScore: Math.max(0, Number(startScore) || 0),
+    })
+  },
+  deleteGoal: async ({ id }) => {
+    await requireOwnDoc('goals', id, 'Это не ваша цель')
+    return remove('goals', id)
+  },
+
+  // чек-ин восстановления (сон, энергия, забитость)
+  listCheckins: async ({ pageSize = 30 } = {}) => {
+    const snap = await getDocs(
+      query(col('checkins'), where('ownerId', '==', requireUid()), orderBy('date', 'desc'), limit(pageSize)),
+    )
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+  },
+  saveCheckin: async ({ id, sleep, energy, soreness, date }) => {
+    const scale = (value) => Math.min(5, Math.max(1, Math.round(Number(value) || 3)))
+    const data = {
+      ownerId: requireUid(),
+      sleep: scale(sleep),
+      energy: scale(energy),
+      soreness: scale(soreness),
+      date: date || new Date().toISOString(),
+    }
+    // Отметка за день одна: переоценить самочувствие в течение дня нормально,
+    // а вот копить по десятку записей на дату — нет, среднее поедет.
+    if (id) {
+      await requireOwnDoc('checkins', id, 'Это не ваша отметка')
+      await update('checkins', id, data)
+      return { id }
+    }
+    return create('checkins', data)
+  },
 }

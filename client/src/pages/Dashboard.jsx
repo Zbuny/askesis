@@ -3,13 +3,15 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api } from '../api/firestore.js'
 import { pluralRu, translateMuscle } from '../utils/translate.js'
-import { gamificationSummary } from '../utils/gamification.js'
+import { gamificationSummary, weeklyGoalFrom } from '../utils/gamification.js'
 import { streakSummary } from '../utils/streak.js'
 import { evaluateAchievements } from '../utils/achievements.js'
 import { recordGain, recordList } from '../utils/records.js'
 import { estimateMinutes, nextAfter, suggestTodayWorkout, workoutMuscles } from '../utils/planner.js'
 import { sessionVolume } from '../utils/workoutLog.js'
 import { weekKey } from '../utils/dates.js'
+import { coachFacts, coachInsights } from '../utils/coach.js'
+import CoachCard from '../components/CoachCard.jsx'
 
 // Дашборд отвечает на один вопрос: что делать сегодня. Поэтому карточка
 // тренировки — единственный крупный призыв к действию, а всё остальное
@@ -29,6 +31,9 @@ export default function Dashboard() {
   const [workouts, setWorkouts] = useState([])
   const [foodLogs, setFoodLogs] = useState([])
   const [exercises, setExercises] = useState([])
+  const [goals, setGoals] = useState([])
+  const [checkins, setCheckins] = useState([])
+  const [profile, setProfile] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -47,10 +52,22 @@ export default function Dashboard() {
 
     api.listFoodHistory({ pageSize: 100 }).then(setFoodLogs).catch(() => {})
     api.listExercises().then(setExercises).catch(() => {})
+    // Уровень задаёт шаг прибавки веса, а значит и то, какие упражнения
+    // тренер считает готовыми к прибавке. Не критичен: без него прогрессия
+    // считает по среднему, а сам тренер об этом отдельно и напомнит.
+    api.getMyProfileData().then(setProfile).catch(() => {})
+    api.listGoals().then(setGoals).catch(() => {})
+    api.listCheckins({ pageSize: 14 }).then(setCheckins).catch(() => {})
   }, [])
 
   const exerciseById = useMemo(() => new Map(exercises.map((ex) => [ex.id, ex])), [exercises])
-  const summary = useMemo(() => gamificationSummary({ history, foodLogs }), [history, foodLogs])
+  // Недельная цель — та частота, которую человек назвал в онбординге, а не
+  // общая тройка: цель, в которую он сам не верит, не мотивирует.
+  const weeklyGoal = useMemo(() => weeklyGoalFrom(profile), [profile])
+  const summary = useMemo(
+    () => gamificationSummary({ history, foodLogs, weeklyGoal }),
+    [history, foodLogs, weeklyGoal],
+  )
   const streak = useMemo(() => streakSummary(history.map((s) => s.date)), [history])
   const achievements = useMemo(() => evaluateAchievements({ history, foodLogs }), [history, foodLogs])
   const today = useMemo(() => suggestTodayWorkout(workouts, history), [workouts, history])
@@ -60,6 +77,27 @@ export default function Dashboard() {
   )
 
   const recentRecords = useMemo(() => recordList(history).slice(0, 3), [history])
+
+  // Наблюдения тренера считаются здесь же, из уже загруженных данных: ни
+  // одного лишнего запроса и ни одной цифры, которой не было бы на экране.
+  const insights = useMemo(
+    () =>
+      coachInsights({
+        history,
+        workouts,
+        exerciseById,
+        foodLogs,
+        goals,
+        checkins,
+        level: profile.level,
+        weeklyGoal,
+      }),
+    [history, workouts, exerciseById, foodLogs, goals, checkins, profile.level, weeklyGoal],
+  )
+  const facts = useMemo(
+    () => coachFacts({ insights, summary, streak, week: summary.week }),
+    [insights, summary, streak],
+  )
 
   const thisWeek = useMemo(() => {
     const key = weekKey(new Date())
@@ -158,6 +196,10 @@ export default function Dashboard() {
           </>
         )}
       </div>
+
+      {/* Тренер стоит сразу под главным действием: карточка выше говорит, что
+          делать, а он — почему именно это и на что смотреть по дороге. */}
+      <CoachCard insights={insights} facts={facts} kind="dashboard" />
 
       <div className="dashboard__section-head">
         <h3>Эта неделя</h3>

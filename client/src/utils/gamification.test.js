@@ -1,4 +1,24 @@
 import { describe, it, expect } from 'vitest'
+import { weeklyGoalFrom } from './gamification.js'
+
+describe('weeklyGoalFrom', () => {
+  it('берёт частоту, которую человек назвал сам', () => {
+    expect(weeklyGoalFrom({ daysPerWeek: 5 })).toBe(5)
+  })
+
+  it('без ответа остаётся общая тройка', () => {
+    expect(weeklyGoalFrom({})).toBe(3)
+    expect(weeklyGoalFrom()).toBe(3)
+    expect(weeklyGoalFrom({ daysPerWeek: null })).toBe(3)
+  })
+
+  it('мусор и невозможные значения сводит к разумному', () => {
+    expect(weeklyGoalFrom({ daysPerWeek: 0 })).toBe(3)
+    expect(weeklyGoalFrom({ daysPerWeek: 'пять' })).toBe(3)
+    expect(weeklyGoalFrom({ daysPerWeek: 99 })).toBe(7)
+  })
+})
+
 import {
   WEEKLY_WORKOUT_GOAL,
   XP_RULES,

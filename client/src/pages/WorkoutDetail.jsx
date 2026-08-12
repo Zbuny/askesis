@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api/firestore.js'
 import { formatDuration, useWorkoutTimer } from '../hooks/useWorkoutTimer.js'
@@ -8,6 +8,13 @@ import { entrySets, formatEntry } from '../utils/workoutLog.js'
 import { exerciseName } from '../utils/translate.js'
 import { formatReps } from '../utils/programItems.js'
 import { formatTarget, nextSessionTarget } from '../utils/progression.js'
+import { RIR_OPTIONS } from '../utils/repRanges.js'
+import { reviewSession } from '../utils/sessionReview.js'
+import { weeklyGoalFrom } from '../utils/gamification.js'
+import SessionReview from '../components/SessionReview.jsx'
+import ReadinessCheckin from '../components/ReadinessCheckin.jsx'
+import ExerciseSwap from '../components/ExerciseSwap.jsx'
+import { readinessScore, todayCheckin } from '../utils/readiness.js'
 import ExerciseAnimation from '../components/ExerciseAnimation.jsx'
 import BackLink from '../components/BackLink.jsx'
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
@@ -15,6 +22,13 @@ import { useConfirm } from '../hooks/useConfirm.js'
 
 const emptySet = () => ({ weight: '', reps: '' })
 const HISTORY_PAGE_SIZE = 10
+
+// Сколько истории тянем ради разбора. Рекорд определяется сравнением со всей
+// историей, а не только с этой тренировкой: одно и то же упражнение может
+// стоять в нескольких, и по отфильтрованной выборке «рекорд» получился бы
+// незаслуженным. Запрос идёт один раз на записанную тренировку, а не на
+// каждый рендер, — на квоту чтений Spark-плана это не влияет.
+const REVIEW_HISTORY_SIZE = 200
 
 export default function WorkoutDetail() {
   const { id } = useParams()
@@ -29,11 +43,18 @@ export default function WorkoutDetail() {
   // уходит в журнал: без следа в данных награду за выполненную рекомендацию
   // не начислить, ведь XP считается из истории, а не копится счётчиком.
   const [followed, setFollowed] = useState(new Set())
-  const [level, setLevel] = useState('')
+  // Запас до отказа по каждому упражнению. Не подставляем из прошлой
+  // записи — это оценка сегодняшнего усилия, а не настройка упражнения.
+  const [rir, setRir] = useState({})
+  const [profile, setProfile] = useState({})
   const { busy: saving, error, setError, run } = useAsyncAction()
   const [duplicating, setDuplicating] = useState(false)
   const [deletingWorkout, setDeletingWorkout] = useState(false)
   const [deletingSessionId, setDeletingSessionId] = useState(null)
+  const [review, setReview] = useState(null)
+  const [checkins, setCheckins] = useState([])
+  const [swapping, setSwapping] = useState(false)
+  const reviewRef = useRef(null)
   const { startedAt, elapsedSeconds, start, reset } = useWorkoutTimer(id)
   const { ask, confirmProps } = useConfirm()
 
@@ -68,8 +89,59 @@ export default function WorkoutDetail() {
 
   useEffect(() => {
     // Уровень задаёт шаг прибавки веса; без него считаем по среднему.
-    api.getMyProfileData().then((data) => setLevel(data.level || '')).catch(() => {})
+    api.getMyProfileData().then(setProfile).catch(() => {})
+    api.listCheckins({ pageSize: 14 }).then(setCheckins).catch(() => {})
   }, [])
+
+  async function handleCheckin(draft) {
+    const existing = todayCheckin(checkins)
+    setSwapping(true)
+    try {
+      const saved = await api.saveCheckin({ id: existing?.id, ...draft })
+      const entry = { id: saved.id, date: existing?.date || new Date().toISOString(), ...draft }
+      setCheckins((prev) => [entry, ...prev.filter((c) => c.id !== saved.id)])
+      return true
+    } catch (err) {
+      setError(friendlyErrorMessage(err))
+      return false
+    } finally {
+      setSwapping(false)
+    }
+  }
+
+  // Замена упражнения меняет саму тренировку, а не разовую запись: человек
+  // заменяет его не «на сегодня», а потому что это упражнение ему не подходит.
+  async function handleSwap(item, replacement) {
+    setSwapping(true)
+    try {
+      const items = workout.items.map((current) =>
+        current.exerciseId === item.exerciseId
+          ? { ...current, exerciseId: replacement.id, exerciseName: exerciseName(replacement) }
+          : current,
+      )
+      await api.updateWorkout({ id, title: workout.title, items })
+      setWorkout({ ...workout, items })
+      // Поля результата привязаны к id упражнения — переносим заполненное,
+      // иначе человек теряет уже введённые подходы.
+      setResults((prev) => {
+        const next = { ...prev }
+        next[replacement.id] = prev[item.exerciseId] || []
+        delete next[item.exerciseId]
+        return next
+      })
+    } catch (err) {
+      setError(friendlyErrorMessage(err))
+    } finally {
+      setSwapping(false)
+    }
+  }
+
+  // Форма длинная, и после сохранения разбор оказывается ниже экрана —
+  // подводим к нему сами, иначе главный ответ («что в следующий раз») никто
+  // не увидит.
+  useEffect(() => {
+    if (review) reviewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [review])
 
   useEffect(() => {
     Promise.all([api.getWorkout({ id }), loadHistory()])
@@ -124,12 +196,15 @@ export default function WorkoutDetail() {
           lastEntry: lastEntries.get(item.exerciseId),
           lastDate: last?.date,
           exercise: exercises[item.exerciseId],
-          level,
+          level: profile.level,
         }),
       )
     })
     return map
-  }, [workout, history, exercises, level])
+  }, [workout, history, exercises, profile.level])
+
+  const catalogue = useMemo(() => Object.values(exercises), [exercises])
+  const readiness = useMemo(() => readinessScore(todayCheckin(checkins)), [checkins])
 
   function applyTarget(item) {
     const target = targets.get(item.exerciseId)
@@ -175,6 +250,7 @@ export default function WorkoutDetail() {
           .filter((set) => set.weight !== '' || set.reps !== '')
           .map((set) => ({ weight: Number(set.weight) || 0, reps: Number(set.reps) || 0 })),
         ...(followed.has(item.exerciseId) ? { followedTarget: true } : {}),
+        ...(rir[item.exerciseId] != null ? { rir: rir[item.exerciseId] } : {}),
       }))
       .filter((entry) => entry.sets.length > 0)
 
@@ -184,7 +260,7 @@ export default function WorkoutDetail() {
     }
 
     try {
-      await run(() =>
+      const saved = await run(() =>
         api.logWorkoutSession({
           workoutId: id,
           date: new Date().toISOString(),
@@ -195,9 +271,40 @@ export default function WorkoutDetail() {
       )
       reset()
       setFollowed(new Set())
+      setRir({})
       loadHistory()
+      buildReview(saved?.id)
     } catch {
       // ошибка уже показана ниже через error
+    }
+  }
+
+  async function buildReview(sessionId) {
+    if (!sessionId) return
+    try {
+      // Питание читаем ради одного: XP за дни с записанной едой входит в
+      // общий счёт, и без него новый уровень определился бы неверно —
+      // либо потерялся, либо объявился на тренировку раньше срока.
+      const [full, foodLogs] = await Promise.all([
+        api.listWorkoutHistory({ pageSize: REVIEW_HISTORY_SIZE }),
+        api.listFoodHistory({ pageSize: REVIEW_HISTORY_SIZE }).catch(() => []),
+      ])
+      const session = full.find((s) => s.id === sessionId)
+      if (!session) return
+      setReview(
+        reviewSession({
+          session,
+          history: full,
+          workout,
+          exerciseById: new Map(Object.entries(exercises)),
+          foodLogs,
+          weeklyGoal: weeklyGoalFrom(profile),
+          level: profile.level,
+        }),
+      )
+    } catch {
+      // Разбор — дополнение к записи, а не её часть: тренировка уже сохранена,
+      // и ронять экран из-за неудавшегося чтения истории нельзя.
     }
   }
 
@@ -265,6 +372,11 @@ export default function WorkoutDetail() {
 
       <h3>Отметить выполнение</h3>
 
+      {/* Чек-ин стоит до формы: прогрессия предлагает прибавку так, будто
+          человек каждый раз приходит одинаковым, а после четырёх часов сна
+          та же прибавка — не прогресс, а способ поймать травму. */}
+      <ReadinessCheckin checkin={todayCheckin(checkins)} onSave={handleCheckin} busy={swapping} />
+
       <div className="timer">
         {startedAt ? (
           <>
@@ -314,11 +426,29 @@ export default function WorkoutDetail() {
                         </button>
                       )}
                       <small>{target.hint}</small>
+                      {/* Прогрессия считает по цифрам прошлой тренировки и о
+                          сегодняшнем состоянии не знает — предупреждаем здесь,
+                          а сам расчёт не трогаем: он должен оставаться
+                          воспроизводимым. */}
+                      {readiness && readiness.loadFactor < 1 && target.action === 'add-weight' && (
+                        <small className="next-target__readiness">
+                          Сегодня готовность {readiness.percent}% — прибавку лучше отложить, а не брать через силу.
+                        </small>
+                      )}
                     </span>
                   )}
-                  <Link to={`/exercises/${item.exerciseId}`} className="log-exercise__how">
-                    Как выполнять →
-                  </Link>
+                  <div className="log-exercise__links">
+                    <Link to={`/exercises/${item.exerciseId}`} className="log-exercise__how">
+                      Как выполнять →
+                    </Link>
+                    <ExerciseSwap
+                      origin={ex}
+                      catalogue={catalogue}
+                      equipment={profile.equipment}
+                      busy={swapping}
+                      onSwap={(replacement) => handleSwap(item, replacement)}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -364,6 +494,38 @@ export default function WorkoutDetail() {
                   + подход
                 </button>
               </div>
+
+              {/* Сколько повторений осталось в запасе. Само число повторений
+                  об усилии не говорит: 8 с запасом в четыре и 8 на пределе в
+                  журнале выглядят одинаково, а для роста это разные подходы.
+                  Спросить об этом можно только у человека — отсюда поле. */}
+              <div className="log-rir">
+                <span className="log-rir__label">Осталось в запасе</span>
+                <div className="log-rir__options">
+                  {RIR_OPTIONS.map((option) => {
+                    const selected = rir[item.exerciseId] === option.value
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        className={selected ? 'is-selected' : undefined}
+                        aria-pressed={selected}
+                        title={option.hint}
+                        onClick={() =>
+                          setRir((prev) => ({
+                            ...prev,
+                            // Повторное нажатие снимает отметку: «не отмечал»
+                            // и «дошёл до отказа» — разные вещи.
+                            [item.exerciseId]: selected ? undefined : option.value,
+                          }))
+                        }
+                      >
+                        {option.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
             </div>
           )
         })}
@@ -376,6 +538,12 @@ export default function WorkoutDetail() {
           </button>
         </div>
       </form>
+
+      {/* Разбор появляется сразу под формой: пока человек ещё на странице,
+          у него есть и цифры сегодняшнего дня, и цель на следующий раз. */}
+      <div ref={reviewRef}>
+        <SessionReview review={review} onClose={() => setReview(null)} />
+      </div>
 
       <h3>История</h3>
       {history.length === 0 && <p>Пока нет записей о выполнении.</p>}

@@ -16,14 +16,27 @@ export const USER_PASSWORD = 'password123'
 // расчётом на это, а не на сеть.
 const AUTH_TIMEOUT = 30_000
 
-export async function register(page, { name, email, password }) {
+// Новый аккаунт после регистрации попадает не в профиль, а в онбординг —
+// анкету из четырёх вопросов (см. pages/Onboarding.jsx). Для сценариев,
+// которые проверяют не её, это лишний шаг: пропускаем его так же, как это
+// сделал бы человек, — кнопкой «Пропустить».
+export async function register(page, { name, email, password }, { skipOnboarding = true } = {}) {
   await page.goto('/register')
   await page.getByLabel('Имя').fill(name)
   await page.getByLabel('Email').fill(email)
   await page.getByLabel('Пароль').fill(password)
   await page.getByRole('checkbox', { name: /обработку персональных данных/ }).check()
   await page.getByRole('button', { name: 'Создать аккаунт' }).click()
-  await page.waitForURL('**/profile', { timeout: AUTH_TIMEOUT })
+  await page.waitForURL('**/onboarding', { timeout: AUTH_TIMEOUT })
+
+  if (!skipOnboarding) return
+  await page.getByRole('button', { name: 'Пропустить — разберусь сам' }).click()
+  await page.waitForURL('**/dashboard', { timeout: AUTH_TIMEOUT })
+
+  // Контракт хелпера прежний: после него вы вошли и стоите в профиле. Иначе
+  // онбординг пришлось бы учитывать в каждом сценарии, который к нему не
+  // имеет отношения.
+  await page.goto('/profile')
 }
 
 export async function login(page, { email, password }) {

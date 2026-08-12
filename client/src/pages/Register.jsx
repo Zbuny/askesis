@@ -7,7 +7,7 @@ export default function Register() {
   const { register, loginWithGoogle } = useAuth()
   const navigate = useNavigate()
   // См. Login.jsx: возвращаем туда, откуда человека увели на авторизацию.
-  const redirectTo = useLocation().state?.from || '/profile'
+  const cameFrom = useLocation().state?.from
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -19,26 +19,39 @@ export default function Register() {
   // раньше, — его исходную дату затирать нельзя.
   // Firestore тянем динамически: страница входа не должна тащить его SDK
   // в стартовый бандл (см. AuthContext).
+  //
+  // Заодно отвечает, нужен ли человеку онбординг: профиль здесь всё равно
+  // читается, и отдельный запрос ради того же ответа был бы лишним.
   async function recordConsent() {
     try {
       const { api } = await import('../api/firestore.js')
       const profile = await api.getMyProfileData()
-      if (profile.dataConsentAt) return
-      await api.updateMyProfileData({ dataConsentAt: new Date().toISOString() })
+      if (!profile.dataConsentAt) {
+        await api.updateMyProfileData({ dataConsentAt: new Date().toISOString() })
+      }
+      return !profile.onboardedAt
     } catch {
       // Аккаунт уже создан, и галочку человек поставил — не ломаем вход
-      // из-за неудачной записи отметки.
+      // из-за неудачной записи отметки. Онбординг в этом случае не навязываем.
+      return false
     }
+  }
+
+  // Если человека увели на регистрацию с конкретной страницы, туда и
+  // возвращаем: анкета важна, но не важнее того, зачем он сюда шёл.
+  function destination(needsOnboarding) {
+    if (cameFrom) return cameFrom
+    return needsOnboarding ? '/onboarding' : '/profile'
   }
 
   async function handleSubmit(e) {
     e.preventDefault()
     try {
-      await run(async () => {
+      const needsOnboarding = await run(async () => {
         await register(name, email, password)
-        await recordConsent()
+        return recordConsent()
       })
-      navigate(redirectTo, { replace: true })
+      navigate(destination(needsOnboarding), { replace: true })
     } catch {
       // ошибка уже показана ниже через error
     }
@@ -52,11 +65,11 @@ export default function Register() {
       return
     }
     try {
-      await run(async () => {
+      const needsOnboarding = await run(async () => {
         await loginWithGoogle()
-        await recordConsent()
+        return recordConsent()
       })
-      navigate(redirectTo, { replace: true })
+      navigate(destination(needsOnboarding), { replace: true })
     } catch {
       // ошибка уже показана ниже через error
     }

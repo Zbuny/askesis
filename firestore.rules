@@ -137,10 +137,16 @@ service cloud.firestore {
     }
 
     function validWorkoutLogEntry(entry) {
-      return entry.exerciseId is string && entry.exerciseId.size() > 0 && entry.exerciseId.size() <= 200
+      return entry.keys().size() <= 8
+        && entry.exerciseId is string && entry.exerciseId.size() > 0 && entry.exerciseId.size() <= 200
         && (!('exerciseName' in entry) || (entry.exerciseName is string && entry.exerciseName.size() <= 200))
         && entry.sets is list && entry.sets.size() > 0 && entry.sets.size() <= 20
-        && (entry.sets.size() < 1 || validWorkoutLogSet(entry.sets[0]));
+        && (entry.sets.size() < 1 || validWorkoutLogSet(entry.sets[0]))
+        && (!('followedTarget' in entry) || entry.followedTarget is bool)
+        // Запас до отказа. Шкала короткая (см. RIR_OPTIONS в
+        // client/src/utils/repRanges.js): за её пределами число ничего не
+        // значит, и прогрессия такое всё равно игнорирует.
+        && (!('rir' in entry) || (entry.rir is number && entry.rir >= 0 && entry.rir <= 3));
     }
 
     // Та же оговорка про отсутствие циклов в правилах — проверяем первые
@@ -186,10 +192,21 @@ service cloud.firestore {
     // не дают записать в базу то, что интерфейс и так считает мусором.
     function validProfile() {
       let d = request.resource.data;
-      return d.keys().size() <= 12
+      return d.keys().size() <= 16
         && (!('weight' in d) || d.weight == null || (d.weight is number && d.weight >= 20 && d.weight <= 400))
         && (!('height' in d) || d.height == null || (d.height is number && d.height >= 80 && d.height <= 260))
-        && (!('age' in d) || d.age == null || (d.age is number && d.age >= 5 && d.age <= 120));
+        && (!('age' in d) || d.age == null || (d.age is number && d.age >= 5 && d.age <= 120))
+        // Ответы онбординга. Частота заодно служит недельной целью на
+        // дашборде, поэтому за пределами реальной недели она бессмысленна.
+        && (!('daysPerWeek' in d) || d.daysPerWeek == null
+            || (d.daysPerWeek is number && d.daysPerWeek >= 1 && d.daysPerWeek <= 7))
+        && (!('goal' in d) || d.goal == null || (d.goal is string && d.goal.size() <= 200))
+        && (!('level' in d) || d.level == null || (d.level is string && d.level.size() <= 60))
+        && (!('equipment' in d) || d.equipment == null || (d.equipment is list && d.equipment.size() <= 30))
+        // Пол нужен ровно для одного — основного обмена в дневных нормах
+        // КБЖУ (client/src/utils/nutrition.js). Поэтому и значений всего два:
+        // формула Миффлина-Сан Жеора различает только их.
+        && (!('sex' in d) || d.sex == null || d.sex in ['male', 'female']);
     }
 
     match /users/{userId} {
@@ -231,6 +248,49 @@ service cloud.firestore {
       allow read, delete: if owns();
       allow create: if ownsNew() && validFoodLog();
       allow update: if owns() && keepsOwner() && validFoodLog();
+    }
+
+    // ---------- личные цели ----------
+
+    // Факт достижения здесь не хранится и храниться не должен: он выводится
+    // из журнала (client/src/utils/goals.js). Поэтому и полей всего ничего —
+    // цель и точка отсчёта на момент её постановки.
+    function validGoal() {
+      let d = request.resource.data;
+      return d.keys().hasAll(['ownerId', 'exerciseId', 'targetReps'])
+        && d.keys().size() <= 8
+        && d.exerciseId is string && d.exerciseId.size() > 0 && d.exerciseId.size() <= 200
+        && (!('exerciseName' in d) || (d.exerciseName is string && d.exerciseName.size() <= 200))
+        && d.targetReps is number && d.targetReps >= 1 && d.targetReps <= 100
+        && (!('targetWeight' in d) || (d.targetWeight is number && d.targetWeight >= 0 && d.targetWeight <= 500))
+        && (!('startScore' in d) || (d.startScore is number && d.startScore >= 0 && d.startScore <= 1000));
+    }
+
+    match /goals/{goalId} {
+      allow read, delete: if owns();
+      allow create: if ownsNew() && validGoal();
+      allow update: if owns() && keepsOwner() && validGoal();
+    }
+
+    // ---------- чек-ин восстановления ----------
+
+    // Три оценки по шкале 1-5 (см. client/src/utils/readiness.js). Шкала
+    // фиксированная, поэтому и границы здесь жёсткие: за её пределами число
+    // ничего не значит, а готовность всё равно считается по прижатому.
+    function validCheckin() {
+      let d = request.resource.data;
+      return d.keys().hasAll(['ownerId', 'sleep', 'energy', 'soreness', 'date'])
+        && d.keys().size() <= 7
+        && d.sleep is number && d.sleep >= 1 && d.sleep <= 5
+        && d.energy is number && d.energy >= 1 && d.energy <= 5
+        && d.soreness is number && d.soreness >= 1 && d.soreness <= 5
+        && isDateString(d.date);
+    }
+
+    match /checkins/{checkinId} {
+      allow read, delete: if owns();
+      allow create: if ownsNew() && validCheckin();
+      allow update: if owns() && keepsOwner() && validCheckin();
     }
   }
 }

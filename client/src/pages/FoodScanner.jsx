@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../api/firestore.js'
-import { scanFood } from '../api/ai.js'
-import { resizeImageToDataUrl } from '../utils/image.js'
+import { aiConfigured, scanFood } from '../api/ai.js'
+import { cropDataUrl, resizeImageToDataUrl } from '../utils/image.js'
+import PhotoCrop from '../components/PhotoCrop.jsx'
+import { dailyTargets, dayProgress } from '../utils/nutrition.js'
+import DailyTargets from '../components/DailyTargets.jsx'
 import { useAsyncAction } from '../hooks/useAsyncAction.js'
 import { friendlyErrorMessage } from '../utils/errors.js'
 import BackLink from '../components/BackLink.jsx'
@@ -26,6 +30,7 @@ function isToday(dateStr) {
 export default function FoodScanner() {
   const fileInputRef = useRef(null)
   const [preview, setPreview] = useState(null)
+  const [cropping, setCropping] = useState(false)
   const [scanning, setScanning] = useState(false)
   const [entry, setEntry] = useState(null)
   const { busy: saving, error, setError, run } = useAsyncAction()
@@ -34,6 +39,10 @@ export default function FoodScanner() {
   const [history, setHistory] = useState([])
   const [hasMoreHistory, setHasMoreHistory] = useState(false)
   const [loadingMoreHistory, setLoadingMoreHistory] = useState(false)
+  // Норма считается из профиля и последнего записанного веса: рост и возраст
+  // человек указывает один раз, а вес меняется — брать его из профиля нельзя.
+  const [profile, setProfile] = useState({})
+  const [weight, setWeight] = useState(null)
 
   useEffect(() => {
     api
@@ -43,6 +52,9 @@ export default function FoodScanner() {
         setHasMoreHistory(list.length === HISTORY_PAGE_SIZE)
       })
       .catch((e) => setError(friendlyErrorMessage(e)))
+
+    api.getMyProfileData().then(setProfile).catch(() => {})
+    api.listWeightHistory({ pageSize: 1 }).then(([last]) => setWeight(last?.weight ?? null)).catch(() => {})
   }, [])
 
   async function loadMoreHistory() {
@@ -73,6 +85,15 @@ export default function FoodScanner() {
     )
   }, [history])
 
+  const targets = useMemo(
+    () => dailyTargets({ ...profile, weight }),
+    [profile, weight],
+  )
+  const progress = useMemo(() => dayProgress(targets, todayTotals), [targets, todayTotals])
+
+  // Фото выбрали — не распознаём сразу, а показываем кадр для обрезки.
+  // Со снимка со всем столом модель считает калории по всему, что в кадре,
+  // и одна лишняя тарелка рядом ломает оценку сильнее любых промптов.
   async function handlePickPhoto(e) {
     const file = e.target.files?.[0]
     e.target.value = ''
@@ -81,8 +102,19 @@ export default function FoodScanner() {
     setError(null)
     setEntry(null)
     try {
-      const dataUrl = await resizeImageToDataUrl(file)
+      setPreview(await resizeImageToDataUrl(file))
+      setCropping(true)
+    } catch (err) {
+      setError(friendlyErrorMessage(err))
+    }
+  }
+
+  async function handleScan(area) {
+    setError(null)
+    try {
+      const dataUrl = area ? await cropDataUrl(preview, area) : preview
       setPreview(dataUrl)
+      setCropping(false)
       setScanning(true)
       const result = await scanFood(dataUrl)
       setEntry({
@@ -109,6 +141,7 @@ export default function FoodScanner() {
       await run(() => api.logFood(entry))
       setEntry(null)
       setPreview(null)
+      setCropping(false)
       const list = await api.listFoodHistory({ pageSize: HISTORY_PAGE_SIZE })
       setHistory(list)
       setHasMoreHistory(list.length === HISTORY_PAGE_SIZE)
@@ -165,7 +198,19 @@ export default function FoodScanner() {
         <strong>{scanning ? 'Распознаю…' : 'Сфотографировать еду'}</strong>
       </button>
 
-      {preview && <img src={preview} alt="Фото еды" className="food-preview" />}
+      {cropping && preview && (
+        <PhotoCrop
+          src={preview}
+          busy={scanning}
+          onApply={handleScan}
+          onCancel={() => {
+            setCropping(false)
+            setPreview(null)
+          }}
+        />
+      )}
+
+      {!cropping && preview && <img src={preview} alt="Фото еды" className="food-preview" />}
 
       {entry && (
         <form className="admin-form" onSubmit={handleSave}>
@@ -206,6 +251,8 @@ export default function FoodScanner() {
       )}
 
       <h3>Сегодня</h3>
+      <DailyTargets targets={targets} progress={progress} />
+
       <div className="stat-cards">
         <div className="stat-card">
           <strong>{Math.round(todayTotals.calories)}</strong>
@@ -224,6 +271,21 @@ export default function FoodScanner() {
           углеводов
         </div>
       </div>
+
+      {/* Норма отвечает на «много или мало», но не на «что с этим делать»:
+          за разбором в свободной форме уводим в чат вместе с цифрами дня. */}
+      {aiConfigured && todayTotals.calories > 0 && (
+        <div className="coach__actions">
+          <Link
+            to={`/workouts/chat?q=${encodeURIComponent(
+              `Сегодня я съел ${Math.round(todayTotals.calories)} ккал: белков ${Math.round(todayTotals.protein)} г, жиров ${Math.round(todayTotals.fat)} г, углеводов ${Math.round(todayTotals.carbs)} г. Мне этого хватает при силовых тренировках?`,
+            )}`}
+            className="coach__link"
+          >
+            Спросить тренера про эти цифры →
+          </Link>
+        </div>
+      )}
 
       <h3>История</h3>
       {history.length === 0 && <p>Пока нет записей — сфотографируйте первое блюдо выше.</p>}

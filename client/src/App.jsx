@@ -20,6 +20,7 @@ const ExerciseDetail = lazy(() => import('./pages/ExerciseDetail.jsx'))
 const Profile = lazy(() => import('./pages/Profile.jsx'))
 const Login = lazy(() => import('./pages/Login.jsx'))
 const Register = lazy(() => import('./pages/Register.jsx'))
+const Onboarding = lazy(() => import('./pages/Onboarding.jsx'))
 const Workouts = lazy(() => import('./pages/Workouts.jsx'))
 const WorkoutBuilder = lazy(() => import('./pages/WorkoutBuilder.jsx'))
 const AiWorkoutBuilder = lazy(() => import('./pages/AiWorkoutBuilder.jsx'))
@@ -79,6 +80,14 @@ export default function App() {
               />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route
+                path="/onboarding"
+                element={
+                  <ProtectedRoute>
+                    <Onboarding />
+                  </ProtectedRoute>
+                }
+              />
               <Route
                 path="/profile"
                 element={

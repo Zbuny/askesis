@@ -5,8 +5,13 @@ import { PERIODS, daySummary, filterByPeriod, kpis, muscleVolume, strengthSeries
 import { streakSummary } from '../utils/streak.js'
 import { recordGain, recordList } from '../utils/records.js'
 import { localDayKey } from '../utils/dates.js'
+import { goalList } from '../utils/goals.js'
 import ProgressChart from '../components/ProgressChart.jsx'
 import TrainingCalendar from '../components/TrainingCalendar.jsx'
+import GoalList from '../components/GoalList.jsx'
+import ConfirmDialog from '../components/ConfirmDialog.jsx'
+import { useConfirm } from '../hooks/useConfirm.js'
+import { useAsyncAction } from '../hooks/useAsyncAction.js'
 
 // Экран отвечает на вопрос «насколько я продвинулся». Поэтому наверху —
 // крупные числа и серия, а разборы (календарь, график силы, объём по
@@ -15,8 +20,11 @@ import TrainingCalendar from '../components/TrainingCalendar.jsx'
 export default function Statistics() {
   const [history, setHistory] = useState([])
   const [exercises, setExercises] = useState([])
+  const [goals, setGoals] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const { busy: goalBusy, run: runGoal } = useAsyncAction()
+  const { ask, confirmProps } = useConfirm()
 
   const [period, setPeriod] = useState('month')
   const [exerciseId, setExerciseId] = useState('')
@@ -36,7 +44,23 @@ export default function Statistics() {
       .finally(() => setLoading(false))
 
     api.listExercises().then(setExercises).catch(() => {})
+    api.listGoals().then(setGoals).catch(() => {})
   }, [])
+
+  async function handleCreateGoal(goal) {
+    const saved = await runGoal(() => api.createGoal(goal))
+    setGoals((prev) => [{ id: saved.id, ...goal }, ...prev])
+  }
+
+  async function handleDeleteGoal(goal) {
+    const confirmed = await ask({
+      title: 'Убрать цель?',
+      message: `«${goal.exerciseName}» исчезнет из списка. Рекорды и история останутся на месте.`,
+    })
+    if (!confirmed) return
+    await runGoal(() => api.deleteGoal({ id: goal.id }))
+    setGoals((prev) => prev.filter((g) => g.id !== goal.id))
+  }
 
   const exerciseById = useMemo(() => new Map(exercises.map((ex) => [ex.id, ex])), [exercises])
   const scoped = useMemo(() => filterByPeriod(history, period), [history, period])
@@ -45,6 +69,7 @@ export default function Statistics() {
   // означали бы не то, что человек ожидает увидеть под словом «рекорд».
   const streak = useMemo(() => streakSummary(history.map((s) => s.date)), [history])
   const records = useMemo(() => recordList(history), [history])
+  const goalRows = useMemo(() => goalList(goals, history), [goals, history])
   const muscles = useMemo(() => muscleVolume(scoped, exerciseById), [scoped, exerciseById])
   const available = useMemo(() => trainedExercises(history), [history])
 
@@ -200,6 +225,18 @@ export default function Statistics() {
         </div>
       )}
 
+      {/* Цели стоят перед рекордами намеренно: рекорд — то, что уже случилось,
+          цель — то, ради чего человек сюда пришёл. */}
+      <h3>Мои цели</h3>
+      <GoalList
+        goals={goalRows}
+        available={available}
+        history={history}
+        onCreate={handleCreateGoal}
+        onDelete={handleDeleteGoal}
+        busy={goalBusy}
+      />
+
       <h3>Личные рекорды</h3>
       {records.length === 0 ? (
         <p>Рекорды появятся, как только вы запишете вес в упражнении.</p>
@@ -219,6 +256,8 @@ export default function Statistics() {
           })}
         </div>
       )}
+
+      <ConfirmDialog {...confirmProps} />
     </section>
   )
 }

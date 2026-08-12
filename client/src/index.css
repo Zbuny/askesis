@@ -133,7 +133,8 @@ a {
 a:focus-visible,
 button:focus-visible,
 input:focus-visible,
-textarea:focus-visible {
+textarea:focus-visible,
+select:focus-visible {
   outline: 1px solid var(--gold);
   outline-offset: 2px;
 }
@@ -1520,7 +1521,8 @@ textarea:focus-visible {
 }
 
 .admin-form input,
-.admin-form textarea {
+.admin-form textarea,
+.admin-form select {
   padding: 0.8rem 1rem;
   border-radius: var(--radius);
   border: 1px solid var(--border-strong);
@@ -1528,11 +1530,43 @@ textarea:focus-visible {
   color: var(--text);
   font-family: var(--font-body);
   font-size: 0.9rem;
-  transition: border-color 0.2s var(--ease);
+  transition: border-color 0.2s var(--ease), background 0.2s var(--ease);
+}
+
+/* Нативную стрелку оставляем: остальные селекты сайта (.filter-bar,
+   .progress-chart-select) тоже с ней, и своя рисованная выбивалась бы из ряда.
+   Браузер рисует её цветом текста, а он здесь уже нужный. */
+/* Поля стоят друг под другом, и высота у них обязана совпадать. Своя строка
+   у селекта выше, чем у input, а line-height на нативном селекте браузер
+   игнорирует (он подчиняется только при appearance: none, то есть ценой
+   стрелки). Поэтому разницу снимаем вертикальным паддингом. */
+.admin-form select {
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+  cursor: pointer;
+}
+
+.admin-form select:hover {
+  background: var(--surface-hover);
+}
+
+/* Пустое значение — это подпись-заглушка «Уровень подготовки», а не выбор.
+   Гасим её так же, как ::placeholder у соседних полей, иначе «ничего не
+   выбрано» читается как выбранный вариант. */
+.admin-form select.is-placeholder {
+  color: var(--text-faint);
+}
+
+/* Выпадающий список рисует система, а не страница: без явного фона он в
+   части браузеров остаётся светлым даже при тёмной теме сайта. */
+.admin-form select option {
+  background: var(--surface);
+  color: var(--text);
 }
 
 .admin-form input:focus,
-.admin-form textarea:focus {
+.admin-form textarea:focus,
+.admin-form select:focus {
   outline: none;
   border-color: var(--gold);
 }
@@ -4901,5 +4935,1110 @@ button.calendar__cell {
 @media (prefers-reduced-motion: reduce) {
   .bottom-nav__action {
     transition: none;
+  }
+}
+
+/* ---------- Готовность и замена упражнения ---------- */
+
+.readiness {
+  margin: 1.25rem 0;
+  padding: 1.25rem 1.4rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.readiness--warn { border-color: rgba(201, 203, 209, 0.35); }
+.readiness--high { border-color: rgba(185, 97, 91, 0.4); }
+
+.readiness__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.readiness__head strong {
+  display: block;
+  margin-top: 0.2rem;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+}
+
+.readiness--warn .readiness__head strong { color: var(--silver); }
+.readiness--high .readiness__head strong { color: var(--danger); }
+
+.readiness__head button {
+  flex-shrink: 0;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-faint);
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: color 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+
+.readiness__head button:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.readiness__scale {
+  margin-top: 1rem;
+}
+
+.readiness__label {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.readiness__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.readiness__options button {
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 0.74rem;
+  cursor: pointer;
+  transition: color 0.2s var(--ease), border-color 0.2s var(--ease), background 0.2s var(--ease);
+}
+
+.readiness__options button:hover {
+  color: var(--text);
+  border-color: var(--text-faint);
+}
+
+.readiness__options button.is-selected {
+  border-color: var(--gold);
+  background: rgba(185, 152, 94, 0.14);
+  color: var(--gold-bright);
+}
+
+.readiness__advice {
+  margin: 1rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.readiness__actions {
+  margin-top: 1.1rem;
+}
+
+.log-exercise__links {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+}
+
+.swap {
+  position: relative;
+}
+
+.swap__toggle {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-faint);
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  cursor: pointer;
+  border-bottom: 1px solid transparent;
+  transition: color 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+
+.swap__toggle:hover {
+  color: var(--text);
+  border-bottom-color: var(--text-faint);
+}
+
+.swap__panel {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+  padding: 0.6rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-strong);
+  background: var(--bg);
+}
+
+.swap__option {
+  display: block;
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: inherit;
+  font-family: var(--font-body);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+
+.swap__option:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--border);
+}
+
+.swap__option strong {
+  display: block;
+  font-size: 0.85rem;
+}
+
+.swap__option span {
+  font-size: 0.72rem;
+  color: var(--text-faint);
+}
+
+.swap__empty {
+  margin: 0;
+  padding: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--text-faint);
+}
+
+.next-target__readiness {
+  color: var(--silver) !important;
+}
+
+/* ---------- Обрезка фото еды ---------- */
+
+.crop {
+  margin: 1.25rem 0;
+}
+
+.crop__hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.crop__frame {
+  position: relative;
+  display: block;
+  width: 100%;
+  max-width: 520px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  cursor: crosshair;
+  /* Иначе жест выделения на телефоне прокручивает страницу вместо того,
+     чтобы рисовать рамку. */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.crop__frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+}
+
+.crop__area {
+  position: absolute;
+  border: 1px solid var(--gold-bright);
+  /* Затемняем всё вокруг рамки одним box-shadow вместо четырёх накладок. */
+  box-shadow: 0 0 0 9999px rgba(8, 8, 10, 0.55);
+  pointer-events: none;
+}
+
+.crop__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.9rem;
+}
+
+.crop__actions button:not(.button) {
+  padding: 0.65rem 1.1rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: color 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+
+.crop__actions button:not(.button):hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--text-faint);
+}
+
+/* ---------- Дневные нормы КБЖУ ---------- */
+
+.targets {
+  margin: 1.25rem 0;
+  padding: 1.35rem 1.5rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.targets__empty {
+  margin: 1.25rem 0;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.targets__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.targets__basis {
+  font-size: 0.72rem;
+  color: var(--text-faint);
+}
+
+.targets__grid {
+  display: grid;
+  gap: 0.9rem;
+  margin-top: 1.1rem;
+}
+
+.targets__label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.82rem;
+}
+
+.targets__label strong {
+  font-family: var(--font-display);
+}
+
+.targets__label em {
+  font-style: normal;
+  font-weight: 400;
+  color: var(--text-faint);
+}
+
+.targets__bar {
+  height: 5px;
+  margin: 0.35rem 0 0.25rem;
+  border-radius: 999px;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.targets__fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--gold), var(--gold-bright));
+  transition: width 0.4s var(--ease);
+}
+
+/* Перебор — не ошибка и не повод для тревоги: один день ничего не решает.
+   Поэтому меняем оттенок, а не заливаем красным. */
+.targets__row.is-over .targets__fill {
+  background: var(--silver);
+}
+
+.targets__row.is-over .targets__note {
+  color: var(--silver);
+}
+
+.targets__note {
+  font-size: 0.72rem;
+  color: var(--text-faint);
+}
+
+.targets__hint {
+  margin: 1.1rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  color: var(--text-faint);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .targets__fill {
+    transition: none;
+  }
+}
+
+/* ---------- Онбординг ---------- */
+
+.onboarding {
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.onboarding h2 {
+  margin: 0.4rem 0 0.6rem;
+}
+
+.onboarding > p {
+  color: var(--text-muted);
+  max-width: 60ch;
+}
+
+/* Подсказка под вариантами объясняет, на что влияет ответ. Без неё анкета
+   читается как формальность, и человек отвечает наугад. */
+.wizard-hint {
+  margin: 1rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--text-faint);
+  max-width: 56ch;
+}
+
+.onboarding__skip {
+  margin-top: 1.5rem;
+  text-align: center;
+}
+
+.onboarding__skip button,
+.onboarding__skip a {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--text-faint);
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  cursor: pointer;
+  transition: color 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+
+.onboarding__skip button:hover,
+.onboarding__skip a:hover {
+  color: var(--text-muted);
+  border-bottom-color: var(--text-faint);
+}
+
+/* ---------- Личные цели ---------- */
+
+.goals {
+  display: grid;
+  gap: 0.85rem;
+  margin: 1.25rem 0;
+}
+
+.goals__empty,
+.goals__hint {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.goals__hint {
+  color: var(--text-faint);
+  font-size: 0.75rem;
+}
+
+.goal {
+  padding: 1.1rem 1.25rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+/* Взятая цель гаснет, а не исчезает: список должен показывать и путь,
+   который уже пройден. */
+.goal--done {
+  border-color: rgba(185, 152, 94, 0.35);
+  background: linear-gradient(150deg, rgba(185, 152, 94, 0.08), var(--surface) 70%);
+}
+
+.goal__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.goal__name {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+}
+
+.goal__target {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.goal__target em {
+  font-style: normal;
+  color: var(--gold-bright);
+}
+
+.goal__head button {
+  flex-shrink: 0;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: color 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+
+.goal__head button:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.goal__scale {
+  position: relative;
+  height: 6px;
+  margin: 0.9rem 0 0.6rem;
+  border-radius: 999px;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.goal__fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--gold), var(--gold-bright));
+  transition: width 0.45s var(--ease);
+}
+
+/* Четверти пути — засечки прямо на шкале: «половина» читается взглядом,
+   без чтения процента рядом. */
+.goal__milestone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--bg);
+  opacity: 0.9;
+}
+
+.goal__milestone.is-passed {
+  background: rgba(8, 8, 10, 0.35);
+}
+
+.goal__meta {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-faint);
+}
+
+.goals__add {
+  justify-self: start;
+  padding: 0.6rem 1.2rem;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: color 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+
+.goals__add:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--text-faint);
+}
+
+.goals__add:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.goals__form {
+  margin: 0;
+  max-width: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .goal__fill {
+    transition: none;
+  }
+}
+
+/* ---------- Запас до отказа (RIR) ---------- */
+
+.log-rir {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.9rem;
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border);
+}
+
+.log-rir__label {
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-faint);
+}
+
+.log-rir__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.log-rir__options button {
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 0.76rem;
+  cursor: pointer;
+  transition: color 0.2s var(--ease), border-color 0.2s var(--ease), background 0.2s var(--ease);
+}
+
+.log-rir__options button:hover {
+  color: var(--text);
+  border-color: var(--text-faint);
+}
+
+/* Выбранный вариант заливаем золотом: отметка должна читаться с одного
+   взгляда, когда человек проглядывает список упражнений сверху вниз. */
+.log-rir__options button.is-selected {
+  border-color: var(--gold);
+  background: rgba(185, 152, 94, 0.14);
+  color: var(--gold-bright);
+}
+
+@media (max-width: 640px) {
+  .log-rir {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  /* Пальцем в пилюлю высотой 28px не попасть — на телефоне растягиваем
+     их на всю ширину строки. */
+  .log-rir__options {
+    width: 100%;
+  }
+
+  .log-rir__options button {
+    flex: 1 1 40%;
+    padding: 0.6rem 0.5rem;
+  }
+}
+
+/* ---------- Тренер: наблюдения и разбор тренировки ---------- */
+
+/* Карточка тренера намеренно спокойнее, чем .today-card: крупный акцент на
+   экране один, а тренер лишь объясняет, зачем на него нажимать. */
+.coach {
+  margin: 1.5rem 0;
+  padding: 1.5rem 1.75rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.coach__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.coach__more {
+  font-size: 0.75rem;
+  color: var(--text-faint);
+}
+
+.coach__list {
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 1.1rem;
+}
+
+/* Полоска слева вместо маркера — тот же приём, что у разбора нагрузки
+   (.load-analysis__note): тон наблюдения виден до чтения текста. */
+.coach__item {
+  position: relative;
+  padding-left: 0.95rem;
+}
+
+.coach__item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.35rem;
+  bottom: 0.2rem;
+  width: 2px;
+  background: var(--border-strong);
+}
+
+.coach__item--ok::before { background: var(--gold); }
+.coach__item--warn::before { background: var(--silver); }
+.coach__item--high::before { background: var(--danger); }
+
+.coach__title {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+
+.coach__item--ok .coach__title {
+  color: var(--gold-bright);
+}
+
+.coach__text {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.coach__action {
+  display: inline-block;
+  margin-top: 0.5rem;
+  font-size: 0.78rem;
+  color: var(--gold-bright);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s var(--ease);
+}
+
+.coach__action:hover {
+  border-bottom-color: var(--gold-bright);
+}
+
+/* Ответ модели отделён от посчитанных наблюдений рамкой намеренно: видно,
+   где заканчиваются цифры приложения и начинается пересказ. */
+.coach__reply {
+  margin-top: 1.25rem;
+  padding: 1rem 1.15rem;
+  border-radius: var(--radius);
+  border: 1px solid rgba(185, 152, 94, 0.28);
+  background: rgba(185, 152, 94, 0.06);
+}
+
+:root[data-theme='light'] .coach__reply {
+  border-color: rgba(163, 128, 63, 0.28);
+  background: rgba(163, 128, 63, 0.07);
+}
+
+.coach__reply-author {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--gold-bright);
+}
+
+.coach__reply p {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.coach__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.9rem;
+  margin-top: 1.35rem;
+}
+
+.coach__actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1.2rem;
+  border: 1px solid var(--gold);
+  border-radius: 10px;
+  background: rgba(185, 152, 94, 0.1);
+  color: var(--gold-bright);
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  cursor: pointer;
+  transition: background 0.2s var(--ease);
+}
+
+.coach__actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.coach__actions button:not(:disabled):hover {
+  background: rgba(185, 152, 94, 0.2);
+}
+
+.coach__link {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 0.2s var(--ease);
+}
+
+.coach__link:hover {
+  color: var(--text);
+}
+
+/* ---------- Разбор тренировки ---------- */
+
+.review {
+  margin: 1.75rem 0;
+  padding: 1.6rem 1.75rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  animation: review-in 0.35s var(--ease) both;
+}
+
+/* Рекорд — единственный повод для золотой рамки: если подсвечивать каждую
+   записанную тренировку, подсветка перестанет что-либо значить. */
+.review--ok {
+  border-color: rgba(185, 152, 94, 0.4);
+  background: linear-gradient(150deg, rgba(185, 152, 94, 0.08), var(--surface) 60%);
+}
+
+@keyframes review-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+.review__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.review__head h3 {
+  margin-top: 0.35rem;
+  font-size: 1.25rem;
+}
+
+.review__close {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+
+.review__close:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.review__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 0.85rem;
+  margin-top: 1.35rem;
+}
+
+.review__stat {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.review__stat strong {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+}
+
+.review__stat span {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}
+
+.review__delta {
+  margin-left: 0.4rem;
+  font-style: normal;
+  font-size: 0.72rem;
+}
+
+.review__delta--up { color: var(--gold-bright); }
+.review__delta--down { color: var(--danger); }
+.review__delta--same { color: var(--text-faint); }
+
+/* Новый уровень — событие, которое случается редко, поэтому ему единственному
+   здесь позволено быть заметным. */
+.review__levelup {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  margin-top: 1.1rem;
+  padding: 0.9rem 1.15rem;
+  border-radius: var(--radius);
+  border: 1px solid rgba(185, 152, 94, 0.45);
+  background: rgba(185, 152, 94, 0.1);
+  animation: levelup-in 0.5s var(--ease) both 0.25s;
+}
+
+.review__levelup strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  color: var(--gold-bright);
+}
+
+.review__levelup span {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.review__levelup-mark {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--gold-bright);
+  box-shadow: 0 0 0 0 rgba(216, 187, 132, 0.6);
+  animation: levelup-pulse 2.4s var(--ease) infinite;
+}
+
+@keyframes levelup-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes levelup-pulse {
+  0%, 70%, 100% { box-shadow: 0 0 0 0 rgba(216, 187, 132, 0); }
+  35% { box-shadow: 0 0 0 7px rgba(216, 187, 132, 0.18); }
+}
+
+.review__records {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 1.1rem;
+}
+
+/* Рекорды въезжают по очереди: два рекорда за тренировку должны читаться
+   как два события, а не как одна строка из двух слов. */
+.review__record {
+  animation: record-in 0.4s var(--ease) both;
+}
+
+.review__record:nth-child(2) { animation-delay: 0.1s; }
+.review__record:nth-child(3) { animation-delay: 0.2s; }
+.review__record:nth-child(n + 4) { animation-delay: 0.3s; }
+
+@keyframes record-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+.review__record {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid rgba(185, 152, 94, 0.35);
+  background: rgba(185, 152, 94, 0.08);
+  font-size: 0.8rem;
+}
+
+.review__record strong {
+  font-family: var(--font-display);
+}
+
+.review__record em {
+  font-style: normal;
+  font-size: 0.72rem;
+  color: var(--gold-bright);
+}
+
+.review__table {
+  width: 100%;
+  margin-top: 1.35rem;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+}
+
+.review__table th {
+  padding: 0 0.75rem 0.6rem 0;
+  text-align: left;
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-faint);
+  border-bottom: 1px solid var(--border);
+}
+
+.review__table td {
+  padding: 0.75rem 0.75rem 0.75rem 0;
+  vertical-align: top;
+  border-bottom: 1px solid var(--border);
+}
+
+.review__table th:last-child,
+.review__table td:last-child {
+  padding-right: 0;
+}
+
+.review__table tr:last-child td {
+  border-bottom: none;
+}
+
+.review__next {
+  display: block;
+  font-family: var(--font-display);
+  color: var(--text);
+}
+
+/* Прибавка и просадка — разные новости, и цвет должен их различать до
+   того, как человек прочтёт подпись под ними. */
+.review__next--add-weight { color: var(--gold-bright); }
+.review__next--deload,
+.review__next--repeat { color: var(--silver); }
+
+.review__table small {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--text-faint);
+}
+
+/* Запас до отказа — приписка к результату, а не отдельная величина: тем же
+   мелким кеглем, что и подсказка справа. Красным горит только «3 и больше»:
+   это единственное значение, с которым надо что-то делать. */
+.review__rir--easy {
+  color: var(--danger);
+}
+
+.review__notes {
+  margin: 1.35rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.review__note {
+  position: relative;
+  padding-left: 0.85rem;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+.review__note::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.4rem;
+  bottom: 0.25rem;
+  width: 2px;
+  background: var(--border-strong);
+}
+
+.review__note--ok::before { background: var(--gold); }
+.review__note--warn::before { background: var(--silver); }
+
+@media (max-width: 640px) {
+  .coach,
+  .review {
+    padding: 1.25rem 1.1rem;
+  }
+
+  /* Три колонки на телефоне не помещаются: разворачиваем строку таблицы в
+     карточку, где подпись колонки уходит в текст ячейки. */
+  .review__table,
+  .review__table tbody,
+  .review__table tr,
+  .review__table td {
+    display: block;
+    width: 100%;
+  }
+
+  .review__table thead {
+    display: none;
+  }
+
+  .review__table tr {
+    padding: 0.85rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .review__table tr:last-child {
+    border-bottom: none;
+  }
+
+  .review__table td {
+    padding: 0;
+    border: none;
+  }
+
+  .review__table td:first-child {
+    margin-bottom: 0.3rem;
+    font-family: var(--font-display);
+  }
+
+  .review__table td:nth-child(2)::before {
+    content: 'Сегодня: ';
+    color: var(--text-faint);
+  }
+
+  .review__table td:nth-child(3) {
+    margin-top: 0.45rem;
+  }
+
+  .coach__actions button {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .review,
+  .review__record,
+  .review__levelup,
+  .review__levelup-mark {
+    animation: none;
   }
 }

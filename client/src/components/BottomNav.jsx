@@ -48,6 +48,7 @@ const ACTIONS = [
   { to: '/workouts/new', label: 'Собрать тренировку' },
   { to: '/nutrition', label: 'Сканировать еду' },
   { to: '/workouts/ai', label: 'Составить с ИИ' },
+  { to: '/workouts/chat', label: 'Спросить тренера' },
 ]
 
 export default function BottomNav() {

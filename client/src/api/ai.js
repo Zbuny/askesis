@@ -2,6 +2,11 @@ import { auth } from '../firebase.js'
 
 const WORKER_URL = import.meta.env.VITE_AI_WORKER_URL
 
+// Тренер на дашборде и разбор после тренировки работают и без воркера —
+// сами выводы считаются на клиенте. Экранам нужно знать, показывать ли
+// кнопку «объяснить», а не ловить ошибку уже после нажатия.
+export const aiConfigured = Boolean(WORKER_URL)
+
 // Модель получает не всю библиотеку (873 упражнения не влезут в промпт),
 // а подборку под выбранный инвентарь — иначе она начинает выдумывать id.
 const MAX_CANDIDATES = 150
@@ -84,6 +89,29 @@ export async function scanFood(imageDataUrl) {
   const data = await response.json().catch(() => ({}))
   if (!response.ok) throw new Error(data.error || `Ошибка ${response.status}`)
   return data
+}
+
+// Комментарий тренера к уже посчитанным выводам. Модель получает готовые
+// формулировки (coach.js → coachFacts, sessionReview.js → reviewFacts) и
+// только связывает их в один совет: считать ей нечего, а значит и
+// расходиться с цифрами на экране не с чем.
+export async function askCoach({ kind, facts }) {
+  if (!WORKER_URL) {
+    throw new Error('ИИ-помощник не настроен: пропишите VITE_AI_WORKER_URL в client/.env (см. worker/README.md)')
+  }
+  const user = auth.currentUser
+  if (!user) throw new Error('Требуется авторизация')
+
+  const token = await user.getIdToken()
+  const response = await fetch(`${WORKER_URL.replace(/\/$/, '')}/coach`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ kind, facts }),
+  })
+
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(data.error || `Ошибка ${response.status}`)
+  return data.reply
 }
 
 export async function askTrainer(messages, context) {

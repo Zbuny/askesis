@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '../api/firestore.js'
 import { exerciseName } from '../utils/translate.js'
 import { classifyReps } from '../utils/repRanges.js'
+import { formatReps } from '../utils/programItems.js'
 import { itemReps } from '../utils/workoutAnalysis.js'
 
 // Разбор и сохранение программы, которую собрала модель. Используется и
@@ -23,6 +24,11 @@ export default function GeneratedPlan({ plan, exerciseById, heading = 'Ваша 
         exerciseName: ex ? exerciseName(ex) : item.exerciseId,
         targetSets: item.targetSets,
         targetReps: item.targetReps,
+        // Верхнюю границу диапазона нельзя терять при сохранении: на ней
+        // держится двойная прогрессия (см. utils/progression.js). Без неё
+        // «8-10» превращается в «8», и вес растёт по чужому правилу
+        // targetReps + 2, а не по тому, что задумала модель.
+        ...(item.targetRepsMax ? { targetRepsMax: item.targetRepsMax } : {}),
       }
     })
   }
@@ -104,7 +110,7 @@ export default function GeneratedPlan({ plan, exerciseById, heading = 'Ваша 
                       {zone.label}
                     </span>
                   )}
-                  <small>{item.targetSets}×{item.targetReps}</small>
+                  <small>{item.targetSets}×{formatReps(item)}</small>
                 </li>
               )
             })}

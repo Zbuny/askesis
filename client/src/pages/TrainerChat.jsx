@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { askTrainer, planFromChat } from '../api/ai.js'
 import { api } from '../api/firestore.js'
 import { useAutoResize } from '../hooks/useAutoResize.js'
@@ -32,6 +32,8 @@ export default function TrainerChat() {
   const [history, setHistory] = useState([])
   const [attachments, setAttachments] = useState({ workoutIds: [], includeHistory: false })
   const feedRef = useRef(null)
+  const [searchParams] = useSearchParams()
+  const askedRef = useRef(false)
   const { ref: textareaRef, adjust } = useAutoResize({ minHeight: 60, maxHeight: 200 })
 
   useEffect(() => {
@@ -48,6 +50,18 @@ export default function TrainerChat() {
     // ограничиваем окно, чтобы не тащить в промпт годы записей.
     api.listWorkoutHistory({ pageSize: 20 }).then(setHistory).catch(() => {})
   }, [])
+
+  // Тренер на дашборде и разбор после тренировки приводят сюда с уже
+  // сформулированным вопросом (?q=...) — отправляем его сам, иначе человек
+  // попадает в пустой чат с текстом в поле и переспрашивает то же самое.
+  // Ref, а не state: в StrictMode эффект вызывается дважды на одном и том же
+  // экземпляре, и без него вопрос ушёл бы двумя запросами к Groq.
+  useEffect(() => {
+    const question = searchParams.get('q')
+    if (!question || askedRef.current) return
+    askedRef.current = true
+    send(question)
+  }, [searchParams])
 
   const exerciseById = useMemo(() => new Map(exercises.map((ex) => [ex.id, ex])), [exercises])
   const hasTrainerReply = messages.some((m) => m.role === 'assistant')

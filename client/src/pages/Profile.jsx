@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api } from '../api/firestore.js'
 import { useAsyncAction } from '../hooks/useAsyncAction.js'
@@ -11,8 +11,9 @@ import { pluralRu } from '../utils/translate.js'
 import { entryTopWeight, sessionVolume } from '../utils/workoutLog.js'
 import { calcBmi } from '../utils/bmi.js'
 import { TRAINING_LEVELS } from '../utils/repRanges.js'
+import { SEX_OPTIONS } from '../utils/nutrition.js'
 
-const emptyProfileData = { height: '', age: '', level: '' }
+const emptyProfileData = { height: '', age: '', level: '', daysPerWeek: '', sex: '' }
 const todayStr = () => new Date().toISOString().slice(0, 10)
 
 export default function Profile() {
@@ -21,6 +22,11 @@ export default function Profile() {
   const [history, setHistory] = useState([])
 
   const [profileData, setProfileData] = useState(emptyProfileData)
+  // Форма живёт до того, как приедут данные из Firestore: человек может
+  // начать печатать раньше, чем вернётся запрос, и ответ не имеет права
+  // затирать введённое. На быстром соединении это незаметно, на медленном —
+  // выглядит как «поле само очистилось».
+  const editedRef = useRef(false)
   const { busy: profileSaving, error, setError, run } = useAsyncAction()
   const [profileSaved, setProfileSaved] = useState(false)
   const [selectedExerciseId, setSelectedExerciseId] = useState('')
@@ -35,13 +41,16 @@ export default function Profile() {
     api.listWeightHistory().then(setWeightHistory).catch((e) => setError(e.message))
     api
       .getMyProfileData()
-      .then((data) =>
+      .then((data) => {
+        if (editedRef.current) return
         setProfileData({
           height: data.height ?? '',
           age: data.age ?? '',
           level: data.level ?? '',
-        }),
-      )
+          daysPerWeek: data.daysPerWeek ?? '',
+          sex: data.sex ?? '',
+        })
+      })
       .catch((e) => setError(e.message))
   }, [])
 
@@ -151,6 +160,8 @@ export default function Profile() {
           height: profileData.height === '' ? null : Number(profileData.height),
           age: profileData.age === '' ? null : Number(profileData.age),
           level: profileData.level || null,
+          daysPerWeek: profileData.daysPerWeek === '' ? null : Number(profileData.daysPerWeek),
+          sex: profileData.sex || null,
         }),
       )
       setProfileSaved(true)
@@ -238,6 +249,7 @@ export default function Profile() {
               placeholder="Рост, см"
               value={profileData.height}
               onChange={(e) => {
+                editedRef.current = true
                 setProfileSaved(false)
                 setProfileData({ ...profileData, height: e.target.value })
               }}
@@ -247,6 +259,7 @@ export default function Profile() {
               placeholder="Возраст"
               value={profileData.age}
               onChange={(e) => {
+                editedRef.current = true
                 setProfileSaved(false)
                 setProfileData({ ...profileData, age: e.target.value })
               }}
@@ -254,8 +267,10 @@ export default function Profile() {
             {/* От уровня зависят и рекомендованный диапазон повторений,
                 и шаг прибавки веса — поэтому спрашиваем его один раз здесь. */}
             <select
+              className={profileData.level ? undefined : 'is-placeholder'}
               value={profileData.level}
               onChange={(e) => {
+                editedRef.current = true
                 setProfileSaved(false)
                 setProfileData({ ...profileData, level: e.target.value })
               }}
@@ -264,6 +279,43 @@ export default function Profile() {
               <option value="">Уровень подготовки</option>
               {TRAINING_LEVELS.map((level) => (
                 <option key={level} value={level}>{level}</option>
+              ))}
+            </select>
+            {/* Частота — это и есть недельная цель на дашборде. Держим её
+                рядом с уровнем: оба ответа даются в онбординге, и оба должны
+                оставаться исправимыми, когда режим изменился. */}
+            <select
+              className={profileData.daysPerWeek ? undefined : 'is-placeholder'}
+              value={profileData.daysPerWeek}
+              onChange={(e) => {
+                editedRef.current = true
+                setProfileSaved(false)
+                setProfileData({ ...profileData, daysPerWeek: e.target.value })
+              }}
+              aria-label="Тренировок в неделю"
+            >
+              <option value="">Тренировок в неделю</option>
+              {[1, 2, 3, 4, 5, 6, 7].map((days) => (
+                <option key={days} value={days}>{days} в неделю</option>
+              ))}
+            </select>
+            {/* Пол нужен ровно для одного — основного обмена в дневных нормах
+                КБЖУ. Формула различает только два значения, поэтому их и два;
+                без ответа норма считается по середине и честно помечается
+                приблизительной. */}
+            <select
+              className={profileData.sex ? undefined : 'is-placeholder'}
+              value={profileData.sex}
+              onChange={(e) => {
+                editedRef.current = true
+                setProfileSaved(false)
+                setProfileData({ ...profileData, sex: e.target.value })
+              }}
+              aria-label="Пол — для расчёта нормы калорий"
+            >
+              <option value="">Пол — для нормы калорий</option>
+              {SEX_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
             <div className="admin-form__actions">

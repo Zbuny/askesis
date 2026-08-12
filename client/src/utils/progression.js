@@ -7,7 +7,7 @@
 // фактических цифр человека, а не из календаря: неделя без прогресса в
 // повторах просто не даёт прибавки веса.
 
-import { RECOMMENDED_REPS, levelKey } from './repRanges.js'
+import { RECOMMENDED_REPS, RIR_TOO_EASY, isRir, levelKey } from './repRanges.js'
 import { entrySets } from './workoutLog.js'
 
 // Пропуск дольше двух недель — форма частично теряется, прибавлять нечего.
@@ -63,6 +63,7 @@ export function nextSessionTarget({ item, lastEntry, lastDate, exercise, level, 
       weight: null,
       reps: range.min,
       range,
+      rir: null,
       hint: `Первый раз: подберите вес, с которым ${range.min}-${range.max} повторений даются близко к отказу.`,
     }
   }
@@ -75,44 +76,85 @@ export function nextSessionTarget({ item, lastEntry, lastDate, exercise, level, 
   const plannedSets = Number(item?.targetSets) || working.length
   const step = weightStep(weight, exercise, level)
 
+  // Запас до отказа, если человек его отметил. Старые записи его не знают —
+  // тогда rir null и всё считается ровно как раньше.
+  const rir = isRir(lastEntry?.rir) ? Number(lastEntry.rir) : null
+  const tooEasy = rir != null && rir >= RIR_TOO_EASY
+  // Шаг рассчитан на подход, доведённый до предела. Если запас оставался,
+  // обычная прибавка съестся этим же запасом и ничего не изменит.
+  const boldStep = rir != null && rir >= 2 ? step * 2 : step
+
   if (daysBetween(lastDate, now) > STALE_AFTER_DAYS) {
     return {
       action: 'repeat',
       weight,
       reps: range.min,
       range,
+      rir,
       hint: `Перерыв больше ${STALE_AFTER_DAYS} дней — повторите прошлый вес, прибавите со следующей тренировки.`,
     }
   }
 
   // Свой вес и резинки: вес прибавлять нечего, растут только повторы.
+  //
+  // Верхнюю границу диапазона здесь НЕ применяем как потолок. Со штангой она
+  // означает «пора добавить вес», а без веса добавлять нечего — и цель,
+  // прижатая к range.max, превращается в требование сделать меньше, чем в
+  // прошлый раз: сделал 20 отжиманий при плане 6-8, приложение предлагает 8.
+  // Поэтому растём от факта, а границу используем только как нижнюю.
   if (weight <= 0) {
+    const grown = tooEasy ? Math.max(range.max, worstReps + 2) : worstReps + 1
     return {
       action: 'add-reps',
       weight: 0,
-      reps: Math.min(worstReps + 1, range.max),
+      reps: Math.max(range.min, grown),
       range,
-      hint: 'Без внешнего веса прогрессия идёт повторениями — добавьте по одному в каждом подходе.',
+      rir,
+      hint:
+        worstReps >= range.max
+          ? 'Диапазон уже перерос — дальше растить повторения можно, но быстрее сработает более сложный вариант упражнения или внешний вес.'
+          : tooEasy
+            ? `С таким запасом подход не рабочий — идите сразу к ${range.max} повторениям, а дальше усложняйте само упражнение.`
+            : 'Без внешнего веса прогрессия идёт повторениями — добавьте по одному в каждом подходе.',
     }
   }
 
   if (worstReps >= range.max && working.length >= plannedSets) {
     return {
       action: 'add-weight',
-      weight: weight + step,
+      weight: weight + boldStep,
       reps: range.min,
       range,
-      hint: `Верх диапазона взят во всех подходах: +${step} кг, повторы падают к ${range.min}.`,
+      rir,
+      hint:
+        boldStep > step
+          ? `Верх диапазона взят, и запас ещё оставался: +${boldStep} кг вместо обычных ${step}, повторы падают к ${range.min}.`
+          : `Верх диапазона взят во всех подходах: +${step} кг, повторы падают к ${range.min}.`,
     }
   }
 
+  // Просадка разбирается раньше запаса намеренно. «Повторов мало, но запас
+  // был» — противоречивый ввод: до отказа человек не дошёл по причине, не
+  // связанной с весом (техника, боль, спешка). Прибавлять на этом нельзя.
   if (worstReps < range.min - 2) {
     return {
       action: 'deload',
       weight: Math.max(step, weight - step),
       reps: range.min,
       range,
+      rir,
       hint: `До ${range.min} повторений не хватило двух и больше — снимите ${step} кг и наберите повторы заново.`,
+    }
+  }
+
+  if (tooEasy) {
+    return {
+      action: 'add-weight',
+      weight: weight + boldStep,
+      reps: range.min,
+      range,
+      rir,
+      hint: `Осталось ${RIR_TOO_EASY}+ повторений в запасе — ограничивают не повторы, а слишком лёгкий вес. Берём +${boldStep} кг, повторы к ${range.min}.`,
     }
   }
 
@@ -121,13 +163,18 @@ export function nextSessionTarget({ item, lastEntry, lastDate, exercise, level, 
     weight,
     reps: Math.min(Math.max(worstReps + 1, range.min), range.max),
     range,
+    rir,
     hint: `Вес тот же, цель — добрать до ${range.max} повторений во всех подходах. Тогда вес вырастет на ${step} кг.`,
   }
 }
 
 export function formatTarget(target) {
   if (!target) return ''
-  const reps = target.reps === target.range.max ? `${target.reps}` : `${target.reps}-${target.range.max}`
+  // Диапазон показываем, только пока цель внутри него. Со своим весом она
+  // может перерасти верхнюю границу (см. ветку weight <= 0 выше), и тогда
+  // «22-8 повт.» читалось бы как опечатка — потому что ею и является.
+  const reps =
+    target.reps < target.range.max ? `${target.reps}-${target.range.max}` : `${target.reps}`
   if (!target.weight) return `${reps} повт.`
   return `${target.weight} кг × ${reps}`
 }

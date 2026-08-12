@@ -31,8 +31,18 @@ export const XP_RULES = {
 // иначе награда то появлялась бы, то исчезала при обрыве серии.
 export const STREAK_MILESTONE_STEP = 3
 
-// Сколько тренировок в неделю считаем выполненной целью.
+// Сколько тренировок в неделю считаем выполненной целью, когда человек не
+// сказал иначе. Свою частоту он называет в онбординге, и она хранится в
+// профиле как daysPerWeek — weeklyGoalFrom() ниже приводит её к числу.
 export const WEEKLY_WORKOUT_GOAL = 3
+
+// Цель не должна быть ни недостижимой, ни бессмысленной: семь дней в неделю
+// — это уже не цель, а отсутствие восстановления.
+export function weeklyGoalFrom(profile) {
+  const days = Number(profile?.daysPerWeek)
+  if (!Number.isFinite(days) || days < 1) return WEEKLY_WORKOUT_GOAL
+  return Math.min(Math.round(days), 7)
+}
 
 // XP за одну тренировку. prCount приходит снаружи: рекорд определяется
 // сравнением со всей предыдущей историей, одной сессии для этого мало.

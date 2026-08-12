@@ -36,6 +36,16 @@ const workoutLog = (ownerId = ALICE) => ({
   createdAt: '2026-08-10T12:00:00.000Z',
 })
 
+const goal = (ownerId = ALICE) => ({
+  ownerId,
+  exerciseId: 'ex1',
+  exerciseName: 'Жим лёжа',
+  targetWeight: 100,
+  targetReps: 1,
+  startScore: 80,
+  createdAt: '2026-08-10T12:00:00.000Z',
+})
+
 const weightLog = (ownerId = ALICE) => ({
   ownerId,
   weight: 80,
@@ -74,6 +84,7 @@ beforeEach(async () => {
     await setDoc(doc(db, 'settings', 'admins'), { uids: [] })
     await setDoc(doc(db, 'workouts', 'bob-workout'), workout(BOB))
     await setDoc(doc(db, 'workoutLogs', 'bob-log'), workoutLog(BOB))
+    await setDoc(doc(db, 'goals', 'bob-goal'), goal(BOB))
     await setDoc(doc(db, 'weightLogs', 'bob-weight'), weightLog(BOB))
     await setDoc(doc(db, 'foodLogs', 'bob-food'), foodLog(BOB))
     await setDoc(doc(db, 'users', BOB), { height: 180, age: 30 })
@@ -239,6 +250,26 @@ describe('форма лога выполнения', () => {
     await assertFails(setDoc(doc(alice(), 'workoutLogs', 'bad'), { ...workoutLog(), entries }))
   })
 
+  it('запас до отказа сохраняется в пределах шкалы', async () => {
+    const withRir = (rir) => [{ exerciseId: 'ex1', exerciseName: 'Жим лёжа', sets: [{ weight: 60, reps: 8 }], rir }]
+
+    await assertSucceeds(setDoc(doc(alice(), 'workoutLogs', 'ok'), { ...workoutLog(), entries: withRir(0) }))
+    await assertSucceeds(setDoc(doc(alice(), 'workoutLogs', 'ok3'), { ...workoutLog(), entries: withRir(3) }))
+    await assertFails(setDoc(doc(alice(), 'workoutLogs', 'bad'), { ...workoutLog(), entries: withRir(9) }))
+    await assertFails(setDoc(doc(alice(), 'workoutLogs', 'bad'), { ...workoutLog(), entries: withRir('много') }))
+  })
+
+  it('в запись упражнения нельзя налить произвольных полей', async () => {
+    const entries = [
+      {
+        exerciseId: 'ex1',
+        sets: [{ weight: 60, reps: 8 }],
+        a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7,
+      },
+    ]
+    await assertFails(setDoc(doc(alice(), 'workoutLogs', 'bad'), { ...workoutLog(), entries }))
+  })
+
   it('запись без sets (старый формат) новым логом больше не пишется', async () => {
     const entries = [{ exerciseId: 'ex1', weight: 60, reps: 8 }]
     await assertFails(setDoc(doc(alice(), 'workoutLogs', 'bad'), { ...workoutLog(), entries }))
@@ -300,5 +331,58 @@ describe('лог питания', () => {
 
   it('название блюда ограничено по длине', async () => {
     await assertFails(setDoc(doc(alice(), 'foodLogs', 'bad'), { ...foodLog(), name: 'е'.repeat(5000) }))
+  })
+})
+
+describe('чек-ин восстановления', () => {
+  const checkin = (ownerId = ALICE) => ({
+    ownerId,
+    sleep: 4,
+    energy: 3,
+    soreness: 2,
+    date: '2026-08-11T07:00:00.000Z',
+  })
+
+  it('нормальная отметка сохраняется', async () => {
+    await assertSucceeds(setDoc(doc(alice(), 'checkins', 'ok'), checkin()))
+  })
+
+  it('значения вне шкалы 1-5 не принимаются', async () => {
+    await assertFails(setDoc(doc(alice(), 'checkins', 'bad'), { ...checkin(), sleep: 0 }))
+    await assertFails(setDoc(doc(alice(), 'checkins', 'bad'), { ...checkin(), energy: 9 }))
+    await assertFails(setDoc(doc(alice(), 'checkins', 'bad'), { ...checkin(), soreness: 'сильно' }))
+  })
+
+  it('отметка без даты не имеет смысла — она про конкретный день', async () => {
+    const { date: _drop, ...withoutDate } = checkin()
+    await assertFails(setDoc(doc(alice(), 'checkins', 'bad'), withoutDate))
+  })
+})
+
+describe('личные цели', () => {
+  it('нормальная цель сохраняется', async () => {
+    await assertSucceeds(setDoc(doc(alice(), 'goals', 'ok'), goal()))
+  })
+
+  it('цель на повторения без веса допустима — так ставят подтягивания', async () => {
+    await assertSucceeds(
+      setDoc(doc(alice(), 'goals', 'reps'), { ...goal(), targetWeight: 0, targetReps: 15 }),
+    )
+  })
+
+  it('нереальные значения не принимаются', async () => {
+    await assertFails(setDoc(doc(alice(), 'goals', 'bad'), { ...goal(), targetWeight: 9000 }))
+    await assertFails(setDoc(doc(alice(), 'goals', 'bad'), { ...goal(), targetReps: 0 }))
+    await assertFails(setDoc(doc(alice(), 'goals', 'bad'), { ...goal(), targetReps: 'много' }))
+  })
+
+  it('цель без упражнения не имеет смысла', async () => {
+    const { exerciseId: _drop, ...withoutExercise } = goal()
+    await assertFails(setDoc(doc(alice(), 'goals', 'bad'), withoutExercise))
+  })
+
+  it('чужую цель не прочитать и не удалить', async () => {
+    await assertFails(getDoc(doc(alice(), 'goals', 'bob-goal')))
+    await assertFails(deleteDoc(doc(alice(), 'goals', 'bob-goal')))
   })
 })
