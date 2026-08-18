@@ -119,7 +119,7 @@ export default function AdminExercises() {
 
       {error && <p className="error">{error}</p>}
 
-      <ExerciseFilterBar exercises={exercises} filters={filters} onChange={setFilters} />
+      <ExerciseFilterBar exercises={exercises} filters={filters} onChange={setFilters} total={filtered.length} />
       <p className="picker__count">Найдено: {filtered.length}</p>
 
       <ul className="admin-list">

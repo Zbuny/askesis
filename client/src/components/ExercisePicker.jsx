@@ -29,7 +29,7 @@ export default function ExercisePicker({ exercises, addedIds, onAdd }) {
   return (
     <>
       <h3>Библиотека упражнений</h3>
-      <ExerciseFilterBar exercises={exercises} filters={filters} onChange={setFilters} />
+      <ExerciseFilterBar exercises={exercises} filters={filters} onChange={setFilters} total={filtered.length} />
       <p className="picker__count">Найдено: {filtered.length}</p>
       <ul className="picker">
         {filtered.slice(0, visibleCount).map((ex) => {

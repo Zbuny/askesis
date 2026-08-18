@@ -26,7 +26,10 @@ test('анкета после регистрации доводит до пер�
   // Ради этой кнопки шаг и переделан: в зале человек иначе отмечает
   // одиннадцать галочек по одной. Набор должен проставить их разом.
   await page.getByRole('button', { name: 'Тренажёрный зал' }).click()
-  await expect(page.locator('.choice.is-selected')).toHaveCount(3)
+  // Сколько именно галочек — зависит от того, что есть в каталоге;
+  // важно, что набор проставил их разом, а не по одной.
+  await expect(page.locator('.equipment__preset.is-selected')).toHaveCount(1)
+  expect(await page.locator('.choice.is-selected').count()).toBeGreaterThanOrEqual(3)
 
   await page.getByRole('button', { name: 'Собрать программу' }).click()
 

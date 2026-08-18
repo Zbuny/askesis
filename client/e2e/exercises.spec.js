@@ -35,3 +35,33 @@ test('гостя каталог отправляет на вход, а посл�
   await expect(page).toHaveURL(/\/exercises/)
   await expect(page.getByRole('heading', { name: 'Библиотека упражнений' })).toBeVisible({ timeout: 10000 })
 })
+
+test('разделы по частям тела сужают выдачу, внутри — карточки мышц', async ({ page }) => {
+  await login(page, { email: ADMIN_EMAIL, password: ADMIN_PASSWORD })
+  await page.goto('/exercises')
+  await expect(page.locator('.exercise-card').first()).toBeVisible({ timeout: 10000 })
+
+  const all = await page.locator('.exercise-card').count()
+
+  // Разделы — главное, ради чего фильтр переделан: 17 групп мышц плоским
+  // списком человек не разбирает.
+  await page.getByRole('button', { name: /^Спина/ }).click()
+  await expect(page.locator('.part.is-selected')).toHaveText(/Спина/)
+
+  // Внутри раздела мышцы показаны карточками с картинкой.
+  await expect(page.locator('.muscle-card').first()).toBeVisible()
+
+  const inZone = await page.locator('.exercise-card').count()
+  expect(inZone).toBeLessThan(all)
+  expect(inZone).toBeGreaterThan(0)
+
+  // Внутри раздела сужаем до одной группы.
+  await page.locator('.muscle-card').first().click()
+  const inMuscle = await page.locator('.exercise-card').count()
+  expect(inMuscle).toBeLessThanOrEqual(inZone)
+  expect(inMuscle).toBeGreaterThan(0)
+
+  // «Все» возвращает всё обратно.
+  await page.getByRole('button', { name: /^Все / }).click()
+  await expect(page.locator('.exercise-card')).toHaveCount(all)
+})

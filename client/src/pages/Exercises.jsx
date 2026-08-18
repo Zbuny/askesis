@@ -23,7 +23,12 @@ export default function Exercises() {
   return (
     <section>
       <h2>Библиотека упражнений</h2>
-      <ExerciseFilterBar exercises={exercises} filters={filters} onChange={setFilters} />
+      <ExerciseFilterBar
+        exercises={exercises}
+        filters={filters}
+        onChange={setFilters}
+        total={filtered.length}
+      />
       {exercises.length === 0 && (
         <p>Библиотека пуста — импортируйте датасет (см. README/SETUP).</p>
       )}
