@@ -9,9 +9,12 @@ test('сохранение личных данных (рост/возраст) �
 
   await page.getByPlaceholder('Рост, см').fill('180')
   await page.getByPlaceholder('Возраст').fill('28')
-  await page.getByRole('button', { name: 'Сохранить' }).click()
+  // Форм с кнопкой «Сохранить» на странице две (данные о себе и инвентарь с
+  // ограничениями) — обе пишут один профиль, но нажимаем и проверяем свою.
+  const myData = page.locator('.profile-sidebar')
+  await myData.getByRole('button', { name: 'Сохранить' }).click()
 
-  await expect(page.getByText('Сохранено')).toBeVisible({ timeout: 10000 })
+  await expect(myData.getByText('Сохранено')).toBeVisible({ timeout: 10000 })
 
   await page.reload()
   await expect(page.getByPlaceholder('Рост, см')).toHaveValue('180', { timeout: 10000 })
@@ -41,4 +44,27 @@ test('запись веса и история веса в профиле', async
   await expect(page.getByRole('heading', { name: 'Удалить запись веса?' })).toBeVisible()
   await page.locator('.confirm').getByRole('button', { name: 'Удалить' }).click()
   await expect(page.locator('.history-list')).toHaveCount(0, { timeout: 10000 })
+})
+
+test('инвентарь и ограничения правятся в профиле, а не только в анкете', async ({ page }) => {
+  const email = uniqueEmail('e2e-profile-gear')
+  await register(page, { name: 'E2E Инвентарь', email, password: 'password123' })
+
+  const gear = page.locator('.profile-content')
+  await expect(page.getByRole('heading', { name: 'Инвентарь и ограничения' })).toBeVisible()
+  await expect(gear.getByText('Не указан — замены подбираются без оглядки на снаряды')).toBeVisible()
+
+  // Библиотека читается только по этой кнопке: до неё списка снарядов на
+  // странице нет вовсе (см. handleOpenEquipment в Profile.jsx).
+  await gear.getByRole('button', { name: 'Изменить' }).click()
+  await gear.getByRole('button', { name: 'Гантели', exact: true }).click({ timeout: 20000 })
+
+  const limits = gear.getByPlaceholder('Например: болит поясница, не делаю становую')
+  await limits.fill('болит поясница, не делаю становую')
+  await gear.getByRole('button', { name: 'Сохранить' }).click()
+  await expect(gear.getByText('Сохранено')).toBeVisible({ timeout: 10000 })
+
+  await page.reload()
+  await expect(gear.getByText('Гантели')).toBeVisible({ timeout: 20000 })
+  await expect(limits).toHaveValue('болит поясница, не делаю становую')
 })

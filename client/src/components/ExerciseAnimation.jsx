@@ -1,18 +1,31 @@
 import { useEffect, useRef, useState } from 'react'
-import { exerciseFrames } from '../utils/exerciseFrames.js'
+import { exerciseAnimationUrl, exerciseFrames } from '../utils/exerciseFrames.js'
 
 const FRAME_MS = 900
 
-// Датасет даёт два кадра на упражнение — начало и конец движения.
-// Пролистывая их по кругу, получаем ту же демонстрацию техники, что и гифка,
-// но без внешних гиф-хостингов и лишнего веса.
+// Демонстрация техники. Два пути, и выбор между ними — это данные, а не код.
+//
+// Если у упражнения заполнено animationUrl, показываем готовую анимацию: её
+// браузер крутит сам, и никакой логики кадров не нужно. Если нет — работает
+// прежняя перелистовка двух кадров из Free Exercise DB. Датасет даёт ровно
+// два кадра на упражнение, и никакие настройки времени не сделают из них
+// гифку, поэтому докладывать анимации можно по одной, по мере появления.
 export default function ExerciseAnimation({ exercise, alt, animate = true, className = '' }) {
+  const animation = exerciseAnimationUrl(exercise)
   const frames = exerciseFrames(exercise)
   const [index, setIndex] = useState(0)
   const [secondFrameOk, setSecondFrameOk] = useState(true)
+  const [animationOk, setAnimationOk] = useState(true)
   const timerRef = useRef(null)
 
-  const canAnimate = animate && frames.length > 1 && secondFrameOk
+  // Битая ссылка на анимацию не должна оставлять пустое место: откатываемся
+  // на кадры, которые есть у каждого упражнения каталога.
+  const useAnimation = Boolean(animation) && animationOk
+  const canAnimate = !useAnimation && animate && frames.length > 1 && secondFrameOk
+
+  useEffect(() => {
+    setAnimationOk(true)
+  }, [animation])
 
   useEffect(() => {
     setIndex(0)
@@ -24,6 +37,20 @@ export default function ExerciseAnimation({ exercise, alt, animate = true, class
     timerRef.current = setInterval(() => setIndex((i) => (i + 1) % frames.length), FRAME_MS)
     return () => clearInterval(timerRef.current)
   }, [canAnimate, frames.length, frames[0]])
+
+  if (useAnimation) {
+    return (
+      <span className={`exercise-anim ${className}`.trim()}>
+        <img
+          src={animation}
+          alt={alt}
+          loading="lazy"
+          className="is-visible"
+          onError={() => setAnimationOk(false)}
+        />
+      </span>
+    )
+  }
 
   if (frames.length === 0) return null
 

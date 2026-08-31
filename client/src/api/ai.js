@@ -1,14 +1,16 @@
 import { auth } from '../firebase.js'
 
-const WORKER_URL = import.meta.env.VITE_AI_WORKER_URL
+// Базовый URL воркера без хвостов вроде /chat — иначе generateWorkoutPlan
+// бьётся в несуществующий путь и получает 404 от Cloudflare, а не от Groq.
+function normalizeWorkerUrl(url) {
+  if (!url) return ''
+  return url.trim().replace(/\/$/, '').replace(/\/(chat|coach|food)$/, '')
+}
 
-// Тренер на дашборде и разбор после тренировки работают и без воркера —
-// сами выводы считаются на клиенте. Экранам нужно знать, показывать ли
-// кнопку «объяснить», а не ловить ошибку уже после нажатия.
-export const aiConfigured = Boolean(WORKER_URL)
+const WORKER_BASE = normalizeWorkerUrl(import.meta.env.VITE_AI_WORKER_URL)
 
-// Модель получает не всю библиотеку (873 упражнения не влезут в промпт),
-// а подборку под выбранный инвентарь — иначе она начинает выдумывать id.
+export const aiConfigured = Boolean(WORKER_BASE)
+
 const MAX_CANDIDATES = 150
 
 function pickCandidates(exercises, equipment) {
@@ -23,7 +25,6 @@ function pickCandidates(exercises, equipment) {
     byMuscle.get(group).push(ex)
   })
 
-  // Забираем по кругу из каждой группы мышц, чтобы подборка была сбалансированной.
   const groups = [...byMuscle.values()]
   const picked = []
   let index = 0
@@ -36,99 +37,59 @@ function pickCandidates(exercises, equipment) {
   return picked
 }
 
-async function requestPlan(payload, exercises, equipment) {
-  if (!WORKER_URL) {
+async function workerFetch(path, payload) {
+  if (!WORKER_BASE) {
     throw new Error('ИИ-помощник не настроен: пропишите VITE_AI_WORKER_URL в client/.env (см. worker/README.md)')
   }
   const user = auth.currentUser
   if (!user) throw new Error('Требуется авторизация')
 
   const token = await user.getIdToken()
-  const candidates = pickCandidates(exercises, equipment).map((ex) => ({
+  const url = path ? `${WORKER_BASE}${path}` : WORKER_BASE
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  })
+
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    const detail = data.detail ? ` (${data.detail})` : ''
+    throw new Error(data.error ? `${data.error}${detail}` : `Ошибка ${response.status}`)
+  }
+  return data
+}
+
+export function generateWorkoutPlan({ profile, exercises }) {
+  const candidates = pickCandidates(exercises, profile.equipment).map((ex) => ({
     id: ex.id,
     name: ex.nameRu || ex.name,
     muscleGroup: ex.muscleGroup,
     equipment: ex.equipment,
   }))
-
-  const response = await fetch(WORKER_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ ...payload, candidates }),
-  })
-
-  const data = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error(data.error || `Ошибка ${response.status}`)
-  return data
+  return workerFetch('', { profile, candidates })
 }
 
-export function generateWorkoutPlan({ profile, exercises }) {
-  return requestPlan({ profile }, exercises, profile.equipment)
-}
-
-// Собирает программу из уже состоявшегося диалога: инвентарь заранее
-// неизвестен, поэтому подборку упражнений не сужаем.
 export function planFromChat({ messages, exercises }) {
-  return requestPlan({ conversation: messages }, exercises, null)
+  const candidates = pickCandidates(exercises, null).map((ex) => ({
+    id: ex.id,
+    name: ex.nameRu || ex.name,
+    muscleGroup: ex.muscleGroup,
+    equipment: ex.equipment,
+  }))
+  return workerFetch('', { conversation: messages, candidates })
 }
 
 export async function scanFood(imageDataUrl) {
-  if (!WORKER_URL) {
-    throw new Error('ИИ-помощник не настроен: пропишите VITE_AI_WORKER_URL в client/.env (см. worker/README.md)')
-  }
-  const user = auth.currentUser
-  if (!user) throw new Error('Требуется авторизация')
-
-  const token = await user.getIdToken()
-  const response = await fetch(`${WORKER_URL.replace(/\/$/, '')}/food`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ image: imageDataUrl }),
-  })
-
-  const data = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error(data.error || `Ошибка ${response.status}`)
-  return data
+  return workerFetch('/food', { image: imageDataUrl })
 }
 
-// Комментарий тренера к уже посчитанным выводам. Модель получает готовые
-// формулировки (coach.js → coachFacts, sessionReview.js → reviewFacts) и
-// только связывает их в один совет: считать ей нечего, а значит и
-// расходиться с цифрами на экране не с чем.
 export async function askCoach({ kind, facts }) {
-  if (!WORKER_URL) {
-    throw new Error('ИИ-помощник не настроен: пропишите VITE_AI_WORKER_URL в client/.env (см. worker/README.md)')
-  }
-  const user = auth.currentUser
-  if (!user) throw new Error('Требуется авторизация')
-
-  const token = await user.getIdToken()
-  const response = await fetch(`${WORKER_URL.replace(/\/$/, '')}/coach`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ kind, facts }),
-  })
-
-  const data = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error(data.error || `Ошибка ${response.status}`)
+  const data = await workerFetch('/coach', { kind, facts })
   return data.reply
 }
 
 export async function askTrainer(messages, context) {
-  if (!WORKER_URL) {
-    throw new Error('ИИ-помощник не настроен: пропишите VITE_AI_WORKER_URL в client/.env (см. worker/README.md)')
-  }
-  const user = auth.currentUser
-  if (!user) throw new Error('Требуется авторизация')
-
-  const token = await user.getIdToken()
-  const response = await fetch(`${WORKER_URL.replace(/\/$/, '')}/chat`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ messages, context }),
-  })
-
-  const data = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error(data.error || `Ошибка ${response.status}`)
+  const data = await workerFetch('/chat', { messages, context })
   return data.reply
 }

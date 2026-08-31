@@ -15,10 +15,16 @@ import SessionReview from '../components/SessionReview.jsx'
 import ReadinessCheckin from '../components/ReadinessCheckin.jsx'
 import ExerciseSwap from '../components/ExerciseSwap.jsx'
 import { readinessScore, todayCheckin } from '../utils/readiness.js'
+import { hasExerciseMedia } from '../utils/exerciseFrames.js'
 import ExerciseAnimation from '../components/ExerciseAnimation.jsx'
 import BackLink from '../components/BackLink.jsx'
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
 import { useConfirm } from '../hooks/useConfirm.js'
+import {
+  clearSessionDraft,
+  loadSessionDraft,
+  saveSessionDraft,
+} from '../utils/workoutDraft.js'
 
 const emptySet = () => ({ weight: '', reps: '' })
 const HISTORY_PAGE_SIZE = 10
@@ -55,6 +61,7 @@ export default function WorkoutDetail() {
   const [checkins, setCheckins] = useState([])
   const [swapping, setSwapping] = useState(false)
   const reviewRef = useRef(null)
+  const sessionHydrated = useRef(false)
   const { startedAt, elapsedSeconds, start, reset } = useWorkoutTimer(id)
   const { ask, confirmProps } = useConfirm()
 
@@ -144,25 +151,34 @@ export default function WorkoutDetail() {
   }, [review])
 
   useEffect(() => {
+    sessionHydrated.current = false
     Promise.all([api.getWorkout({ id }), loadHistory()])
       .then(([w, loadedHistory]) => {
         setWorkout(w)
 
-        // Подставляем прошлый результат по каждому подходу — так проще
-        // ориентироваться, с каким весом заходить сегодня.
-        const lastEntries = new Map((loadedHistory?.[0]?.entries || []).map((e) => [e.exerciseId, e]))
-        const initial = {}
-        w.items.forEach((item) => {
-          const lastSets = entrySets(lastEntries.get(item.exerciseId))
-          const count = Math.max(item.targetSets || 1, lastSets.length, 1)
-          // Ничего не подставляем «из цели»: пустой подход должен означать
-          // «не делал». Цель показываем плейсхолдером.
-          initial[item.exerciseId] = Array.from({ length: count }, (_, i) => ({
-            weight: lastSets[i] ? String(lastSets[i].weight) : '',
-            reps: lastSets[i] ? String(lastSets[i].reps) : '',
-          }))
-        })
-        setResults(initial)
+        const draft = loadSessionDraft(id)
+        if (draft) {
+          setResults(draft.results)
+          setRir(draft.rir)
+          setFollowed(new Set(draft.followed))
+        } else {
+          // Подставляем прошлый результат по каждому подходу — так проще
+          // ориентироваться, с каким весом заходить сегодня.
+          const lastEntries = new Map((loadedHistory?.[0]?.entries || []).map((e) => [e.exerciseId, e]))
+          const initial = {}
+          w.items.forEach((item) => {
+            const lastSets = entrySets(lastEntries.get(item.exerciseId))
+            const count = Math.max(item.targetSets || 1, lastSets.length, 1)
+            initial[item.exerciseId] = Array.from({ length: count }, (_, i) => ({
+              weight: lastSets[i] ? String(lastSets[i].weight) : '',
+              reps: lastSets[i] ? String(lastSets[i].reps) : '',
+            }))
+          })
+          setResults(initial)
+          setRir({})
+          setFollowed(new Set())
+        }
+        sessionHydrated.current = true
 
         // Картинка и ссылка «как выполнять» — берём из уже закэшированного
         // каталога (см. api/cache.js), а не читаем каждое упражнение
@@ -181,6 +197,11 @@ export default function WorkoutDetail() {
       })
       .catch((e) => setError(e.message))
   }, [id])
+
+  useEffect(() => {
+    if (!workout || !sessionHydrated.current) return
+    saveSessionDraft(id, { results, rir, followed: [...followed] })
+  }, [id, workout, results, rir, followed])
 
   // Что ставить сегодня — считаем из последней записи по этой же тренировке:
   // добрал верх диапазона во всех подходах — вес растёт, нет — добираем повторы.
@@ -270,6 +291,7 @@ export default function WorkoutDetail() {
         }),
       )
       reset()
+      clearSessionDraft(id)
       setFollowed(new Set())
       setRir({})
       loadHistory()
@@ -403,7 +425,7 @@ export default function WorkoutDetail() {
             <div className="log-exercise" key={item.exerciseId}>
               <div className="log-exercise__head">
                 <Link to={`/exercises/${item.exerciseId}`} className="log-exercise__media">
-                  {ex?.imageUrl ? (
+                  {hasExerciseMedia(ex) ? (
                     <ExerciseAnimation exercise={ex} alt={exerciseName(ex)} animate={false} />
                   ) : (
                     <span className="log-exercise__media-empty" aria-hidden="true" />
@@ -445,6 +467,7 @@ export default function WorkoutDetail() {
                       origin={ex}
                       catalogue={catalogue}
                       equipment={profile.equipment}
+                      limits={profile.limits}
                       busy={swapping}
                       onSwap={(replacement) => handleSwap(item, replacement)}
                     />

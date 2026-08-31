@@ -73,7 +73,7 @@ function requireOwnWorkout(id) {
 // библиотеки, и нужны они только на странице упражнения, которая читает свой
 // документ отдельным запросом. В кэш кладём урезанную проекцию, иначе он один
 // занял бы четверть квоты localStorage и парсился заметное время при загрузке.
-const LIST_FIELDS = ['id', 'name', 'nameRu', 'muscleGroup', 'equipment', 'level', 'category', 'imageUrl', 'imageUrls']
+const LIST_FIELDS = ['id', 'name', 'nameRu', 'muscleGroup', 'equipment', 'level', 'category', 'imageUrl', 'imageUrls', 'animationUrl']
 
 function slimExercise(ex) {
   const slim = {}

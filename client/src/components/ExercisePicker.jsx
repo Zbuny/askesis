@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { exerciseName, translateEquipment, translateMuscle } from '../utils/translate.js'
 import { emptyFilters, filterExercises } from '../utils/exerciseFilters.js'
 import ExerciseFilterBar from './ExerciseFilterBar.jsx'
+import { hasExerciseMedia } from '../utils/exerciseFrames.js'
 import ExerciseAnimation from './ExerciseAnimation.jsx'
 
 const PAGE_SIZE = 40
@@ -37,7 +38,7 @@ export default function ExercisePicker({ exercises, addedIds, onAdd }) {
           return (
             <li key={ex.id} className={`picker__item${added ? ' is-added' : ''}`}>
               <Link to={`/exercises/${ex.id}`} className="picker__media" title="Открыть упражнение">
-                {ex.imageUrl ? (
+                {hasExerciseMedia(ex) ? (
                   <ExerciseAnimation exercise={ex} alt={exerciseName(ex)} animate={false} />
                 ) : (
                   <span className="picker__media-empty" aria-hidden="true" />

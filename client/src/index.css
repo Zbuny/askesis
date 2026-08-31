@@ -1839,6 +1839,35 @@ select:focus-visible {
   gap: 0.6rem;
 }
 
+.admin-list__reorder {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-right: 0.5rem;
+  flex-shrink: 0;
+}
+
+.admin-list__reorder button {
+  background: none;
+  border: 1px solid var(--border-strong);
+  color: var(--text-muted);
+  border-radius: var(--radius);
+  padding: 0.15rem 0.45rem;
+  font-size: 0.75rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.admin-list__reorder button:hover:not(:disabled) {
+  border-color: var(--gold);
+  color: var(--gold-bright);
+}
+
+.admin-list__reorder button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 .number-input {
   width: 3.75rem;
   padding: 0.4rem;
@@ -3937,6 +3966,99 @@ select:focus-visible {
   max-width: 620px;
 }
 
+/* Поле профиля, которое не влезает в один input: инвентарь показывается
+   строкой со снарядами, ограничения — свободным текстом. */
+.profile-field {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.profile-field__label {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-faint);
+}
+
+.profile-field__summary {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.profile-field__summary p {
+  flex: 1 1 200px;
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+
+.account {
+  margin-top: 1rem;
+}
+
+.account__email {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  font-size: 0.88rem;
+  overflow-wrap: anywhere;
+}
+
+.account__badge {
+  justify-self: start;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  color: var(--text-faint);
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.account__badge.is-ok {
+  border-color: var(--gold);
+  color: var(--gold-bright);
+}
+
+.account__actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 0.85rem;
+}
+
+/* Те же очертания, что у кнопки рядом с UID: обе — второстепенные действия
+   в одной колонке, и выглядеть они обязаны одинаково. */
+.profile-field__summary button,
+.account__actions button {
+  padding: 0.6rem 1.1rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text-muted);
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: border-color 0.2s var(--ease), color 0.2s var(--ease);
+}
+
+.profile-field__summary button:hover:not(:disabled),
+.account__actions button:hover:not(:disabled) {
+  border-color: var(--gold);
+  color: var(--gold-bright);
+}
+
+.account__actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 /* ---------- 404 ---------- */
 
 .not-found {
@@ -5265,6 +5387,15 @@ button.calendar__cell {
   padding: 0.4rem;
   font-size: 0.78rem;
   color: var(--text-faint);
+}
+
+.swap__limits {
+  margin: 0 0 0.5rem;
+  padding: 0.5rem 0.6rem;
+  border-left: 2px solid var(--gold);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--text-muted);
 }
 
 .next-target__readiness {

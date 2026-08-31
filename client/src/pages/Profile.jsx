@@ -6,8 +6,11 @@ import { useAsyncAction } from '../hooks/useAsyncAction.js'
 import { friendlyErrorMessage } from '../utils/errors.js'
 import ProgressChart from '../components/ProgressChart.jsx'
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
+import EquipmentPicker from '../components/EquipmentPicker.jsx'
 import { useConfirm } from '../hooks/useConfirm.js'
 import { calcBmi } from '../utils/bmi.js'
+import { uniqueValues } from '../utils/exerciseFilters.js'
+import { translateEquipment } from '../utils/translate.js'
 import { TRAINING_LEVELS } from '../utils/repRanges.js'
 import { SEX_OPTIONS } from '../utils/nutrition.js'
 
@@ -16,16 +19,30 @@ import { SEX_OPTIONS } from '../utils/nutrition.js'
 // тренировок, живёт на «Статистике» — там для этого есть и период, и разбор
 // дня, и рекорды.
 //
+// Инвентарь и ограничения тоже живут здесь, а не только в анкетах. Оба
+// ответа даются один раз — в онбординге и в мастере ИИ — и оба нужны потом
+// постоянно: по инвентарю подбирается замена упражнения, ограничения уходят
+// тренеру в чат. Пока их некуда было исправить, менялись они единственным
+// способом — пройти анкету заново.
+//
 // Побочный, но важный эффект разделения: журнал здесь больше не читается.
 // Раньше страница тянула listWorkoutHistory({}) целиком — без пагинации, всю
 // историю до первого дня — ради четырёх чисел в шапке. На Spark-плане это
 // был самый дорогой экран приложения при том, что открывают его чаще других.
 
-const emptyProfileData = { height: '', age: '', level: '', daysPerWeek: '', sex: '' }
+const emptyProfileData = {
+  height: '',
+  age: '',
+  level: '',
+  daysPerWeek: '',
+  sex: '',
+  equipment: [],
+  limits: '',
+}
 const todayStr = () => new Date().toISOString().slice(0, 10)
 
 export default function Profile() {
-  const { user, isAdmin } = useAuth()
+  const { user, isAdmin, resetPassword, verifyEmail, refreshEmailVerified } = useAuth()
   const [uidCopied, setUidCopied] = useState(false)
 
   const [profileData, setProfileData] = useState(emptyProfileData)
@@ -33,9 +50,34 @@ export default function Profile() {
   // начать печатать раньше, чем вернётся запрос, и ответ не имеет права
   // затирать введённое. На быстром соединении это незаметно, на медленном —
   // выглядит как «поле само очистилось».
-  const editedRef = useRef(false)
+  //
+  // Помним при этом не факт правки, а список правленых полей. Отбросить
+  // ответ целиком уже нельзя: в нём приезжают инвентарь и ограничения,
+  // которых в форме не видно, — а сохранение после этого записало бы поверх
+  // них пустоту.
+  const editedRef = useRef(new Set())
+  // Пока профиль не приехал, форма пуста — и сохранение из неё затёрло бы
+  // инвентарь с ограничениями пустыми значениями. Раньше цена такой гонки
+  // была невелика (рост и возраст видно тут же, что они стёрлись), теперь
+  // это молчаливая потеря настроек, поэтому до загрузки не сохраняем.
+  const [loaded, setLoaded] = useState(false)
   const { busy: profileSaving, error, setError, run } = useAsyncAction()
-  const [profileSaved, setProfileSaved] = useState(false)
+  // Форм на странице две, а профиль один: пишутся они одинаково, но «Сохранено»
+  // обязано появиться в той карточке, где нажали, а не в обеих сразу.
+  const [savedSection, setSavedSection] = useState(null)
+
+  // Библиотека упражнений нужна ровно за одним — списком снарядов, которые
+  // вообще встречаются в базе. Тянем её только когда человек открыл выбор
+  // инвентаря: без этого страница снова стала бы читать 800+ документов
+  // ради экрана, который открывают чаще всех (см. шапку файла).
+  const [equipmentOptions, setEquipmentOptions] = useState(null)
+  const [equipmentOpen, setEquipmentOpen] = useState(false)
+
+  // Почта подтверждается вне приложения, поэтому флаг в объекте пользователя
+  // может отстать — держим его отдельно и обновляем по кнопке.
+  const [emailVerified, setEmailVerified] = useState(Boolean(user?.emailVerified))
+  const [accountNotice, setAccountNotice] = useState(null)
+  const [accountBusy, setAccountBusy] = useState(false)
 
   const [weightHistory, setWeightHistory] = useState([])
   const [weightEntry, setWeightEntry] = useState({ weight: '', date: todayStr() })
@@ -47,15 +89,27 @@ export default function Profile() {
     api
       .getMyProfileData()
       .then((data) => {
-        if (editedRef.current) return
-        setProfileData({
+        const loadedData = {
           height: data.height ?? '',
           age: data.age ?? '',
           level: data.level ?? '',
           daysPerWeek: data.daysPerWeek ?? '',
           sex: data.sex ?? '',
+          equipment: data.equipment ?? [],
+          limits: data.limits ?? '',
+        }
+        setProfileData((prev) => {
+          const merged = { ...loadedData }
+          editedRef.current.forEach((field) => {
+            merged[field] = prev[field]
+          })
+          return merged
         })
+        setLoaded(true)
       })
+      // Флаг намеренно остаётся снятым: не прочитав профиль, мы не знаем,
+      // что в нём было, и запись из пустой формы стёрла бы настройки.
+      // Текст ошибки при этом виден выше.
       .catch((e) => setError(e.message))
   }, [setError])
 
@@ -66,6 +120,13 @@ export default function Profile() {
     [latestWeight, profileData.height],
   )
 
+  // Пароль есть только у тех, кто регистрировался по почте: пришедшему через
+  // Google менять в приложении нечего — учётка живёт на стороне Google.
+  const hasPassword = useMemo(
+    () => (user?.providerData || []).some((provider) => provider.providerId === 'password'),
+    [user],
+  )
+
   const weightSeries = useMemo(
     () =>
       [...weightHistory]
@@ -74,10 +135,11 @@ export default function Profile() {
     [weightHistory],
   )
 
-  // Каждое поле помечает форму изменённой: см. editedRef выше.
+  // Каждое правленое поле попадает в editedRef — см. выше, зачем именно
+  // список полей, а не один флаг.
   function edit(patch) {
-    editedRef.current = true
-    setProfileSaved(false)
+    Object.keys(patch).forEach((field) => editedRef.current.add(field))
+    setSavedSection(null)
     setProfileData((prev) => ({ ...prev, ...patch }))
   }
 
@@ -93,9 +155,9 @@ export default function Profile() {
     }
   }
 
-  async function handleSaveProfileData(e) {
+  async function handleSaveProfileData(e, section) {
     e.preventDefault()
-    setProfileSaved(false)
+    setSavedSection(null)
     try {
       await run(() =>
         api.updateMyProfileData({
@@ -104,11 +166,72 @@ export default function Profile() {
           level: profileData.level || null,
           daysPerWeek: profileData.daysPerWeek === '' ? null : Number(profileData.daysPerWeek),
           sex: profileData.sex || null,
+          equipment: profileData.equipment,
+          // Пустую строку кладём как null, а не как '': так поле читается
+          // одинаково и у тех, кто ограничения стёр, и у тех, кто их
+          // никогда не заполнял.
+          limits: profileData.limits.trim() || null,
         }),
       )
-      setProfileSaved(true)
+      setSavedSection(section)
     } catch {
       // ошибка уже показана ниже через error
+    }
+  }
+
+  async function handleOpenEquipment() {
+    setEquipmentOpen(true)
+    if (equipmentOptions) return
+    try {
+      const exercises = await api.listExercises()
+      setEquipmentOptions(uniqueValues(exercises, 'equipment'))
+    } catch (err) {
+      setError(friendlyErrorMessage(err))
+      setEquipmentOpen(false)
+    }
+  }
+
+  // Оба действия с аккаунтом — это письмо на свой же адрес: пароль меняется
+  // по ссылке из письма, а не в форме. Так не нужно ни спрашивать текущий
+  // пароль, ни держать его в поле ввода.
+  async function runAccountAction(action, notice) {
+    setAccountNotice(null)
+    setAccountBusy(true)
+    try {
+      await action()
+      setAccountNotice(notice)
+    } catch (err) {
+      setError(friendlyErrorMessage(err))
+    } finally {
+      setAccountBusy(false)
+    }
+  }
+
+  function handleSendVerification() {
+    return runAccountAction(
+      verifyEmail,
+      `Письмо отправлено на ${user?.email}. Перейдите по ссылке из письма и вернитесь сюда.`,
+    )
+  }
+
+  function handleChangePassword() {
+    return runAccountAction(
+      () => resetPassword(user.email),
+      `Письмо со ссылкой для смены пароля отправлено на ${user?.email}.`,
+    )
+  }
+
+  async function handleRecheckEmail() {
+    setAccountNotice(null)
+    setAccountBusy(true)
+    try {
+      const verified = await refreshEmailVerified()
+      setEmailVerified(verified)
+      if (!verified) setAccountNotice('Пока не подтверждено — перейдите по ссылке из письма.')
+    } catch (err) {
+      setError(friendlyErrorMessage(err))
+    } finally {
+      setAccountBusy(false)
     }
   }
 
@@ -150,7 +273,8 @@ export default function Profile() {
           <h2>Привет, {user?.displayName || 'спортсмен'}</h2>
           <p>
             Здесь только данные о вас — от них зависят диапазон повторений, шаг
-            прибавки веса, недельная цель и норма калорий.{' '}
+            прибавки веса, недельная цель, норма калорий и подбор замены
+            упражнения.{' '}
             <Link to="/statistics">Прогресс и графики — на «Статистике»</Link>.
           </p>
         </div>
@@ -161,7 +285,7 @@ export default function Profile() {
       <div className="profile-layout">
         <div className="profile-sidebar">
           <h3>Мои данные</h3>
-          <form className="admin-form" onSubmit={handleSaveProfileData}>
+          <form className="admin-form" onSubmit={(e) => handleSaveProfileData(e, 'data')}>
             <input
               type="number"
               placeholder="Рост, см"
@@ -217,10 +341,41 @@ export default function Profile() {
               ))}
             </select>
             <div className="admin-form__actions">
-              <button type="submit" disabled={profileSaving}>Сохранить</button>
-              {profileSaved && <span className="eyebrow">Сохранено</span>}
+              <button type="submit" disabled={profileSaving || !loaded}>Сохранить</button>
+              {savedSection === 'data' && <span className="eyebrow">Сохранено</span>}
             </div>
           </form>
+
+          <h3>Аккаунт</h3>
+          <div className="account">
+            <p className="account__email">
+              <span>{user?.email || 'Почта не указана'}</span>
+              <span className={emailVerified ? 'account__badge is-ok' : 'account__badge'}>
+                {emailVerified ? 'Почта подтверждена' : 'Почта не подтверждена'}
+              </span>
+            </p>
+            <div className="account__actions">
+              {!emailVerified && user?.email && (
+                <>
+                  <button type="button" onClick={handleSendVerification} disabled={accountBusy}>
+                    Подтвердить почту
+                  </button>
+                  <button type="button" onClick={handleRecheckEmail} disabled={accountBusy}>
+                    Уже подтвердил
+                  </button>
+                </>
+              )}
+              {hasPassword && user?.email && (
+                <button type="button" onClick={handleChangePassword} disabled={accountBusy}>
+                  Сменить пароль
+                </button>
+              )}
+            </div>
+            {!hasPassword && (
+              <p className="uid-block__hint">Вход через Google — пароль меняется в аккаунте Google.</p>
+            )}
+            {accountNotice && <p className="uid-block__hint">{accountNotice}</p>}
+          </div>
 
           <h3>Мой ID</h3>
           <div className="uid-block">
@@ -235,6 +390,51 @@ export default function Profile() {
         </div>
 
         <div className="profile-content">
+          <h3>Инвентарь и ограничения</h3>
+          <p className="uid-block__hint">
+            Отсюда берутся замена упражнения прямо в тренировке, программа
+            ИИ-тренера и подсказки в чате.
+          </p>
+          <form className="admin-form" onSubmit={(e) => handleSaveProfileData(e, 'gear')}>
+            <div className="profile-field">
+              <span className="profile-field__label">Инвентарь</span>
+              {equipmentOpen ? (
+                <EquipmentPicker
+                  available={equipmentOptions || []}
+                  selected={profileData.equipment}
+                  onChange={(equipment) => edit({ equipment })}
+                />
+              ) : (
+                <div className="profile-field__summary">
+                  <p>
+                    {profileData.equipment.length > 0
+                      ? profileData.equipment.map(translateEquipment).join(', ')
+                      : 'Не указан — замены подбираются без оглядки на снаряды'}
+                  </p>
+                  <button type="button" onClick={handleOpenEquipment}>Изменить</button>
+                </div>
+              )}
+            </div>
+
+            <div className="profile-field">
+              <span className="profile-field__label">Травмы и ограничения</span>
+              {/* Ровно тот же потолок, что и в правилах Firestore: лучше не
+                  дать дописать, чем отклонить сохранение уже написанного. */}
+              <textarea
+                rows={3}
+                maxLength={400}
+                placeholder="Например: болит поясница, не делаю становую"
+                value={profileData.limits}
+                onChange={(e) => edit({ limits: e.target.value })}
+              />
+            </div>
+
+            <div className="admin-form__actions">
+              <button type="submit" disabled={profileSaving || !loaded}>Сохранить</button>
+              {savedSection === 'gear' && <span className="eyebrow">Сохранено</span>}
+            </div>
+          </form>
+
           <h3>Вес</h3>
           <form className="admin-form" onSubmit={handleLogWeight}>
             <input

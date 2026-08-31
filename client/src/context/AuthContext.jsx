@@ -8,6 +8,7 @@ import {
   updateProfile,
   signOut as firebaseSignOut,
   sendPasswordResetEmail,
+  sendEmailVerification,
 } from 'firebase/auth'
 import { auth } from '../firebase.js'
 
@@ -60,9 +61,37 @@ export function AuthProvider({ children }) {
 
   const resetPassword = useCallback((email) => sendPasswordResetEmail(auth, email), [])
 
+  const verifyEmail = useCallback(() => {
+    if (!auth.currentUser) throw new Error('Требуется авторизация')
+    return sendEmailVerification(auth.currentUser)
+  }, [])
+
+  // Подтверждение почты происходит вне приложения — в почтовом клиенте, а то
+  // и на другом устройстве. onAuthStateChanged об этом не узнает, и объект
+  // пользователя в контексте остаётся с прежним emailVerified до следующего
+  // входа. reload() перечитывает его с сервера; возвращаем сам флаг, а не
+  // кладём в состояние: reload меняет объект на месте, ссылка остаётся той
+  // же, и перерисовки от setUser всё равно не будет.
+  const refreshEmailVerified = useCallback(async () => {
+    if (!auth.currentUser) return false
+    await auth.currentUser.reload()
+    return auth.currentUser.emailVerified
+  }, [])
+
   return (
     <AuthContext.Provider
-      value={{ user, isAdmin, loading, login, register, loginWithGoogle, logout, resetPassword }}
+      value={{
+        user,
+        isAdmin,
+        loading,
+        login,
+        register,
+        loginWithGoogle,
+        logout,
+        resetPassword,
+        verifyEmail,
+        refreshEmailVerified,
+      }}
     >
       {children}
     </AuthContext.Provider>

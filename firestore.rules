@@ -203,6 +203,11 @@ service cloud.firestore {
         && (!('goal' in d) || d.goal == null || (d.goal is string && d.goal.size() <= 200))
         && (!('level' in d) || d.level == null || (d.level is string && d.level.size() <= 60))
         && (!('equipment' in d) || d.equipment == null || (d.equipment is list && d.equipment.size() <= 30))
+        // Травмы и ограничения — единственное поле профиля со свободным
+        // текстом, поэтому длина здесь не формальность: без потолка сюда
+        // уходит документ любого размера. 400 символов — столько же, сколько
+        // пропускает воркер в промпт (worker/src/index.js, sanitizeProfile).
+        && (!('limits' in d) || d.limits == null || (d.limits is string && d.limits.size() <= 400))
         // Пол нужен ровно для одного — основного обмена в дневных нормах
         // КБЖУ (client/src/utils/nutrition.js). Поэтому и значений всего два:
         // формула Миффлина-Сан Жеора различает только их.

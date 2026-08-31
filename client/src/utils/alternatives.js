@@ -10,6 +10,7 @@
 // в списке, но никогда не позволяет подсунуть присед вместо жима.
 
 import { exerciseName } from './translate.js'
+import { parseLimits, conflictsWithLimits } from './limits.js'
 
 export const MAX_ALTERNATIVES = 6
 
@@ -26,6 +27,17 @@ function equipmentScore(exercise, origin, available) {
   // у кого её нет, бессмысленно, каким бы похожим упражнение ни было.
   if (available?.length) return available.includes(equipment) ? 0 : 5
   return equipment === origin.equipment ? 1 : 0
+}
+
+// Ограничения весят больше любой другой суммы штрафов, чтобы упражнение,
+// которое человек просил не давать, гарантированно оказалось в конце списка.
+// Именно в конце, а не за его пределами: совпадение по основе слова иногда
+// ловит лишнее, и молча вычеркнуть единственную доступную замену хуже, чем
+// показать её с пометкой (см. utils/limits.js).
+const LIMITS_PENALTY = 20
+
+function limitsScore(exercise, avoid) {
+  return conflictsWithLimits(exercise, avoid) ? LIMITS_PENALTY : 0
 }
 
 const LEVEL_RANK = { beginner: 0, intermediate: 1, expert: 2 }
@@ -49,8 +61,10 @@ function secondaryScore(exercise, origin) {
   return shared > 0 ? 0 : 1
 }
 
-export function findAlternatives(origin, catalogue = [], { equipment = [], limit = MAX_ALTERNATIVES } = {}) {
+export function findAlternatives(origin, catalogue = [], { equipment = [], limits = '', limit = MAX_ALTERNATIVES } = {}) {
   if (!origin?.muscleGroup) return []
+
+  const avoid = parseLimits(limits)
 
   return catalogue
     .filter((ex) => ex.id !== origin.id && ex.muscleGroup === origin.muscleGroup)
@@ -60,7 +74,8 @@ export function findAlternatives(origin, catalogue = [], { equipment = [], limit
         equipmentScore(ex, origin, equipment) +
         categoryScore(ex, origin) +
         levelScore(ex, origin) +
-        secondaryScore(ex, origin),
+        secondaryScore(ex, origin) +
+        limitsScore(ex, avoid),
     }))
     .sort((a, b) => {
       if (a.score !== b.score) return a.score - b.score
@@ -71,11 +86,14 @@ export function findAlternatives(origin, catalogue = [], { equipment = [], limit
     .map((row) => ({
       ...row.exercise,
       // Человеку нужно не число, а причина: «то же самое, но с гантелями».
-      reason: reasonFor(row.exercise, origin, equipment),
+      reason: reasonFor(row.exercise, origin, equipment, avoid),
     }))
 }
 
-function reasonFor(exercise, origin, available) {
+function reasonFor(exercise, origin, available, avoid) {
+  // Про ограничения говорим первым делом: остальные причины объясняют, чем
+  // замена хороша, а эта — почему на неё стоит посмотреть внимательно.
+  if (conflictsWithLimits(exercise, avoid)) return 'Похоже на ваши ограничения — осторожно'
   if (exercise.equipment && exercise.equipment !== origin.equipment) {
     const fits = available?.length && available.includes(exercise.equipment)
     return fits ? 'Та же группа мышц, есть в вашем инвентаре' : 'Та же группа мышц, другой снаряд'

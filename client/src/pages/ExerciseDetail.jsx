@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import { api } from '../api/firestore.js'
 import ExerciseAnimation from '../components/ExerciseAnimation.jsx'
 import BackLink from '../components/BackLink.jsx'
-import { exerciseFrames } from '../utils/exerciseFrames.js'
+import { exerciseFrames, hasExerciseMedia } from '../utils/exerciseFrames.js'
 import {
   exerciseInstructions,
   exerciseName,
@@ -43,7 +43,7 @@ export default function ExerciseDetail() {
       <BackLink fallback="/exercises" label="К библиотеке" />
 
       <div className="exercise-detail__layout">
-        {exercise.imageUrl && (
+        {hasExerciseMedia(exercise) && (
           <div className="exercise-detail__media">
             <ExerciseAnimation exercise={exercise} alt={exerciseName(exercise)} />
             <span className="exercise-detail__caption">Движение целиком</span>

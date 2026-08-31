@@ -6,12 +6,12 @@ import { exerciseName, translateEquipment } from '../utils/translate.js'
 // показывает аналоги той же группы мышц — подробнее о правилах подбора см.
 // utils/alternatives.js.
 
-export default function ExerciseSwap({ origin, catalogue, equipment, onSwap, busy }) {
+export default function ExerciseSwap({ origin, catalogue, equipment, limits, onSwap, busy }) {
   const [open, setOpen] = useState(false)
 
   if (!origin) return null
 
-  const options = open ? findAlternatives(origin, catalogue, { equipment }) : []
+  const options = open ? findAlternatives(origin, catalogue, { equipment, limits }) : []
 
   return (
     <div className="swap">
@@ -21,6 +21,12 @@ export default function ExerciseSwap({ origin, catalogue, equipment, onSwap, bus
 
       {open && (
         <div className="swap__panel">
+          {/* Ограничения показываем текстом, а не только учитываем в порядке:
+              разобрать фразу до конца подбор всё равно не может, а человек,
+              видя свою же формулировку, выберет замену сам. */}
+          {limits?.trim() && (
+            <p className="swap__limits">Ваши ограничения: {limits.trim()}</p>
+          )}
           {options.length === 0 ? (
             <p className="swap__empty">
               В библиотеке нет другого упражнения на эту же группу мышц

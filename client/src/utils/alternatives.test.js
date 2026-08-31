@@ -64,6 +64,25 @@ describe('findAlternatives', () => {
     expect(findAlternatives(null, catalogue)).toEqual([])
   })
 
+  it('задвигает в конец то, что человек просил не давать', () => {
+    const list = ids(findAlternatives(bench, catalogue, { limits: 'не делаю отжимания' }))
+
+    expect(list[list.length - 1]).toBe('push-up')
+  })
+
+  it('не прячет упражнение из-за ограничений, а помечает его', () => {
+    const list = findAlternatives(bench, catalogue, { limits: 'не делаю отжимания' })
+    const pushUp = list.find((ex) => ex.id === 'push-up')
+
+    expect(pushUp).toBeDefined()
+    expect(pushUp.reason).toBe('Похоже на ваши ограничения — осторожно')
+  })
+
+  it('без ограничений порядок прежний', () => {
+    expect(ids(findAlternatives(bench, catalogue, { limits: '' })))
+      .toEqual(ids(findAlternatives(bench, catalogue)))
+  })
+
   it('порядок не меняется между вызовами', () => {
     expect(ids(findAlternatives(bench, catalogue))).toEqual(ids(findAlternatives(bench, catalogue)))
   })

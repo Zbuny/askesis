@@ -45,6 +45,11 @@ export default function AiWorkoutBuilder() {
         // Уровень уже указан в профиле — не спрашиваем его второй раз,
         // просто подставляем в мастер как выбранный.
         level: prev.level || data.level || '',
+        // То же и с инвентарём с ограничениями: оба поля правятся в профиле
+        // и нужны не только здесь, поэтому мастер начинает с них, а не с
+        // чистого листа. Ответ остаётся исправимым — это те же шаги 4 и 5.
+        equipment: prev.equipment.length ? prev.equipment : data.equipment || [],
+        limits: prev.limits || data.limits || '',
         age: data.age,
         weight: data.weight,
         height: data.height,
@@ -71,6 +76,13 @@ export default function AiWorkoutBuilder() {
     setError(null)
     setGenerating(true)
     setPlan(null)
+    // Ответы про инвентарь и ограничения больше не одноразовые: по ним
+    // подбирается замена упражнения в тренировке и отвечает тренер в чате.
+    // Пишем их в профиль до генерации и молча — программа важнее, и ронять
+    // её из-за неудачной записи в Firestore незачем.
+    api
+      .updateMyProfileData({ equipment: profile.equipment, limits: profile.limits.trim() || null })
+      .catch(() => {})
     try {
       if (!aiConfigured) {
         setPlan(buildStarterPlan({ exercises, ...profile }))
@@ -175,10 +187,15 @@ export default function AiWorkoutBuilder() {
             <textarea
               className="wizard-textarea"
               rows={4}
+              maxLength={400}
               placeholder="Например: болит поясница, не делаю становую. Можно оставить пустым."
               value={profile.limits}
               onChange={(e) => setProfile({ ...profile, limits: e.target.value })}
             />
+            <p className="wizard-hint">
+              Сохраним в профиль: по этому же тексту подбирается замена
+              упражнения в тренировке и отвечает тренер в чате.
+            </p>
           </>
         )}
 

@@ -311,6 +311,11 @@ describe('вес и профиль', () => {
     await assertFails(setDoc(doc(alice(), 'users', ALICE), { age: 999 }))
   })
 
+  it('ограничения пишутся, но не длиннее 400 символов', async () => {
+    await assertSucceeds(setDoc(doc(alice(), 'users', ALICE), { limits: 'болит поясница' }))
+    await assertFails(setDoc(doc(alice(), 'users', ALICE), { limits: 'я'.repeat(401) }))
+  })
+
   it('в чужой профиль не записать', async () => {
     await assertFails(setDoc(doc(alice(), 'users', BOB), { height: 175 }))
   })

@@ -6,7 +6,7 @@ import ExerciseFilterBar from '../../components/ExerciseFilterBar.jsx'
 import ConfirmDialog from '../../components/ConfirmDialog.jsx'
 import { useConfirm } from '../../hooks/useConfirm.js'
 
-const emptyForm = { id: null, name: '', muscleGroup: '', equipment: '', instructions: '', imageUrl: '' }
+const emptyForm = { id: null, name: '', muscleGroup: '', equipment: '', instructions: '', imageUrl: '', animationUrl: '' }
 const PAGE_SIZE = 40
 
 export default function AdminExercises() {
@@ -41,6 +41,7 @@ export default function AdminExercises() {
       equipment: ex.equipment || '',
       instructions: ex.instructions || '',
       imageUrl: ex.imageUrl || '',
+      animationUrl: ex.animationUrl || '',
     })
     // Список — все 873 упражнения подряд, форма — вверху страницы.
     // Без прокрутки клик по «Изменить» в конце списка выглядит так,
@@ -98,6 +99,14 @@ export default function AdminExercises() {
           placeholder="Ссылка на картинку"
           value={form.imageUrl}
           onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
+        />
+        {/* Каталог даёт два кадра на упражнение, и гифки из них не выйдет.
+            Сюда кладётся готовая анимация, когда она есть: показ переключается
+            сам, а без ссылки работает прежняя перелистовка кадров. */}
+        <input
+          placeholder="Ссылка на GIF-анимацию (необязательно)"
+          value={form.animationUrl}
+          onChange={(e) => setForm({ ...form, animationUrl: e.target.value })}
         />
         <textarea
           placeholder="Инструкция по выполнению"

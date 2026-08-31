@@ -5,6 +5,7 @@ import { useAsyncData } from '../hooks/useAsyncData.js'
 import { exerciseName, translateEquipment, translateMuscle } from '../utils/translate.js'
 import { emptyFilters, filterExercises } from '../utils/exerciseFilters.js'
 import ExerciseFilterBar from '../components/ExerciseFilterBar.jsx'
+import { hasExerciseMedia } from '../utils/exerciseFrames.js'
 import ExerciseAnimation from '../components/ExerciseAnimation.jsx'
 
 export default function Exercises() {
@@ -44,7 +45,7 @@ export default function Exercises() {
             onFocus={() => setHoveredId(ex.id)}
             onBlur={() => setHoveredId(null)}
           >
-            {ex.imageUrl && (
+            {hasExerciseMedia(ex) && (
               <ExerciseAnimation
                 exercise={ex}
                 alt={exerciseName(ex)}

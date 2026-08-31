@@ -1,13 +1,19 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api/firestore.js'
 import { exerciseName } from '../utils/translate.js'
 import { useAsyncAction } from '../hooks/useAsyncAction.js'
 import ExercisePicker from '../components/ExercisePicker.jsx'
 import BackLink from '../components/BackLink.jsx'
+import { hasExerciseMedia } from '../utils/exerciseFrames.js'
 import ExerciseAnimation from '../components/ExerciseAnimation.jsx'
 import LoadAnalysis from '../components/LoadAnalysis.jsx'
 import { classifyReps } from '../utils/repRanges.js'
+import {
+  clearBuilderDraft,
+  loadBuilderDraft,
+  saveBuilderDraft,
+} from '../utils/workoutDraft.js'
 
 export default function WorkoutBuilder() {
   const { id } = useParams()
@@ -20,40 +26,79 @@ export default function WorkoutBuilder() {
   const [loading, setLoading] = useState(isEdit)
   const [level, setLevel] = useState('')
   const { busy: saving, error, setError, run } = useAsyncAction()
+  const hydrated = useRef(false)
 
   useEffect(() => {
     api.listExercises().then(setExercises).catch((e) => setLoadError(e.message))
-    // Уровень нужен только для подсказки о диапазоне повторений — если его
-    // не удалось прочитать, конструктор всё равно должен работать.
     api.getMyProfileData().then((data) => setLevel(data.level || '')).catch(() => {})
   }, [])
 
   useEffect(() => {
-    if (!isEdit) return
+    hydrated.current = false
+
+    if (!isEdit) {
+      const draft = loadBuilderDraft(null)
+      if (draft) {
+        setTitle(draft.title)
+        setItems(draft.items)
+      }
+      hydrated.current = true
+      return
+    }
+
     api
       .getWorkout({ id })
       .then((w) => {
-        setTitle(w.title || '')
-        setItems(w.items || [])
+        const draft = loadBuilderDraft(id)
+        if (draft && (draft.title || draft.items.length > 0)) {
+          setTitle(draft.title || w.title || '')
+          setItems(draft.items)
+        } else {
+          setTitle(w.title || '')
+          setItems(w.items || [])
+        }
       })
       .catch((e) => setLoadError(e.message))
-      .finally(() => setLoading(false))
+      .finally(() => {
+        hydrated.current = true
+        setLoading(false)
+      })
   }, [id, isEdit])
+
+  useEffect(() => {
+    if (!hydrated.current) return
+    saveBuilderDraft(isEdit ? id : null, { title, items })
+  }, [title, items, id, isEdit])
 
   const exerciseById = useMemo(() => new Map(exercises.map((ex) => [ex.id, ex])), [exercises])
   const addedIds = useMemo(() => new Set(items.map((item) => item.exerciseId)), [items])
 
   function addExercise(ex) {
-    if (items.some((item) => item.exerciseId === ex.id)) return
-    setItems([...items, { exerciseId: ex.id, exerciseName: exerciseName(ex), targetSets: 3, targetReps: 10 }])
+    setItems((prev) => {
+      if (prev.some((item) => item.exerciseId === ex.id)) return prev
+      return [...prev, { exerciseId: ex.id, exerciseName: exerciseName(ex), targetSets: 3, targetReps: 10 }]
+    })
   }
 
   function removeExercise(exerciseId) {
-    setItems(items.filter((item) => item.exerciseId !== exerciseId))
+    setItems((prev) => prev.filter((item) => item.exerciseId !== exerciseId))
+  }
+
+  function moveExercise(exerciseId, direction) {
+    setItems((prev) => {
+      const index = prev.findIndex((item) => item.exerciseId === exerciseId)
+      if (index < 0) return prev
+      const next = index + direction
+      if (next < 0 || next >= prev.length) return prev
+      const copy = [...prev]
+      const [moved] = copy.splice(index, 1)
+      copy.splice(next, 0, moved)
+      return copy
+    })
   }
 
   function updateItem(exerciseId, field, value) {
-    setItems(items.map((item) => (item.exerciseId === exerciseId ? { ...item, [field]: value } : item)))
+    setItems((prev) => prev.map((item) => (item.exerciseId === exerciseId ? { ...item, [field]: value } : item)))
   }
 
   async function handleSubmit(e) {
@@ -65,9 +110,11 @@ export default function WorkoutBuilder() {
     try {
       if (isEdit) {
         await run(() => api.updateWorkout({ id, title, items }))
+        clearBuilderDraft(id)
         navigate(`/workouts/${id}`)
       } else {
         const result = await run(() => api.createWorkout({ title, items }))
+        clearBuilderDraft(null)
         navigate(`/workouts/${result.id}`)
       }
     } catch {
@@ -89,12 +136,32 @@ export default function WorkoutBuilder() {
         <h3>Выбрано ({items.length})</h3>
         {items.length === 0 && <p>Добавьте упражнения из списка ниже.</p>}
         <ul className="admin-list">
-          {items.map((item) => {
+          {items.map((item, index) => {
             const zone = classifyReps(item.targetReps)
             return (
               <li key={item.exerciseId}>
+                <span className="admin-list__reorder" aria-label={`Порядок: ${item.exerciseName}`}>
+                  <button
+                    type="button"
+                    disabled={index === 0}
+                    onClick={() => moveExercise(item.exerciseId, -1)}
+                    aria-label={`Выше: ${item.exerciseName}`}
+                    title="Выше"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    disabled={index === items.length - 1}
+                    onClick={() => moveExercise(item.exerciseId, 1)}
+                    aria-label={`Ниже: ${item.exerciseName}`}
+                    title="Ниже"
+                  >
+                    ↓
+                  </button>
+                </span>
                 <span className="picked">
-                  {exerciseById.get(item.exerciseId)?.imageUrl && (
+                  {hasExerciseMedia(exerciseById.get(item.exerciseId)) && (
                     <span className="picked__media">
                       <ExerciseAnimation
                         exercise={exerciseById.get(item.exerciseId)}
