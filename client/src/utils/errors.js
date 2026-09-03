@@ -11,6 +11,10 @@ const MESSAGES = {
   'auth/popup-closed-by-user': 'Окно входа через Google было закрыто',
   'auth/network-request-failed': 'Нет соединения с сервером — проверьте интернет',
   'auth/user-disabled': 'Этот аккаунт заблокирован',
+  // Firestore отдаёт тот же код и на чтение чужого документа, и на чтение
+  // несуществующего (см. getOne в api/firestore.js) — без этой записи сюда
+  // долетал бы сырой английский текст "Missing or insufficient permissions."
+  'permission-denied': 'Нет доступа к этой записи',
 }
 
 export function friendlyErrorMessage(err) {

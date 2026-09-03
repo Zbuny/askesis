@@ -27,6 +27,11 @@ export default function WorkoutBuilder() {
   const [level, setLevel] = useState('')
   const { busy: saving, error, setError, run } = useAsyncAction()
   const hydrated = useRef(false)
+  // Перетаскивание пунктов мышью/пальцем. itemRefs хранит DOM-узлы <li> —
+  // по ним меряем, куда сейчас указывает палец, и на сколько раздвинуть
+  // соседей, чтобы освободить место. drag — null, пока ничего не тащат.
+  const itemRefs = useRef(new Map())
+  const [drag, setDrag] = useState(null)
 
   useEffect(() => {
     api.listExercises().then(setExercises).catch((e) => setLoadError(e.message))
@@ -101,6 +106,69 @@ export default function WorkoutBuilder() {
     setItems((prev) => prev.map((item) => (item.exerciseId === exerciseId ? { ...item, [field]: value } : item)))
   }
 
+  // Сколько пунктов сейчас лежат выше clientY — их индекс в списке без
+  // перетаскиваемого элемента. Пока идёт жест, сам список не переставляем
+  // (перечитывать items на каждый пиксель незачем), поэтому позиции соседей
+  // стабильны и их можно смерить напрямую через DOM.
+  function targetIndexFromY(draggedId, clientY) {
+    let index = 0
+    for (const item of items) {
+      if (item.exerciseId === draggedId) continue
+      const el = itemRefs.current.get(item.exerciseId)
+      if (el && clientY > el.getBoundingClientRect().top + el.offsetHeight / 2) index++
+    }
+    return index
+  }
+
+  function handleDragStart(e, exerciseId, index) {
+    // Подходы/повторы и «Убрать» должны работать как обычно — тащим только
+    // если палец или курсор лёг на саму строку, а не на элемент управления.
+    if (e.target.closest('.admin-list__actions')) return
+    if (e.pointerType === 'mouse' && e.button !== 0) return
+    const el = itemRefs.current.get(exerciseId)
+    if (!el) return
+    e.preventDefault()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    setDrag({ id: exerciseId, fromIndex: index, targetIndex: index, startY: e.clientY, y: 0, height: el.offsetHeight })
+  }
+
+  function handleDragMove(e) {
+    if (!drag) return
+    setDrag((prev) => prev && { ...prev, y: e.clientY - prev.startY, targetIndex: targetIndexFromY(prev.id, e.clientY) })
+  }
+
+  function handleDragEnd() {
+    setDrag((prev) => {
+      if (!prev) return null
+      if (prev.targetIndex !== prev.fromIndex) {
+        setItems((list) => {
+          const copy = [...list]
+          const from = copy.findIndex((item) => item.exerciseId === prev.id)
+          if (from < 0) return list
+          const [moved] = copy.splice(from, 1)
+          copy.splice(prev.targetIndex, 0, moved)
+          return copy
+        })
+      }
+      return null
+    })
+  }
+
+  function dragRowStyle(exerciseId, index) {
+    if (!drag) return undefined
+    if (drag.id === exerciseId) return { transform: `translateY(${drag.y}px)` }
+    // Раздвигаем только тех соседей, что оказались между стартом и текущей
+    // целью перетаскивания — остальные стоят на месте.
+    const offset = drag.height + 1
+    if (drag.fromIndex > drag.targetIndex && index >= drag.targetIndex && index < drag.fromIndex) {
+      return { transform: `translateY(${offset}px)` }
+    }
+    if (drag.fromIndex < drag.targetIndex && index > drag.fromIndex && index <= drag.targetIndex) {
+      return { transform: `translateY(-${offset}px)` }
+    }
+    return undefined
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
     if (!title || items.length === 0) {
@@ -135,31 +203,37 @@ export default function WorkoutBuilder() {
 
         <h3>Выбрано ({items.length})</h3>
         {items.length === 0 && <p>Добавьте упражнения из списка ниже.</p>}
-        <ul className="admin-list">
+        <ul className={`admin-list workout-items${drag ? ' is-reordering' : ''}`}>
           {items.map((item, index) => {
             const zone = classifyReps(item.targetReps)
             return (
-              <li key={item.exerciseId}>
-                <span className="admin-list__reorder" aria-label={`Порядок: ${item.exerciseName}`}>
-                  <button
-                    type="button"
-                    disabled={index === 0}
-                    onClick={() => moveExercise(item.exerciseId, -1)}
-                    aria-label={`Выше: ${item.exerciseName}`}
-                    title="Выше"
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    disabled={index === items.length - 1}
-                    onClick={() => moveExercise(item.exerciseId, 1)}
-                    aria-label={`Ниже: ${item.exerciseName}`}
-                    title="Ниже"
-                  >
-                    ↓
-                  </button>
-                </span>
+              <li
+                key={item.exerciseId}
+                ref={(el) => {
+                  if (el) itemRefs.current.set(item.exerciseId, el)
+                  else itemRefs.current.delete(item.exerciseId)
+                }}
+                className={drag?.id === item.exerciseId ? 'is-dragging' : undefined}
+                style={dragRowStyle(item.exerciseId, index)}
+                tabIndex={0}
+                aria-label={`${item.exerciseName}. Потяните строку или используйте стрелки вверх/вниз, чтобы изменить порядок`}
+                // Тащим за саму строку — отдельная ручка на узком экране
+                // только отжимала название за край (см. скриншот в задаче).
+                onPointerDown={(e) => handleDragStart(e, item.exerciseId, index)}
+                onPointerMove={handleDragMove}
+                onPointerUp={handleDragEnd}
+                onPointerCancel={handleDragEnd}
+                onKeyDown={(e) => {
+                  if (e.target !== e.currentTarget) return
+                  if (e.key === 'ArrowUp') {
+                    e.preventDefault()
+                    moveExercise(item.exerciseId, -1)
+                  } else if (e.key === 'ArrowDown') {
+                    e.preventDefault()
+                    moveExercise(item.exerciseId, 1)
+                  }
+                }}
+              >
                 <span className="picked">
                   {hasExerciseMedia(exerciseById.get(item.exerciseId)) && (
                     <span className="picked__media">
@@ -170,7 +244,7 @@ export default function WorkoutBuilder() {
                       />
                     </span>
                   )}
-                  {item.exerciseName}
+                  <span className="picked__name">{item.exerciseName}</span>
                   {zone && (
                     <span className={`rep-zone rep-zone--${zone.tone}`} title={zone.hint}>
                       {zone.label}

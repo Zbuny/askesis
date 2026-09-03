@@ -1839,33 +1839,42 @@ select:focus-visible {
   gap: 0.6rem;
 }
 
-.admin-list__reorder {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-right: 0.5rem;
-  flex-shrink: 0;
+/* Пункт двигается перетаскиванием, а при живой перестановке — не в момент
+   самого перетаскивания — плавно съезжает на освободившееся место. Пункт,
+   который тащат, transition сам себе только мешает, поэтому снят отдельно. */
+.admin-list li {
+  transition: transform 0.15s var(--ease);
 }
 
-.admin-list__reorder button {
-  background: none;
-  border: 1px solid var(--border-strong);
-  color: var(--text-muted);
-  border-radius: var(--radius);
-  padding: 0.15rem 0.45rem;
-  font-size: 0.75rem;
-  line-height: 1;
-  cursor: pointer;
+.admin-list li.is-dragging {
+  position: relative;
+  z-index: 5;
+  transition: none;
+  background: var(--surface);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
 }
 
-.admin-list__reorder button:hover:not(:disabled) {
-  border-color: var(--gold);
-  color: var(--gold-bright);
+/* Список тренировки (WorkoutBuilder) тащат за саму строку — без отдельной
+   ручки. Курсор и блокировку жёста скроллом даём только здесь: остальные
+   .admin-list на других страницах перетаскивания не поддерживают. */
+.workout-items li {
+  cursor: grab;
+  touch-action: none;
 }
 
-.admin-list__reorder button:disabled {
-  opacity: 0.35;
-  cursor: default;
+.workout-items li.is-dragging {
+  cursor: grabbing;
+}
+
+/* Подходы/повторы и «Убрать» — обычные элементы управления, не место для
+   перетаскивания: возвращаем им родной курсор и прокрутку/тап пальцем. */
+.workout-items li .admin-list__actions {
+  cursor: auto;
+  touch-action: auto;
+}
+
+.admin-list.is-reordering {
+  user-select: none;
 }
 
 .number-input {
@@ -2204,7 +2213,16 @@ select:focus-visible {
   display: flex;
   align-items: center;
   gap: 0.7rem;
+  flex: 1 1 auto;
   min-width: 0;
+}
+
+/* Без явного min-width текстовый узел во flex-контейнере не сжимается
+   (flex min-width: auto по умолчанию) и вместо переноса вылезает за край
+   экрана — это и обрезало название на узких карточках. */
+.picked__name {
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 
 /* ---------- Индекс массы тела ---------- */

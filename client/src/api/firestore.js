@@ -35,7 +35,19 @@ async function listAll(name, orderField) {
 }
 
 async function getOne(name, id) {
-  const snap = await getDoc(doc(db, name, id))
+  let snap
+  try {
+    snap = await getDoc(doc(db, name, id))
+  } catch (err) {
+    // Правила личных коллекций проверяют resource.data.ownerId. На
+    // несуществующем документе resource == null, и обращение к его полю
+    // Firestore трактует как отказ в доступе — тем же permission-denied, что
+    // и при чтении чужого документа. С клиента эти два случая неотличимы,
+    // а без перехвата сюда долетает сырое "Missing or insufficient permissions."
+    // вместо человеческого сообщения.
+    if (err.code === 'permission-denied') throw new Error('Не найдено', { cause: err })
+    throw err
+  }
   if (!snap.exists()) throw new Error('Не найдено')
   return { ...snap.data(), id: snap.id }
 }

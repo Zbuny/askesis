@@ -74,7 +74,7 @@ export default function WorkoutDetail() {
         return sessions
       })
       .catch((e) => {
-        setError(e.message)
+        setError(friendlyErrorMessage(e))
         return []
       })
   }
@@ -88,7 +88,7 @@ export default function WorkoutDetail() {
       setHistory((prev) => [...prev, ...more])
       setHasMoreHistory(more.length === HISTORY_PAGE_SIZE)
     } catch (e) {
-      setError(e.message)
+      setError(friendlyErrorMessage(e))
     } finally {
       setLoadingMoreHistory(false)
     }
@@ -195,7 +195,7 @@ export default function WorkoutDetail() {
           })
           .catch(() => {})
       })
-      .catch((e) => setError(e.message))
+      .catch((e) => setError(friendlyErrorMessage(e)))
   }, [id])
 
   useEffect(() => {
