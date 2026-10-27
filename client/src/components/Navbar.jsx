@@ -32,7 +32,7 @@ export default function Navbar() {
   return (
     <header className="navbar">
       <div className="navbar__bar">
-        <Link to="/" className="navbar__logo" onClick={closeMenu}>
+        <Link to={user ? '/dashboard' : '/'} className="navbar__logo" onClick={closeMenu}>
           <img src="/logo.png" alt="" className="navbar__logo-img" />
           Askesis
         </Link>
@@ -60,23 +60,34 @@ export default function Navbar() {
         </div>
       </div>
       <nav className={`navbar__links ${open ? 'navbar__links--open' : ''}`}>
-        <NavLink to="/" onClick={closeMenu}>Главная</NavLink>
-        <NavLink to="/programs" onClick={closeMenu}>Программы</NavLink>
-        <NavLink to="/exercises" onClick={closeMenu}>Упражнения</NavLink>
         {user ? (
           <>
-            <NavLink to="/dashboard" onClick={closeMenu}>Обзор</NavLink>
-            <NavLink to="/workouts" onClick={closeMenu}>Мои тренировки</NavLink>
-            <NavLink to="/statistics" onClick={closeMenu}>Статистика</NavLink>
+            {/* Порядок совпадает с нижней панелью телефона: ежедневное
+                (обзор, тренировки, статистика) слева, справочники и аккаунт
+                правее. «Главную» убрали — это логотип, а у вошедшего он
+                ведёт в обзор, где всё и начинается. Пункты с .is-in-bottom-nav
+                на телефоне уже есть внизу, в гамбургере их не дублируем. */}
+            <NavLink to="/dashboard" className="is-in-bottom-nav" onClick={closeMenu}>Обзор</NavLink>
+            <NavLink to="/workouts" className="is-in-bottom-nav" onClick={closeMenu}>Тренировки</NavLink>
+            <NavLink to="/programs" onClick={closeMenu}>Программы</NavLink>
+            <NavLink to="/exercises" onClick={closeMenu}>Упражнения</NavLink>
             <NavLink to="/nutrition" onClick={closeMenu}>Питание</NavLink>
-            <NavLink to="/profile" onClick={closeMenu}>Профиль</NavLink>
-            {isAdmin && <NavLink to="/admin" onClick={closeMenu}>Админка</NavLink>}
-            <button onClick={() => { logout(); closeMenu() }}>Выйти</button>
+            <NavLink to="/statistics" className="is-in-bottom-nav" onClick={closeMenu}>Статистика</NavLink>
+            <span className="navbar__links-end">
+              <NavLink to="/profile" className="is-in-bottom-nav" onClick={closeMenu}>Профиль</NavLink>
+              {isAdmin && <NavLink to="/admin" onClick={closeMenu}>Админка</NavLink>}
+              <button onClick={() => { logout(); closeMenu() }}>Выйти</button>
+            </span>
           </>
         ) : (
-          <Link to="/login" className="button button--nav" onClick={closeMenu}>
-            Войти
-          </Link>
+          <>
+            <NavLink to="/" end onClick={closeMenu}>Главная</NavLink>
+            <NavLink to="/programs" onClick={closeMenu}>Программы</NavLink>
+            <NavLink to="/exercises" onClick={closeMenu}>Упражнения</NavLink>
+            <Link to="/login" className="button button--nav" onClick={closeMenu}>
+              Войти
+            </Link>
+          </>
         )}
       </nav>
     </header>

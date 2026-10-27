@@ -7,6 +7,7 @@ import ProtectedRoute from './components/ProtectedRoute.jsx'
 import AdminRoute from './components/AdminRoute.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import Home from './pages/Home.jsx'
+import { PageLoading } from './components/PageState.jsx'
 
 // Главная — единственная страница в основном бандле: с неё начинают все, и
 // ждать ради неё второй сетевой запрос незачем. Остальные экраны грузятся по
@@ -38,7 +39,7 @@ export default function App() {
       <Navbar />
       <main className="content">
         <ErrorBoundary>
-          <Suspense fallback={<p>Загрузка...</p>}>
+          <Suspense fallback={<PageLoading />}>
             <Routes>
               <Route path="/" element={<Home />} />
               {/* Каталоги закрыты правилами Firestore: читать их может только

@@ -282,6 +282,24 @@ select:focus-visible {
   color: var(--gold-bright);
 }
 
+/* Аккаунт (профиль, админка, выход) отодвинут вправо от разделов: это не
+   место, куда идут тренироваться, и «Выйти» не должно стоять в одном ряду
+   с «Тренировками», где по нему легко промахнуться. */
+.navbar__links-end {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  margin-left: auto;
+}
+
+/* На телефоне у вошедшего есть нижняя панель — гамбургер держит только то,
+   чего внизу нет, иначе одно и то же меню приходится читать дважды. */
+@media (max-width: 760px) {
+  .navbar__links .is-in-bottom-nav {
+    display: none;
+  }
+}
+
 /* ---------- Content shell ---------- */
 
 .content {
@@ -4484,6 +4502,15 @@ select:focus-visible {
     width: 100%;
   }
 
+  .navbar__links-end {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.85rem;
+    margin-left: 0;
+    padding-top: 0.85rem;
+    border-top: 1px solid var(--border);
+  }
+
   .content {
     padding: 2rem 1rem;
   }
@@ -4641,9 +4668,89 @@ select:focus-visible {
 
 .skeleton--hero { height: 220px; }
 .skeleton--card { height: 130px; }
+.skeleton--title { height: 2rem; max-width: 280px; }
 
 @media (prefers-reduced-motion: reduce) {
   .skeleton::after { animation: none; }
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- Пустые состояния и ошибки страниц ---------- */
+
+/* Пустой список и ошибка загрузки выглядят одинаково — рамка с пояснением и
+   следующим шагом. Различаются только тоном: ошибка помечена цветом danger
+   на рамке, но смысл несёт текст, а не цвет. */
+.empty-state {
+  margin: 1.5rem 0;
+  padding: 2rem 1.75rem;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  text-align: center;
+}
+
+.empty-state--error {
+  border-style: solid;
+  border-color: var(--danger);
+}
+
+.content .empty-state h3 {
+  margin: 0 0 0.5rem;
+}
+
+.empty-state p {
+  margin: 0 auto;
+  max-width: 46ch;
+  color: var(--text-muted);
+}
+
+.empty-state__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.empty-state__actions .button {
+  margin-top: 0;
+}
+
+/* Заголовок страницы и её главное действие в одной строке: кнопка стоит там,
+   куда смотрят первым делом, а не теряется среди карточек ниже. */
+.page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.content .page-head h2 {
+  margin: 0;
+}
+
+.page-head .button {
+  margin-top: 0;
+  padding: 0.85rem 1.6rem;
+}
+
+.section-label {
+  display: block;
+  margin: 2rem 0 0;
 }
 
 /* ---------- Dashboard ---------- */
@@ -5165,9 +5272,9 @@ button.calendar__cell {
     /* 56px — нижняя граница уверенного попадания пальцем. */
     min-height: 56px;
     padding: 0.5rem 0.25rem;
-    color: var(--text-faint);
-    font-size: 0.62rem;
-    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    font-size: 0.68rem;
+    letter-spacing: 0.02em;
     text-transform: uppercase;
     text-decoration: none;
   }
@@ -5219,6 +5326,23 @@ button.calendar__cell {
     width: 100%;
     padding: 0.9rem 1rem;
     text-align: left;
+  }
+
+  /* Каталоги — справочники, а не действия: отделены подписью и тише по
+     тону, чтобы глаз сначала цеплялся за то, ради чего меню открыли. */
+  .bottom-sheet__label {
+    margin: 0.35rem 0 0;
+    padding: 0.4rem 1rem 0;
+    border-top: 1px solid var(--border);
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+
+  .bottom-sheet button.bottom-sheet__secondary {
+    padding: 0.75rem 1rem;
+    color: var(--text-muted);
   }
 
   /* Панель перекрывает низ страницы — освобождаем под неё место, иначе

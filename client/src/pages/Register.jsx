@@ -41,7 +41,7 @@ export default function Register() {
   // возвращаем: анкета важна, но не важнее того, зачем он сюда шёл.
   function destination(needsOnboarding) {
     if (cameFrom) return cameFrom
-    return needsOnboarding ? '/onboarding' : '/profile'
+    return needsOnboarding ? '/onboarding' : '/dashboard'
   }
 
   async function handleSubmit(e) {
@@ -90,15 +90,17 @@ export default function Register() {
           <form onSubmit={handleSubmit}>
             <label className="field">
               <span>Имя</span>
-              <input placeholder="Как к тебе обращаться" value={name} onChange={(e) => setName(e.target.value)} required />
+              <input autoComplete="given-name" placeholder="Как к тебе обращаться" value={name} onChange={(e) => setName(e.target.value)} required />
             </label>
             <label className="field">
               <span>Email</span>
-              <input type="email" placeholder="you@mail.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <input type="email" autoComplete="email" placeholder="you@mail.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
             </label>
+            {/* Firebase не примет пароль короче шести символов — говорим об этом
+                до отправки, а не ошибкой после. */}
             <label className="field">
-              <span>Пароль</span>
-              <input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
+              <span>Пароль · не короче 6 символов</span>
+              <input type="password" autoComplete="new-password" minLength={6} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
             </label>
             <label className="consent">
               <input
@@ -128,7 +130,7 @@ export default function Register() {
 
           {error && <p className="error">{error}</p>}
 
-          <p className="auth-card__footer">Уже есть аккаунт? <Link to="/login">Войти</Link></p>
+          <p className="auth-card__footer">Уже есть аккаунт? <Link to="/login" state={cameFrom ? { from: cameFrom } : undefined}>Войти</Link></p>
         </div>
       </div>
     </div>

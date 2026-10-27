@@ -17,6 +17,7 @@ export default function ConfirmDialog({
   busy = false,
   onConfirm,
   onCancel,
+  onDismiss,
 }) {
   const ref = useRef(null)
 
@@ -34,11 +35,11 @@ export default function ConfirmDialog({
     // кнопок — состояние снаружи должно об этом узнать.
     const handleCancel = (event) => {
       event.preventDefault()
-      if (!busy) onCancel?.()
+      if (!busy) (onDismiss || onCancel)?.()
     }
     dialog.addEventListener('cancel', handleCancel)
     return () => dialog.removeEventListener('cancel', handleCancel)
-  }, [busy, onCancel])
+  }, [busy, onCancel, onDismiss])
 
   return (
     <dialog className="confirm" ref={ref} aria-labelledby="confirm-title">

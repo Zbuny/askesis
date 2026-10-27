@@ -2,21 +2,51 @@ import { Link } from 'react-router-dom'
 import { api } from '../api/firestore.js'
 import { useAsyncData } from '../hooks/useAsyncData.js'
 import TiltCard from '../components/TiltCard.jsx'
+import { EmptyState, PageError, PageLoading } from '../components/PageState.jsx'
 import { pluralRu } from '../utils/translate.js'
 
+// Сюда приходят, чтобы начать тренировку, поэтому список собственных
+// тренировок — главное на экране и стоит первым. Создание новой — одна
+// кнопка в шапке, а ИИ-варианты ниже как дополнительные пути: раньше три
+// равных по весу призыва стояли над списком и спорили за внимание.
 export default function Workouts() {
-  const { data: workouts, loading, error } = useAsyncData(api.listMyWorkouts, [])
+  const { data: workouts, loading, error, reload } = useAsyncData(api.listMyWorkouts, [])
 
-  if (error) return <p>Ошибка: {error}</p>
-  if (loading) return <p>Загрузка...</p>
+  if (loading) return <PageLoading label="Загружаем тренировки" />
+  if (error) return <PageError message={error} onRetry={reload} backTo="/dashboard" />
 
   return (
     <section>
-      <h2>Мои тренировки</h2>
-      <div className="hero__actions">
-        <Link to="/workouts/new" className="button">+ Собрать тренировку</Link>
+      <div className="page-head">
+        <h2>Мои тренировки</h2>
+        {workouts.length > 0 && (
+          <Link to="/workouts/new" className="button">+ Собрать тренировку</Link>
+        )}
       </div>
 
+      {workouts.length === 0 ? (
+        <EmptyState
+          title="Пока нет ни одной тренировки"
+          text="Соберите свою из библиотеки, начните готовую программу или попросите ИИ-тренера составить план под цель."
+        >
+          <Link to="/workouts/new" className="button">Собрать тренировку</Link>
+          <Link to="/programs" className="button--ghost">Готовые программы</Link>
+        </EmptyState>
+      ) : (
+        <div className="program-grid">
+          {workouts.map((w) => {
+            const count = w.items?.length || 0
+            return (
+              <TiltCard as={Link} to={`/workouts/${w.id}`} className="program-card" key={w.id}>
+                <h3>{w.title}</h3>
+                <p>{count} {pluralRu(count, 'упражнение', 'упражнения', 'упражнений')}</p>
+              </TiltCard>
+            )
+          })}
+        </div>
+      )}
+
+      <span className="eyebrow section-label">С помощью ИИ</span>
       <div className="ai-actions">
         <Link to="/workouts/ai" className="ai-action">
           <span className="ai-action__glow" aria-hidden="true" />
@@ -51,20 +81,6 @@ export default function Workouts() {
             <span className="ai-action__arrow" aria-hidden="true">→</span>
           </span>
         </Link>
-      </div>
-
-      {workouts.length === 0 && <p>Пока нет ни одной тренировки.</p>}
-
-      <div className="program-grid">
-        {workouts.map((w) => {
-          const count = w.items?.length || 0
-          return (
-            <TiltCard as={Link} to={`/workouts/${w.id}`} className="program-card" key={w.id}>
-              <h3>{w.title}</h3>
-              <p>{count} {pluralRu(count, 'упражнение', 'упражнения', 'упражнений')}</p>
-            </TiltCard>
-          )
-        })}
       </div>
     </section>
   )

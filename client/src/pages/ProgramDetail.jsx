@@ -7,6 +7,7 @@ import { exerciseName } from '../utils/translate.js'
 import { formatReps, programItems } from '../utils/programItems.js'
 import BackLink from '../components/BackLink.jsx'
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
+import { PageError, PageLoading } from '../components/PageState.jsx'
 import { useConfirm } from '../hooks/useConfirm.js'
 
 export default function ProgramDetail() {
@@ -35,15 +36,19 @@ export default function ProgramDetail() {
   async function handleStart() {
     // Уже есть личная тренировка из этой программы — не плодим копии молча,
     // даём выбор: открыть существующую или всё же завести ещё одну.
+    // Безопасный вариант — «Открыть её»: он стоит на месте отмены, где диалог
+    // держит фокус, так что случайный Enter не плодит копию. Esc (null)
+    // не делает ничего.
     if (existingWorkout) {
-      const openExisting = await ask({
+      const createAnother = await ask({
         title: 'Вы уже начинали эту программу',
         message: `Тренировка «${existingWorkout.title}» уже есть в вашем списке.`,
-        confirmLabel: 'Открыть её',
-        cancelLabel: 'Создать ещё одну',
+        confirmLabel: 'Создать ещё одну',
+        cancelLabel: 'Открыть её',
         danger: false,
       })
-      if (openExisting) {
+      if (createAnother === null) return
+      if (!createAnother) {
         navigate(`/workouts/${existingWorkout.id}`)
         return
       }
@@ -56,8 +61,8 @@ export default function ProgramDetail() {
     }
   }
 
-  if (loadError) return <p>Ошибка: {loadError}</p>
-  if (!program) return <p>Загрузка...</p>
+  if (loadError) return <PageError title="Не получилось открыть программу" message={loadError} backTo="/programs" backLabel="К программам" />
+  if (!program) return <PageLoading cards={2} label="Загружаем программу" />
 
   const exerciseById = new Map(exercises.map((ex) => [ex.id, ex]))
   const items = programItems(program)

@@ -286,60 +286,80 @@ export default function Profile() {
         <div className="profile-sidebar">
           <h3>Мои данные</h3>
           <form className="admin-form" onSubmit={(e) => handleSaveProfileData(e, 'data')}>
-            <input
-              type="number"
-              placeholder="Рост, см"
-              value={profileData.height}
-              onChange={(e) => edit({ height: e.target.value })}
-            />
-            <input
-              type="number"
-              placeholder="Возраст"
-              value={profileData.age}
-              onChange={(e) => edit({ age: e.target.value })}
-            />
+            {/* Подпись над полем, а не в плейсхолдере: заполненное «182»
+                без подписи уже не скажет, рост это или вес. */}
+            <label className="field">
+              <span>Рост, см</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min="100"
+                max="250"
+                placeholder="180"
+                value={profileData.height}
+                onChange={(e) => edit({ height: e.target.value })}
+              />
+            </label>
+            <label className="field">
+              <span>Возраст, лет</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min="10"
+                max="100"
+                placeholder="25"
+                value={profileData.age}
+                onChange={(e) => edit({ age: e.target.value })}
+              />
+            </label>
             {/* От уровня зависят и рекомендованный диапазон повторений,
                 и шаг прибавки веса — поэтому спрашиваем его один раз здесь. */}
-            <select
-              className={profileData.level ? undefined : 'is-placeholder'}
-              value={profileData.level}
-              onChange={(e) => edit({ level: e.target.value })}
-              aria-label="Уровень подготовки"
-            >
-              <option value="">Уровень подготовки</option>
-              {TRAINING_LEVELS.map((level) => (
-                <option key={level} value={level}>{level}</option>
-              ))}
-            </select>
+            <label className="field">
+              <span>Уровень подготовки</span>
+              <select
+                className={profileData.level ? undefined : 'is-placeholder'}
+                value={profileData.level}
+                onChange={(e) => edit({ level: e.target.value })}
+              >
+                <option value="">Не выбран</option>
+                {TRAINING_LEVELS.map((level) => (
+                  <option key={level} value={level}>{level}</option>
+                ))}
+              </select>
+            </label>
             {/* Частота — это и есть недельная цель на дашборде. Держим её
                 рядом с уровнем: оба ответа даются в онбординге, и оба должны
                 оставаться исправимыми, когда режим изменился. */}
-            <select
-              className={profileData.daysPerWeek ? undefined : 'is-placeholder'}
-              value={profileData.daysPerWeek}
-              onChange={(e) => edit({ daysPerWeek: e.target.value })}
-              aria-label="Тренировок в неделю"
-            >
-              <option value="">Тренировок в неделю</option>
-              {[1, 2, 3, 4, 5, 6, 7].map((days) => (
-                <option key={days} value={days}>{days} в неделю</option>
-              ))}
-            </select>
+            <label className="field">
+              <span>Тренировок в неделю</span>
+              <select
+                className={profileData.daysPerWeek ? undefined : 'is-placeholder'}
+                value={profileData.daysPerWeek}
+                onChange={(e) => edit({ daysPerWeek: e.target.value })}
+              >
+                <option value="">Не выбрано</option>
+                {[1, 2, 3, 4, 5, 6, 7].map((days) => (
+                  <option key={days} value={days}>{days} в неделю</option>
+                ))}
+              </select>
+            </label>
             {/* Пол нужен ровно для одного — основного обмена в дневных нормах
                 КБЖУ. Формула различает только два значения, поэтому их и два;
                 без ответа норма считается по середине и честно помечается
                 приблизительной. */}
-            <select
-              className={profileData.sex ? undefined : 'is-placeholder'}
-              value={profileData.sex}
-              onChange={(e) => edit({ sex: e.target.value })}
-              aria-label="Пол — для расчёта нормы калорий"
-            >
-              <option value="">Пол — для нормы калорий</option>
-              {SEX_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
+            <label className="field">
+              <span>Пол · для нормы калорий</span>
+              <select
+                className={profileData.sex ? undefined : 'is-placeholder'}
+                value={profileData.sex}
+                onChange={(e) => edit({ sex: e.target.value })}
+              >
+                <option value="">Не указан</option>
+                {SEX_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
             <div className="admin-form__actions">
               <button type="submit" disabled={profileSaving || !loaded}>Сохранить</button>
               {savedSection === 'data' && <span className="eyebrow">Сохранено</span>}
@@ -437,18 +457,28 @@ export default function Profile() {
 
           <h3>Вес</h3>
           <form className="admin-form" onSubmit={handleLogWeight}>
-            <input
-              type="number"
-              placeholder="Вес, кг"
-              value={weightEntry.weight}
-              onChange={(e) => setWeightEntry({ ...weightEntry, weight: e.target.value })}
-            />
-            <input
-              type="date"
-              value={weightEntry.date}
-              max={todayStr()}
-              onChange={(e) => setWeightEntry({ ...weightEntry, date: e.target.value })}
-            />
+            <label className="field">
+              <span>Вес, кг</span>
+              <input
+                type="number"
+                inputMode="decimal"
+                step="0.1"
+                min="20"
+                max="400"
+                placeholder="75.5"
+                value={weightEntry.weight}
+                onChange={(e) => setWeightEntry({ ...weightEntry, weight: e.target.value })}
+              />
+            </label>
+            <label className="field">
+              <span>Дата</span>
+              <input
+                type="date"
+                value={weightEntry.date}
+                max={todayStr()}
+                onChange={(e) => setWeightEntry({ ...weightEntry, date: e.target.value })}
+              />
+            </label>
             <div className="admin-form__actions">
               <button type="submit" disabled={profileSaving || !weightEntry.weight}>Записать</button>
             </div>
@@ -468,7 +498,7 @@ export default function Profile() {
               </div>
             </div>
           ) : (
-            <p className="bmi__hint">Запишите вес и укажите рост слева — посчитаем индекс массы тела.</p>
+            <p className="bmi__hint">Запишите вес и укажите рост в «Моих данных» — посчитаем индекс массы тела.</p>
           )}
 
           {weightSeries.length === 0 && <p>Пока нет записей веса — добавьте первую выше.</p>}

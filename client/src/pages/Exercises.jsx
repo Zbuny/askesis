@@ -7,9 +7,10 @@ import { emptyFilters, filterExercises } from '../utils/exerciseFilters.js'
 import ExerciseFilterBar from '../components/ExerciseFilterBar.jsx'
 import { hasExerciseMedia } from '../utils/exerciseFrames.js'
 import ExerciseAnimation from '../components/ExerciseAnimation.jsx'
+import { PageError, PageLoading } from '../components/PageState.jsx'
 
 export default function Exercises() {
-  const { data, loading, error } = useAsyncData(api.listExercises, [])
+  const { data, loading, error, reload } = useAsyncData(api.listExercises, [])
   const exercises = data || []
   const [filters, setFilters] = useState(emptyFilters)
   // В сетке крутим кадры только у карточки под курсором — иначе сотни
@@ -18,8 +19,8 @@ export default function Exercises() {
 
   const filtered = useMemo(() => filterExercises(exercises, filters), [exercises, filters])
 
-  if (error) return <p>Не удалось загрузить упражнения: {error}</p>
-  if (loading) return <p>Загрузка...</p>
+  if (loading) return <PageLoading cards={4} label="Загружаем упражнения" />
+  if (error) return <PageError title="Не получилось загрузить упражнения" message={error} onRetry={reload} backTo="/dashboard" />
 
   return (
     <section>

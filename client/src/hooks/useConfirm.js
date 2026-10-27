@@ -39,6 +39,10 @@ export function useConfirm() {
       ...(request || {}),
       onConfirm: () => settle(true),
       onCancel: () => settle(false),
+      // Esc — это «передумал», а не выбор второй кнопки. Для «Удалить?/Отмена»
+      // разницы нет (null тоже ложно), но когда обе кнопки что-то делают,
+      // закрытие окна не должно молча выполнять одну из них.
+      onDismiss: () => settle(null),
     },
   }
 }

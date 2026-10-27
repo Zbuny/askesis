@@ -5,6 +5,7 @@ import { exerciseName } from '../utils/translate.js'
 import { useAsyncAction } from '../hooks/useAsyncAction.js'
 import ExercisePicker from '../components/ExercisePicker.jsx'
 import BackLink from '../components/BackLink.jsx'
+import { PageError, PageLoading } from '../components/PageState.jsx'
 import { hasExerciseMedia } from '../utils/exerciseFrames.js'
 import ExerciseAnimation from '../components/ExerciseAnimation.jsx'
 import LoadAnalysis from '../components/LoadAnalysis.jsx'
@@ -190,8 +191,8 @@ export default function WorkoutBuilder() {
     }
   }
 
-  if (loadError) return <p>Ошибка: {loadError}</p>
-  if (loading) return <p>Загрузка...</p>
+  if (loadError) return <PageError title="Не получилось открыть конструктор" message={loadError} backTo="/workouts" backLabel="К тренировкам" />
+  if (loading) return <PageLoading cards={2} label="Загружаем конструктор" />
 
   return (
     <section>

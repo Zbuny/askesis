@@ -19,6 +19,7 @@ import { hasExerciseMedia } from '../utils/exerciseFrames.js'
 import ExerciseAnimation from '../components/ExerciseAnimation.jsx'
 import BackLink from '../components/BackLink.jsx'
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
+import { PageError, PageLoading } from '../components/PageState.jsx'
 import { useConfirm } from '../hooks/useConfirm.js'
 import {
   clearSessionDraft,
@@ -375,23 +376,18 @@ export default function WorkoutDetail() {
     }
   }
 
-  if (error && !workout) return <p>Ошибка: {error}</p>
-  if (!workout) return <p>Загрузка...</p>
+  if (error && !workout) return <PageError title="Не получилось открыть тренировку" message={error} backTo="/workouts" backLabel="К тренировкам" />
+  if (!workout) return <PageLoading cards={3} label="Загружаем тренировку" />
 
   return (
     <section>
       <BackLink fallback="/workouts" label="К тренировкам" />
       <h2>{workout.title}</h2>
-      <div className="admin-list__actions">
-        <button type="button" onClick={() => navigate(`/workouts/${id}/edit`)}>Редактировать</button>
-        <button type="button" onClick={handleDuplicate} disabled={duplicating}>
-          {duplicating ? 'Копируем...' : 'Скопировать как новую'}
-        </button>
-        <button type="button" className="is-danger" onClick={handleDelete} disabled={deletingWorkout}>
-          {deletingWorkout ? 'Удаляем...' : 'Удалить тренировку'}
-        </button>
-      </div>
 
+      {/* Сюда приходят из зала — сразу к подходам. Правка, копия и удаление
+          нужны редко и переехали в конец страницы: «Удалить тренировку»
+          первой кнопкой под заголовком — ровно то место, куда попадает
+          палец, когда экран ещё прокручивается. */}
       <h3>Отметить выполнение</h3>
 
       {/* Чек-ин стоит до формы: прогрессия предлагает прибавку так, будто
@@ -598,6 +594,17 @@ export default function WorkoutDetail() {
           {loadingMoreHistory ? 'Загружаем...' : 'Показать ещё'}
         </button>
       )}
+
+      <h3>Управление тренировкой</h3>
+      <div className="admin-list__actions">
+        <button type="button" onClick={() => navigate(`/workouts/${id}/edit`)}>Редактировать</button>
+        <button type="button" onClick={handleDuplicate} disabled={duplicating}>
+          {duplicating ? 'Копируем...' : 'Скопировать как новую'}
+        </button>
+        <button type="button" className="is-danger" onClick={handleDelete} disabled={deletingWorkout}>
+          {deletingWorkout ? 'Удаляем...' : 'Удалить тренировку'}
+        </button>
+      </div>
 
       <ConfirmDialog {...confirmProps} />
     </section>

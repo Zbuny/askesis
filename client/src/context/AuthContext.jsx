@@ -33,6 +33,32 @@ async function checkIsAdmin(uid) {
   }
 }
 
+// Firebase восстанавливает сессию асинхронно — около секунды на холодном
+// старте. Главная в это время не знает, гость перед ней или нет: показать
+// витрину — вошедший увидит, как она мелькает перед обзором; показать пустоту —
+// гость секунду смотрит на чёрный экран. Подсказка в localStorage решает
+// это без ожидания: гость сразу получает витрину, а пустую паузу видит только
+// тот, кто в этом браузере уже входил. Это лишь подсказка — права по-прежнему
+// решает Firebase, и при ошибке хранилища всё работает как раньше.
+const SESSION_HINT_KEY = 'askesis:had-session'
+
+function rememberSession(signedIn) {
+  try {
+    if (signedIn) localStorage.setItem(SESSION_HINT_KEY, '1')
+    else localStorage.removeItem(SESSION_HINT_KEY)
+  } catch {
+    // приватный режим или запрет хранилища — подсказки просто не будет
+  }
+}
+
+export function hadSession() {
+  try {
+    return localStorage.getItem(SESSION_HINT_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [isAdmin, setIsAdmin] = useState(false)
@@ -40,6 +66,7 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      rememberSession(Boolean(firebaseUser))
       setUser(firebaseUser)
       setIsAdmin(firebaseUser ? await checkIsAdmin(firebaseUser.uid) : false)
       setLoading(false)

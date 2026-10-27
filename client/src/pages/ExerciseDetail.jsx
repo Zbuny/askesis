@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { api } from '../api/firestore.js'
 import ExerciseAnimation from '../components/ExerciseAnimation.jsx'
 import BackLink from '../components/BackLink.jsx'
+import { PageError, PageLoading } from '../components/PageState.jsx'
 import { exerciseFrames, hasExerciseMedia } from '../utils/exerciseFrames.js'
 import {
   exerciseInstructions,
@@ -27,8 +28,8 @@ export default function ExerciseDetail() {
     api.getExercise({ id }).then(setExercise).catch((e) => setError(e.message))
   }, [id])
 
-  if (error) return <p>Ошибка: {error}</p>
-  if (!exercise) return <p>Загрузка...</p>
+  if (error) return <PageError title="Не получилось открыть упражнение" message={error} backTo="/exercises" backLabel="К библиотеке" />
+  if (!exercise) return <PageLoading cards={2} label="Загружаем упражнение" />
 
   const steps = exerciseInstructions(exercise)
     .split('\n')

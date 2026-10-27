@@ -8,8 +8,10 @@ export default function Login() {
   const { login, loginWithGoogle, resetPassword } = useAuth()
   const navigate = useNavigate()
   // Адрес, с которого ProtectedRoute отправил сюда. Прямой заход на /login
-  // состояния не несёт — тогда как раньше уводим в профиль.
-  const redirectTo = useLocation().state?.from || '/profile'
+  // состояния не несёт — тогда ведём в обзор: он отвечает на вопрос «что
+  // делать сегодня», а профиль после первой настройки почти не открывают.
+  const cameFrom = useLocation().state?.from
+  const redirectTo = cameFrom || '/dashboard'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const { busy: submitting, error, setError, run } = useAsyncAction()
@@ -70,11 +72,11 @@ export default function Login() {
           <form onSubmit={handleSubmit}>
             <label className="field">
               <span>Email</span>
-              <input type="email" placeholder="you@mail.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <input type="email" autoComplete="email" placeholder="you@mail.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
             </label>
             <label className="field">
               <span>Пароль</span>
-              <input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
+              <input type="password" autoComplete="current-password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
             </label>
             <button type="submit" className="auth-card__submit" disabled={submitting}>
               {submitting ? 'Входим...' : 'Войти'}
@@ -99,7 +101,7 @@ export default function Login() {
             <form onSubmit={handleReset}>
               <label className="field">
                 <span>Email для сброса пароля</span>
-                <input type="email" placeholder="you@mail.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                <input type="email" autoComplete="email" placeholder="you@mail.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
               </label>
               <button type="submit" className="auth-card__submit" disabled={resetting}>
                 {resetting ? 'Отправляем...' : 'Отправить письмо для сброса'}
@@ -116,7 +118,7 @@ export default function Login() {
 
           {error && <p className="error">{error}</p>}
 
-          <p className="auth-card__footer">Нет аккаунта? <Link to="/register">Зарегистрироваться</Link></p>
+          <p className="auth-card__footer">Нет аккаунта? <Link to="/register" state={cameFrom ? { from: cameFrom } : undefined}>Зарегистрироваться</Link></p>
         </div>
       </div>
     </div>

@@ -43,12 +43,22 @@ function UserIcon() {
   )
 }
 
+// «Начать тренировку» раньше вело просто в список — обещание не совпадало с
+// тем, что открывалось. Теперь подпись честная, а порядок идёт от самого
+// частого действия в зале к редким. Программ и упражнений внизу нет, а
+// гамбургер наверху далеко от большого пальца — поэтому каталоги тоже здесь,
+// отдельной группой.
 const ACTIONS = [
-  { to: '/workouts', label: 'Начать тренировку' },
-  { to: '/workouts/new', label: 'Собрать тренировку' },
+  { to: '/workouts', label: 'Выбрать тренировку' },
   { to: '/nutrition', label: 'Сканировать еду' },
+  { to: '/workouts/new', label: 'Собрать тренировку' },
   { to: '/workouts/ai', label: 'Составить с ИИ' },
   { to: '/workouts/chat', label: 'Спросить тренера' },
+]
+
+const CATALOGS = [
+  { to: '/programs', label: 'Готовые программы' },
+  { to: '/exercises', label: 'Библиотека упражнений' },
 ]
 
 export default function BottomNav() {
@@ -56,13 +66,22 @@ export default function BottomNav() {
   const [open, setOpen] = useState(false)
   const navigate = useNavigate()
   const sheetRef = useRef(null)
+  const triggerRef = useRef(null)
 
   // Меню действий закрываем по Esc и по нажатию мимо: на телефоне это
-  // единственный способ уйти назад, не выбирая пункт.
+  // единственный способ уйти назад, не выбирая пункт. Фокус уходит в меню
+  // при открытии и возвращается на «+» по Esc — иначе с клавиатуры или
+  // экранного диктора меню открывается «где-то», а закрывается в никуда.
   useEffect(() => {
     if (!open) return
-    const onKey = (e) => e.key === 'Escape' && setOpen(false)
+    sheetRef.current?.querySelector('button')?.focus()
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return
+      setOpen(false)
+      triggerRef.current?.focus()
+    }
     const onPointer = (e) => {
+      if (triggerRef.current?.contains(e.target)) return
       if (sheetRef.current && !sheetRef.current.contains(e.target)) setOpen(false)
     }
     document.addEventListener('keydown', onKey)
@@ -89,6 +108,12 @@ export default function BottomNav() {
               {action.label}
             </button>
           ))}
+          <span className="bottom-sheet__label" role="presentation">Каталоги</span>
+          {CATALOGS.map((action) => (
+            <button key={action.to} type="button" role="menuitem" className="bottom-sheet__secondary" onClick={() => go(action.to)}>
+              {action.label}
+            </button>
+          ))}
         </div>
       )}
 
@@ -103,6 +128,7 @@ export default function BottomNav() {
         </NavLink>
 
         <button
+          ref={triggerRef}
           type="button"
           className={`bottom-nav__action${open ? ' is-open' : ''}`}
           onClick={() => setOpen((v) => !v)}

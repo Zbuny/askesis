@@ -1,5 +1,5 @@
-import { Link } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext.jsx'
+import { Link, Navigate } from 'react-router-dom'
+import { hadSession, useAuth } from '../context/AuthContext.jsx'
 import TiltCard from '../components/TiltCard.jsx'
 import TrainingCalendar from '../components/TrainingCalendar.jsx'
 import ProgressChart from '../components/ProgressChart.jsx'
@@ -124,7 +124,14 @@ const DEMO_POINTS = [
 ]
 
 export default function Home() {
-  const { user } = useAuth()
+  const { user, loading } = useAuth()
+
+  // Главная — витрина для гостя. Вошедшему она каждый раз пересказывала, что
+  // такое Askesis, вместо того чтобы показать сегодняшнюю тренировку, —
+  // поэтому сразу ведём в обзор. Пока сессия восстанавливается, пустой экран
+  // получает только тот, кто здесь уже входил (см. hadSession).
+  if (loading && hadSession()) return null
+  if (user) return <Navigate to="/dashboard" replace />
 
   return (
     <>
@@ -134,13 +141,12 @@ export default function Home() {
           <span className="eyebrow">Askesis · Система тренировок</span>
           <h1>Твой план.<br />Твоё развитие.</h1>
           <p>Профессиональные программы тренировок, библиотека упражнений и точный учёт прогресса — без лишнего шума.</p>
+          {/* Каталоги закрыты для гостя, поэтому «Смотреть программы» вело на
+              вход без объяснений. Вторая кнопка — честный путь для тех, у кого
+              аккаунт уже есть. */}
           <div className="hero__actions">
-            {user ? (
-              <Link to="/workouts" className="button">Мои тренировки</Link>
-            ) : (
-              <Link to="/register" className="button">Начать</Link>
-            )}
-            <Link to="/programs" className="button--ghost">Смотреть программы</Link>
+            <Link to="/register" className="button">Начать бесплатно</Link>
+            <Link to="/login" className="button--ghost">Уже есть аккаунт</Link>
           </div>
           <div className="hero__meta">
             <span>
@@ -258,25 +264,13 @@ export default function Home() {
 
       <section className="cta-band">
         <span className="eyebrow">Присоединиться</span>
-        <h2>{user ? 'Продолжай движение' : 'Начни путь к дисциплине'}</h2>
-        <p>
-          {user
-            ? 'Загляни в личный кабинет — там свежая статистика и история твоих тренировок.'
-            : 'Регистрация занимает минуту. Дальше — только ты, план и результат.'}
-        </p>
+        <h2>Начни путь к дисциплине</h2>
+        <p>Регистрация занимает минуту. Дальше — только ты, план и результат.</p>
         <div className="hero__actions">
-          {user ? (
-            <Link to="/profile" className="button">Открыть профиль</Link>
-          ) : (
-            <>
-              <Link to="/register" className="button">Создать аккаунт</Link>
-              <Link to="/login" className="button--ghost">Уже есть аккаунт</Link>
-            </>
-          )}
+          <Link to="/register" className="button">Создать аккаунт</Link>
+          <Link to="/login" className="button--ghost">Уже есть аккаунт</Link>
         </div>
-        {!user && (
-          <p className="cta-band__note">Бесплатно · Без рекламы · Ваши данные остаются только у вас</p>
-        )}
+        <p className="cta-band__note">Бесплатно · Без рекламы · Ваши данные остаются только у вас</p>
       </section>
     </>
   )
