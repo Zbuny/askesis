@@ -434,7 +434,7 @@ export default function WorkoutDetail() {
       </div>
 
       <form onSubmit={handleLogSession}>
-        {workout.items.map((item) => {
+        {workout.items.map((item, index) => {
           const ex = exercises[item.exerciseId]
           const sets = results[item.exerciseId] || []
           const target = targets.get(item.exerciseId)
@@ -450,6 +450,12 @@ export default function WorkoutDetail() {
                 </Link>
 
                 <div className="log-exercise__info">
+                  {/* Номер в тренировке — в зале проще держать в голове
+                      «третье из пяти», чем название. */}
+                  <span className="log-exercise__index">
+                    {String(index + 1).padStart(2, '0')}
+                    <small> / {String(workout.items.length).padStart(2, '0')}</small>
+                  </span>
                   <Link to={`/exercises/${item.exerciseId}`} className="log-exercise__name">
                     {ex ? exerciseName(ex) : item.exerciseName}
                   </Link>

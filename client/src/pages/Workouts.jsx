@@ -1,9 +1,12 @@
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/firestore.js'
 import { useAsyncData } from '../hooks/useAsyncData.js'
 import TiltCard from '../components/TiltCard.jsx'
 import { EmptyState, PageError, PageLoading } from '../components/PageState.jsx'
-import { pluralRu } from '../utils/translate.js'
+import { pluralRu, translateMuscle } from '../utils/translate.js'
+import { estimateMinutes, workoutMuscles } from '../utils/planner.js'
+import { exerciseFrames } from '../utils/exerciseFrames.js'
 
 // Сюда приходят, чтобы начать тренировку, поэтому список собственных
 // тренировок — главное на экране и стоит первым. Создание новой — одна
@@ -11,6 +14,14 @@ import { pluralRu } from '../utils/translate.js'
 // равных по весу призыва стояли над списком и спорили за внимание.
 export default function Workouts() {
   const { data: workouts, loading, error, reload } = useAsyncData(api.listMyWorkouts, [])
+  // Каталог нужен только для картинок и групп мышц на карточках. Он кэшируется
+  // на сутки (api/cache.js), так что обычно приходит без запроса; без него
+  // карточки просто остаются текстовыми.
+  const [exercises, setExercises] = useState([])
+  useEffect(() => {
+    api.listExercises().then(setExercises).catch(() => {})
+  }, [])
+  const exerciseById = useMemo(() => new Map(exercises.map((ex) => [ex.id, ex])), [exercises])
 
   if (loading) return <PageLoading label="Загружаем тренировки" />
   if (error) return <PageError message={error} onRetry={reload} backTo="/dashboard" />
@@ -36,10 +47,34 @@ export default function Workouts() {
         <div className="program-grid">
           {workouts.map((w) => {
             const count = w.items?.length || 0
+            const muscles = workoutMuscles(w, exerciseById, translateMuscle)
+            // Миниатюры первых упражнений — список тренировок узнаётся по
+            // картинкам быстрее, чем по названиям вроде «День 1» и «День 2».
+            const thumbs = (w.items || [])
+              .map((item) => exerciseFrames(exerciseById.get(item.exerciseId))[0])
+              .filter(Boolean)
+              .slice(0, 3)
             return (
-              <TiltCard as={Link} to={`/workouts/${w.id}`} className="program-card" key={w.id}>
+              <TiltCard as={Link} to={`/workouts/${w.id}`} className="program-card workout-card" key={w.id}>
+                {thumbs.length > 0 && (
+                  <span className="workout-card__thumbs" aria-hidden="true">
+                    {thumbs.map((src) => (
+                      <img key={src} src={src} alt="" loading="lazy" />
+                    ))}
+                  </span>
+                )}
                 <h3>{w.title}</h3>
-                <p>{count} {pluralRu(count, 'упражнение', 'упражнения', 'упражнений')}</p>
+                {muscles.length > 0 && (
+                  <span className="chips">
+                    {muscles.map((muscle) => (
+                      <span key={muscle} className="chip">{muscle}</span>
+                    ))}
+                  </span>
+                )}
+                <p>
+                  {count} {pluralRu(count, 'упражнение', 'упражнения', 'упражнений')}
+                  {estimateMinutes(w) > 0 && ` · ~${estimateMinutes(w)} мин`}
+                </p>
               </TiltCard>
             )
           })}

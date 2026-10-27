@@ -12,6 +12,22 @@ import { sessionVolume } from '../utils/workoutLog.js'
 import { weekKey } from '../utils/dates.js'
 import { coachFacts, coachInsights } from '../utils/coach.js'
 import CoachCard from '../components/CoachCard.jsx'
+import ProgressRing from '../components/ProgressRing.jsx'
+import { exerciseFrames } from '../utils/exerciseFrames.js'
+
+const STAT_ICONS = {
+  volume: 'M4 9v6M7 7v10M17 7v10M20 9v6M7 12h10',
+  time: 'M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z',
+  trophy: 'M8 4h8v5a4 4 0 0 1-8 0zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M9 20h6',
+}
+
+function StatIcon({ kind }) {
+  return (
+    <svg className="stat-tile__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d={STAT_ICONS[kind]} />
+    </svg>
+  )
+}
 
 // Дашборд отвечает на один вопрос: что делать сегодня. Поэтому карточка
 // тренировки — единственный крупный призыв к действию, а всё остальное
@@ -130,44 +146,70 @@ export default function Dashboard() {
 
   const muscles = today ? workoutMuscles(today.workout, exerciseById, translateMuscle) : []
   const minutes = today ? estimateMinutes(today.workout) : 0
+  // Обложка карточки «сегодня» — кадр первого упражнения, у которого он есть.
+  // Каталог догружается отдельно, так что сначала карточка без фото, и это
+  // нормально: фон проявляется, вёрстка не прыгает.
+  const cover = today
+    ? (today.workout.items || [])
+        .map((item) => exerciseFrames(exerciseById.get(item.exerciseId))[0])
+        .find(Boolean)
+    : null
 
   return (
     <section className="dashboard">
-      <div className="glass-hero">
+      <div className="glass-hero dash-hero">
         <div className="glass-hero__glow" aria-hidden="true" />
-        <div className="glass-hero__content">
-          <span className="eyebrow">Askesis · Обзор</span>
-          <h2>{greeting()}, {user?.displayName || 'спортсмен'}</h2>
+        <div className="glass-hero__content dash-hero__content">
+          <div className="dash-hero__main">
+            <span className="eyebrow">Askesis · Обзор</span>
+            <h2>{greeting()}, {user?.displayName || 'спортсмен'}</h2>
 
-          <div className="level-row">
-            <div className="level-row__info">
-              <strong>Уровень {summary.level}</strong>
-              <span>{summary.title}</span>
+            <div className="level-row">
+              <div className="level-row__info">
+                <strong>Уровень {summary.level}</strong>
+                <span>{summary.title}</span>
+              </div>
+              <div className="level-bar" role="progressbar" aria-valuenow={summary.percent} aria-valuemin={0} aria-valuemax={100}>
+                <span className="level-bar__fill" style={{ width: `${summary.percent}%` }} />
+              </div>
+              <span className="level-row__xp">
+                {summary.xpInLevel.toLocaleString('ru-RU')} / {summary.xpForNext.toLocaleString('ru-RU')} XP
+              </span>
             </div>
-            <div className="level-bar" role="progressbar" aria-valuenow={summary.percent} aria-valuemin={0} aria-valuemax={100}>
-              <span className="level-bar__fill" style={{ width: `${summary.percent}%` }} />
-            </div>
-            <span className="level-row__xp">
-              {summary.xpInLevel.toLocaleString('ru-RU')} / {summary.xpForNext.toLocaleString('ru-RU')} XP
-            </span>
+
+            {streak.current > 0 && (
+              <p className="streak-line">
+                <strong>{streak.current} {pluralRu(streak.current, 'день', 'дня', 'дней')} подряд</strong>
+                {streak.next && <span> · до {streak.next.target} осталось {streak.next.remaining}</span>}
+              </p>
+            )}
           </div>
 
-          {streak.current > 0 && (
-            <p className="streak-line">
-              <strong>{streak.current} {pluralRu(streak.current, 'день', 'дня', 'дней')} подряд</strong>
-              {streak.next && <span> · до {streak.next.target} осталось {streak.next.remaining}</span>}
-            </p>
-          )}
+          <ProgressRing
+            value={summary.week.done}
+            max={summary.week.goal}
+            label="Тренировок на этой неделе"
+            caption="неделя"
+          />
         </div>
       </div>
 
       {/* Главное действие экрана. Всё, что ниже, — объяснение, зачем его делать. */}
-      <div className="today-card">
+      <div
+        className={`today-card${cover ? ' today-card--cover' : ''}`}
+        style={cover ? { '--today-cover': `url("${cover}")` } : undefined}
+      >
         <span className="eyebrow">Тренировка на сегодня</span>
         {today ? (
           <>
             <h3>{today.workout.title}</h3>
-            {muscles.length > 0 && <p className="today-card__muscles">{muscles.join(' · ')}</p>}
+            {muscles.length > 0 && (
+              <p className="today-card__muscles chips">
+                {muscles.map((muscle) => (
+                  <span key={muscle} className="chip">{muscle}</span>
+                ))}
+              </p>
+            )}
             <p className="today-card__meta">
               {today.workout.items?.length || 0} {pluralRu(today.workout.items?.length || 0, 'упражнение', 'упражнения', 'упражнений')}
               {minutes > 0 && ` · ~${minutes} мин`}
@@ -179,6 +221,7 @@ export default function Dashboard() {
               </p>
             )}
             <Link to={`/workouts/${today.workout.id}`} className="button today-card__cta">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor" /></svg>
               {today.doneToday ? 'Открыть тренировку' : 'Начать тренировку'}
             </Link>
             {upNext && <p className="today-card__next">Дальше: {upNext.title}</p>}
@@ -205,24 +248,21 @@ export default function Dashboard() {
         <h3>Эта неделя</h3>
         <Link to="/statistics">Вся статистика →</Link>
       </div>
+      {/* Тренировки за неделю уже в кольце наверху — здесь то, чего там нет. */}
       <div className="week-grid">
-        <div className="glass-card">
-          <strong>{summary.week.done} / {summary.week.goal}</strong>
-          <span>тренировок</span>
-          <div className="level-bar level-bar--slim">
-            <span className="level-bar__fill" style={{ width: `${summary.week.percent}%` }} />
-          </div>
-        </div>
-        <div className="glass-card">
+        <div className="glass-card stat-tile">
+          <StatIcon kind="volume" />
           <strong>{Math.round(thisWeek.volume).toLocaleString('ru-RU')}</strong>
           <span>кг объёма</span>
         </div>
-        <div className="glass-card">
+        <div className="glass-card stat-tile">
+          <StatIcon kind="time" />
           <strong>{thisWeek.minutes || '—'}</strong>
           <span>минут в зале</span>
         </div>
-        <div className="glass-card">
-          <strong>{achievements.unlocked} / {achievements.total}</strong>
+        <div className="glass-card stat-tile">
+          <StatIcon kind="trophy" />
+          <strong>{achievements.unlocked}<small> / {achievements.total}</small></strong>
           <span>достижений</span>
         </div>
       </div>
