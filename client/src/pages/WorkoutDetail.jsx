@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api/firestore.js'
 import { formatDuration, useWorkoutTimer } from '../hooks/useWorkoutTimer.js'
@@ -20,6 +20,8 @@ import ExerciseAnimation from '../components/ExerciseAnimation.jsx'
 import BackLink from '../components/BackLink.jsx'
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
 import { PageError, PageLoading } from '../components/PageState.jsx'
+import SessionCoach, { SessionCoachButton } from '../components/SessionCoach.jsx'
+import { buildSessionContext } from '../utils/sessionCoach.js'
 import { useConfirm } from '../hooks/useConfirm.js'
 import {
   clearSessionDraft,
@@ -65,6 +67,17 @@ export default function WorkoutDetail() {
   const sessionHydrated = useRef(false)
   const { startedAt, elapsedSeconds, start, reset } = useWorkoutTimer(id)
   const { ask, confirmProps } = useConfirm()
+  // Тренер поверх формы: открыт ли, про какое упражнение спросили и есть ли
+  // уже ответ (тогда на кнопке точка — переписка не пропала).
+  const [coachOpen, setCoachOpen] = useState(false)
+  const [coachFocusId, setCoachFocusId] = useState(null)
+  const [coachHasReplies, setCoachHasReplies] = useState(false)
+  const closeCoach = useCallback(() => setCoachOpen(false), [])
+
+  function openCoach(exerciseId = null) {
+    setCoachFocusId(exerciseId)
+    setCoachOpen(true)
+  }
 
   function loadHistory() {
     return api
@@ -227,6 +240,14 @@ export default function WorkoutDetail() {
 
   const catalogue = useMemo(() => Object.values(exercises), [exercises])
   const readiness = useMemo(() => readinessScore(todayCheckin(checkins)), [checkins])
+
+  // Русское название из каталога, а пока он не догрузился — то, что
+  // сохранено в самой тренировке.
+  function exerciseLabel(exerciseId) {
+    const ex = exercises[exerciseId]
+    if (ex) return exerciseName(ex)
+    return workout?.items.find((item) => item.exerciseId === exerciseId)?.exerciseName || ''
+  }
 
   function applyTarget(item) {
     const target = targets.get(item.exerciseId)
@@ -467,6 +488,9 @@ export default function WorkoutDetail() {
                       busy={swapping}
                       onSwap={(replacement) => handleSwap(item, replacement)}
                     />
+                    <button type="button" className="log-exercise__ask" onClick={() => openCoach(item.exerciseId)}>
+                      Спросить тренера
+                    </button>
                   </div>
                 </div>
               </div>
@@ -605,6 +629,27 @@ export default function WorkoutDetail() {
           {deletingWorkout ? 'Удаляем...' : 'Удалить тренировку'}
         </button>
       </div>
+
+      <SessionCoachButton onClick={() => openCoach(null)} hasReplies={coachHasReplies} />
+      <SessionCoach
+        open={coachOpen}
+        onClose={closeCoach}
+        focusName={coachFocusId ? exerciseLabel(coachFocusId) : null}
+        profile={profile}
+        onRepliesChange={setCoachHasReplies}
+        getContext={() =>
+          buildSessionContext({
+            workout,
+            results,
+            rir,
+            targets,
+            exerciseNames: Object.fromEntries(workout.items.map((item) => [item.exerciseId, exerciseLabel(item.exerciseId)])),
+            readiness,
+            elapsedSeconds: startedAt ? elapsedSeconds : 0,
+            focusExerciseId: coachFocusId,
+          })
+        }
+      />
 
       <ConfirmDialog {...confirmProps} />
     </section>

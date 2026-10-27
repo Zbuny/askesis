@@ -300,6 +300,7 @@ const CHAT_SYSTEM_PROMPT = `Ты — тренер по силовой и общ�
 - Если приложены сохранённые тренировки или история весов — опирайся на них: предлагай конкретные веса и замены, а не общие слова.
 - Если указан инвентарь — не предлагай упражнений на снарядах, которых в нём нет. Если указаны травмы и ограничения — обходи то, о чём человек попросил, и предлагай замену.
 - Держись в пределах 250 слов, если не просят подробнее.
+- Если в данных есть «Идёт тренировка» — человек в зале между подходами: отвечай до 80 слов, сразу с конкретикой (вес, повторы, отдых, замена) по его текущим цифрам.
 
 ${REP_RANGE_RULES}`
 
@@ -334,6 +335,25 @@ function buildContextMessage(context) {
       lines.push(`Травмы и ограничения: ${context.profile.limits.slice(0, 400)}`)
     }
     if (lines.length) parts.push(lines.join('\n'))
+  }
+
+  // Вопрос задан прямо во время тренировки — снимок того, что сейчас в форме
+  // (client/src/utils/sessionCoach.js). Часть подходов подставлена из прошлого
+  // раза, поэтому модель предупреждаем: это не обязательно сделанное сегодня.
+  const session = context.session
+  if (session && typeof session === 'object' && Array.isArray(session.exercises)) {
+    const head = [`Идёт тренировка «${String(session.title || '').slice(0, 80)}»`]
+    if (Number.isFinite(session.minutes)) head.push(`${session.minutes} мин в зале`)
+    if (typeof session.readiness === 'string' && session.readiness) head.push(`готовность сегодня ${session.readiness.slice(0, 8)}`)
+    const list = session.exercises.slice(0, 20).map((e) => {
+      const bits = [`${String(e.name || '').slice(0, 80)} — план ${String(e.plan || '').slice(0, 20)}`]
+      if (e.today) bits.push(`цель на сегодня ${String(e.today).slice(0, 40)}`)
+      if (e.sets) bits.push(`в форме: ${String(e.sets).slice(0, 120)}`)
+      if (e.rir) bits.push(`запас до отказа: ${String(e.rir).slice(0, 20)}`)
+      return bits.join('; ')
+    })
+    const focus = session.focus ? `\nВопрос про упражнение: ${String(session.focus).slice(0, 80)}` : ''
+    parts.push(`${head.join(', ')}. Подходы «в форме» частично подставлены из прошлого раза.\n${list.join('\n')}${focus}`)
   }
 
   if (Array.isArray(context.workouts) && context.workouts.length) {

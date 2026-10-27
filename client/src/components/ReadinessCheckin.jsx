@@ -9,6 +9,12 @@ import {
 // Чек-ин перед тренировкой. Три вопроса и ни одним больше: анкету на пять
 // экранов перед залом не заполняет никто, а без ответов готовность посчитать
 // не из чего — в журнале сна и усталости нет.
+//
+// По умолчанию свёрнут в одну строку. Развёрнутые шкалы занимали целый экран
+// над первым упражнением, и в зале их приходилось пролистывать каждый раз.
+// Раньше решение «развернуть» принималось при первой отрисовке, когда
+// сегодняшняя отметка ещё не загрузилась, — и форма оставалась открытой
+// даже у того, кто уже ответил.
 
 const SCALES = [
   { key: 'sleep', title: 'Как спали?', options: SLEEP_OPTIONS },
@@ -16,28 +22,54 @@ const SCALES = [
   { key: 'soreness', title: 'Мышцы после прошлой?', options: SORENESS_OPTIONS },
 ]
 
-export default function ReadinessCheckin({ checkin, onSave, busy }) {
-  const [open, setOpen] = useState(!checkin)
-  const [draft, setDraft] = useState({
+function draftFrom(checkin) {
+  return {
     sleep: checkin?.sleep ?? 3,
     energy: checkin?.energy ?? 3,
     soreness: checkin?.soreness ?? 1,
-  })
+  }
+}
+
+export default function ReadinessCheckin({ checkin, onSave, busy }) {
+  const [open, setOpen] = useState(false)
+  const [draft, setDraft] = useState(() => draftFrom(checkin))
 
   const saved = checkin ? readinessScore(checkin) : null
   const preview = readinessScore(draft)
 
+  // Черновик берём из отметки в момент открытия, а не при монтировании:
+  // к этому времени она уже загружена, и «Изменить» показывает свои ответы,
+  // а не значения по умолчанию.
+  function openEditor() {
+    setDraft(draftFrom(checkin))
+    setOpen(true)
+  }
+
   if (!open && saved) {
     return (
-      <div className={`readiness readiness--${saved.tone}`}>
+      <div className={`readiness readiness--compact readiness--${saved.tone}`}>
         <div className="readiness__head">
           <div>
             <span className="eyebrow">Готовность сегодня</span>
             <strong>{saved.percent}% · {saved.label}</strong>
           </div>
-          <button type="button" onClick={() => setOpen(true)}>Изменить</button>
+          <button type="button" onClick={openEditor}>Изменить</button>
         </div>
         <p className="readiness__advice">{saved.advice}</p>
+      </div>
+    )
+  }
+
+  if (!open) {
+    return (
+      <div className="readiness readiness--compact">
+        <div className="readiness__head">
+          <div>
+            <span className="eyebrow">Как вы сегодня?</span>
+            <strong>Три вопроса — подскажем, брать ли прибавку</strong>
+          </div>
+          <button type="button" onClick={openEditor}>Ответить</button>
+        </div>
       </div>
     )
   }
@@ -49,9 +81,7 @@ export default function ReadinessCheckin({ checkin, onSave, busy }) {
           <span className="eyebrow">Как вы сегодня?</span>
           <strong>{preview.percent}% · {preview.label}</strong>
         </div>
-        {saved && (
-          <button type="button" onClick={() => setOpen(false)}>Свернуть</button>
-        )}
+        <button type="button" onClick={() => setOpen(false)}>Свернуть</button>
       </div>
 
       {SCALES.map((scale) => (
