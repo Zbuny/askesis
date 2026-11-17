@@ -44,5 +44,7 @@ export async function login(page, { email, password }) {
   await page.getByLabel('Email').fill(email)
   await page.getByLabel('Пароль').fill(password)
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
-  await page.waitForURL('**/profile', { timeout: AUTH_TIMEOUT })
+  // После входа приложение ведёт на обзор (или туда, откуда человек пришёл),
+  // а не в профиль, как раньше.
+  await page.waitForURL(/\/(dashboard|profile)/, { timeout: AUTH_TIMEOUT })
 }

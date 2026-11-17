@@ -270,7 +270,7 @@ export default function Profile() {
         <div className="glass-hero__glow" aria-hidden="true" />
         <div className="glass-hero__content">
           <span className="eyebrow">Askesis · Профиль</span>
-          <h2>Привет, {user?.displayName || 'спортсмен'}</h2>
+          <h1>Привет, {user?.displayName || 'спортсмен'}</h1>
           <p>
             Здесь только данные о вас — от них зависят диапазон повторений, шаг
             прибавки веса, недельная цель, норма калорий и подбор замены

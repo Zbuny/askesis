@@ -138,7 +138,7 @@ export default function Dashboard() {
   if (error) {
     return (
       <section>
-        <h2>Обзор</h2>
+        <h1 className="page-title">Обзор</h1>
         <p className="error">{error}</p>
       </section>
     )
@@ -162,7 +162,7 @@ export default function Dashboard() {
         <div className="glass-hero__content dash-hero__content">
           <div className="dash-hero__main">
             <span className="eyebrow">Askesis · Обзор</span>
-            <h2>{greeting()}, {user?.displayName || 'спортсмен'}</h2>
+            <h1>{greeting()}, {user?.displayName || 'спортсмен'}</h1>
 
             <div className="level-row">
               <div className="level-row__info">

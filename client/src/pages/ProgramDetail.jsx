@@ -70,7 +70,7 @@ export default function ProgramDetail() {
   return (
     <section>
       <BackLink fallback="/programs" label="К программам" />
-      <h2>{program.title}</h2>
+      <h1 className="page-title">{program.title}</h1>
       <p>{program.level} · {program.duration}</p>
       <p>{program.description}</p>
 

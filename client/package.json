@@ -14,6 +14,8 @@
     "dev:emulator": "vite --mode emulator --port 5174"
   },
   "dependencies": {
+    "@splinetool/react-spline": "^4.1.0",
+    "@splinetool/runtime": "^2.0.35",
     "firebase": "^11.0.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

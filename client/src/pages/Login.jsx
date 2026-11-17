@@ -66,7 +66,7 @@ export default function Login() {
           </div>
 
           <span className="eyebrow">Askesis · Вход</span>
-          <h2>Добро пожаловать обратно</h2>
+          <h1>Добро пожаловать обратно</h1>
           <p className="auth-card__subtitle">Продолжай путь дисциплины и контроля.</p>
 
           <form onSubmit={handleSubmit}>

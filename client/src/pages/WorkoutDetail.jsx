@@ -23,6 +23,10 @@ import { PageError, PageLoading } from '../components/PageState.jsx'
 import SessionCoach, { SessionCoachButton } from '../components/SessionCoach.jsx'
 import { buildSessionContext } from '../utils/sessionCoach.js'
 import { useConfirm } from '../hooks/useConfirm.js'
+import { loadRestPreferences, useRestTimer } from '../hooks/useRestTimer.js'
+import { useWakeLock } from '../hooks/useWakeLock.js'
+import RestTimer from '../components/RestTimer.jsx'
+import { countSets, restSecondsFor, setsToLog } from '../utils/restTimer.js'
 import {
   clearSessionDraft,
   loadSessionDraft,
@@ -66,6 +70,8 @@ export default function WorkoutDetail() {
   const reviewRef = useRef(null)
   const sessionHydrated = useRef(false)
   const { startedAt, elapsedSeconds, start, reset } = useWorkoutTimer(id)
+  const restTimer = useRestTimer(id)
+  useWakeLock(Boolean(startedAt))
   const { ask, confirmProps } = useConfirm()
   // Тренер поверх формы: открыт ли, про какое упражнение спросили и есть ли
   // уже ответ (тогда на кнопке точка — переписка не пропала).
@@ -270,8 +276,53 @@ export default function WorkoutDetail() {
     }))
   }
 
+  // Новый подход повторяет предыдущий: в зале следующий подход почти всегда
+  // с тем же весом, и вбивать его заново — лишние нажатия потными пальцами.
   function addSet(exerciseId) {
-    setResults((prev) => ({ ...prev, [exerciseId]: [...prev[exerciseId], emptySet()] }))
+    setResults((prev) => {
+      const sets = prev[exerciseId] || []
+      const last = sets[sets.length - 1]
+      const next = last ? { weight: last.weight, reps: last.reps } : emptySet()
+      return { ...prev, [exerciseId]: [...sets, next] }
+    })
+  }
+
+  // Отметка «сделал». Ставит отдых и, если человек забыл, запускает таймер
+  // тренировки — первый отмеченный подход и есть её начало.
+  function toggleSetDone(item, index) {
+    const sets = results[item.exerciseId] || []
+    const set = sets[index]
+    if (!set) return
+    const done = !set.done
+    setResults((prev) => ({
+      ...prev,
+      [item.exerciseId]: prev[item.exerciseId].map((current, i) => {
+        if (i !== index) return current
+        // Пустые повторы при отметке берём из цели: «сделал как написано».
+        const reps = done && current.reps === '' && item.targetReps ? String(item.targetReps) : current.reps
+        return { ...current, reps, done }
+      }),
+    }))
+
+    if (!done) return
+    try {
+      navigator.vibrate?.(12)
+    } catch {
+      // не поддерживается — ничего страшного
+    }
+    if (!startedAt) start()
+
+    const { total, done: doneCount } = countSets(results)
+    // Последний подход тренировки — отдыхать уже не нужно, нужно записать.
+    if (doneCount + 1 >= total) {
+      restTimer.stop()
+      return
+    }
+    restTimer.start({
+      seconds: restSecondsFor({ exercise: exercises[item.exerciseId], item, preferences: loadRestPreferences() }),
+      exerciseId: item.exerciseId,
+      label: exerciseLabel(item.exerciseId),
+    })
   }
 
   function removeSet(exerciseId, index) {
@@ -284,21 +335,22 @@ export default function WorkoutDetail() {
   async function handleLogSession(e) {
     e.preventDefault()
 
+    const usesChecks = countSets(results).done > 0
     const entries = workout.items
       .map((item) => ({
         exerciseId: item.exerciseId,
         exerciseName: item.exerciseName,
-        // Пустые подходы не записываем — упражнение могли пропустить.
-        sets: (results[item.exerciseId] || [])
-          .filter((set) => set.weight !== '' || set.reps !== '')
-          .map((set) => ({ weight: Number(set.weight) || 0, reps: Number(set.reps) || 0 })),
+        // Пустые подходы не записываем — упражнение могли пропустить. Если
+        // человек отмечал подходы, неотмеченные — это подсказка прошлого
+        // раза, а не сделанная работа (см. setsToLog).
+        sets: setsToLog(results[item.exerciseId], usesChecks),
         ...(followed.has(item.exerciseId) ? { followedTarget: true } : {}),
         ...(rir[item.exerciseId] != null ? { rir: rir[item.exerciseId] } : {}),
       }))
       .filter((entry) => entry.sets.length > 0)
 
     if (entries.length === 0) {
-      setError('Заполните хотя бы один подход')
+      setError(usesChecks ? 'Отмеченные подходы пустые — впишите вес или повторы' : 'Заполните хотя бы один подход')
       return
     }
 
@@ -313,6 +365,7 @@ export default function WorkoutDetail() {
         }),
       )
       reset()
+      restTimer.stop()
       clearSessionDraft(id)
       setFollowed(new Set())
       setRir({})
@@ -400,10 +453,12 @@ export default function WorkoutDetail() {
   if (error && !workout) return <PageError title="Не получилось открыть тренировку" message={error} backTo="/workouts" backLabel="К тренировкам" />
   if (!workout) return <PageLoading cards={3} label="Загружаем тренировку" />
 
+  const setStats = countSets(results)
+
   return (
-    <section>
+    <section className={`workout-session${restTimer.rest ? ' is-resting' : ''}`}>
       <BackLink fallback="/workouts" label="К тренировкам" />
-      <h2>{workout.title}</h2>
+      <h1 className="page-title">{workout.title}</h1>
 
       {/* Сюда приходят из зала — сразу к подходам. Правка, копия и удаление
           нужны редко и переехали в конец страницы: «Удалить тренировку»
@@ -416,7 +471,9 @@ export default function WorkoutDetail() {
           та же прибавка — не прогресс, а способ поймать травму. */}
       <ReadinessCheckin checkin={todayCheckin(checkins)} onSave={handleCheckin} busy={swapping} />
 
-      <div className="timer">
+      {/* Карточка прилипает к верху при прокрутке: время и «сколько
+          осталось» видны на любом упражнении, а не только в начале. */}
+      <div className={`timer${startedAt ? ' is-running' : ''}`}>
         {startedAt ? (
           <>
             <span className="timer__value">{formatDuration(elapsedSeconds)}</span>
@@ -427,9 +484,26 @@ export default function WorkoutDetail() {
           </>
         ) : (
           <>
-            <span className="timer__label">Засечь время тренировки, чтобы оно попало в статистику</span>
-            <button type="button" onClick={start}>Начать тренировку</button>
+            <span className="timer__label">Отметьте первый подход — время пойдёт само. Или запустите сейчас</span>
+            <button type="button" onClick={start}>Начать</button>
           </>
+        )}
+        {setStats.total > 0 && (
+          <div className="timer__progress">
+            <span className="timer__progress-text">
+              Подходы <strong>{setStats.done}</strong> / {setStats.total}
+            </span>
+            <span
+              className="timer__progress-track"
+              role="progressbar"
+              aria-label="Выполнено подходов"
+              aria-valuemin={0}
+              aria-valuemax={setStats.total}
+              aria-valuenow={setStats.done}
+            >
+              <span style={{ transform: `scaleX(${setStats.done / setStats.total})` }} />
+            </span>
+          </div>
         )}
       </div>
 
@@ -502,32 +576,54 @@ export default function WorkoutDetail() {
               </div>
 
               <div className="log-sets">
+                {/* Подписи столбцов один раз сверху вместо «кг/повт.» в каждой
+                    строке — так полям хватает ширины на крупные цифры. */}
+                <div className="log-sets__head" aria-hidden="true">
+                  <span>Подход</span>
+                  <span>Вес, кг</span>
+                  <span>Повторы</span>
+                  <span />
+                </div>
                 {sets.map((set, i) => (
-                  <div className="log-set" key={i}>
-                    <span className="log-set__num">{i + 1}</span>
-                    <label className="log-set__field">
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        min="0"
-                        step="0.5"
-                        placeholder="0"
-                        value={set.weight}
-                        onChange={(e) => updateSet(item.exerciseId, i, 'weight', e.target.value)}
-                      />
-                      <span>кг</span>
-                    </label>
-                    <label className="log-set__field">
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        min="0"
-                        placeholder={String(item.targetReps || '')}
-                        value={set.reps}
-                        onChange={(e) => updateSet(item.exerciseId, i, 'reps', e.target.value)}
-                      />
-                      <span>повт.</span>
-                    </label>
+                  <div className={`log-set${set.done ? ' is-done' : ''}`} key={i}>
+                    <button
+                      type="button"
+                      className="log-set__check"
+                      onClick={() => toggleSetDone(item, i)}
+                      aria-pressed={Boolean(set.done)}
+                      aria-label={`Подход ${i + 1} выполнен`}
+                    >
+                      {set.done ? (
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M5 12.5l4.5 4.5L19 7.5" />
+                        </svg>
+                      ) : (
+                        i + 1
+                      )}
+                    </button>
+                    <input
+                      className="log-set__input"
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      step="0.5"
+                      placeholder="0"
+                      aria-label={`Вес, подход ${i + 1}, кг`}
+                      value={set.weight}
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) => updateSet(item.exerciseId, i, 'weight', e.target.value)}
+                    />
+                    <input
+                      className="log-set__input"
+                      type="number"
+                      inputMode="numeric"
+                      min="0"
+                      placeholder={String(item.targetReps || '')}
+                      aria-label={`Повторы, подход ${i + 1}`}
+                      value={set.reps}
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) => updateSet(item.exerciseId, i, 'reps', e.target.value)}
+                    />
                     <button
                       type="button"
                       className="log-set__remove"
@@ -535,7 +631,9 @@ export default function WorkoutDetail() {
                       title="Убрать подход"
                       aria-label={`Убрать подход ${i + 1}`}
                     >
-                      ×
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M7 7l10 10M17 7L7 17" />
+                      </svg>
                     </button>
                   </div>
                 ))}
@@ -579,9 +677,14 @@ export default function WorkoutDetail() {
           )
         })}
 
-        {error && <p className="error">{error}</p>}
+        {error && <p className="error" role="alert">{error}</p>}
 
-        <div className="admin-form__actions">
+        <div className="admin-form__actions log-submit">
+          {setStats.done > 0 && setStats.done < setStats.total && (
+            <p className="log-submit__hint">
+              Запишутся только отмеченные подходы — {setStats.done} из {setStats.total}.
+            </p>
+          )}
           <button type="submit" className="button" disabled={saving}>
             {saving ? 'Сохраняем...' : 'Записать сегодняшнюю тренировку'}
           </button>
@@ -636,6 +739,13 @@ export default function WorkoutDetail() {
         </button>
       </div>
 
+      <RestTimer
+        rest={restTimer.rest}
+        left={restTimer.left}
+        finished={restTimer.finished}
+        onAdjust={restTimer.adjust}
+        onStop={restTimer.stop}
+      />
       <SessionCoachButton onClick={() => openCoach(null)} hasReplies={coachHasReplies} />
       <SessionCoach
         open={coachOpen}

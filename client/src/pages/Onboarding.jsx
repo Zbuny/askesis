@@ -95,7 +95,7 @@ export default function Onboarding() {
     return (
       <section className="onboarding">
         <span className="eyebrow">Askesis · Готово</span>
-        <h2>Ваша первая программа</h2>
+        <h1>Ваша первая программа</h1>
         <p>
           {usedAi
             ? 'Собрана ИИ-тренером под ваши ответы. Сохраните дни — дальше приложение будет само поднимать веса по вашим цифрам.'
@@ -114,7 +114,7 @@ export default function Onboarding() {
   return (
     <section className="onboarding">
       <span className="eyebrow">Askesis · Знакомство</span>
-      <h2>Четыре вопроса — и программа готова</h2>
+      <h1>Четыре вопроса — и программа готова</h1>
       <p>
         Ответы сохранятся в профиль: от них зависят недельная цель, шаг прибавки
         веса и подсказки тренера. Поменять их можно в любой момент.

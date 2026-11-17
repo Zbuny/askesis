@@ -77,6 +77,42 @@ describe('muscleVolume', () => {
     expect(rows[0].percent).toBe(100)
   })
 
+  it('доля считается от всего объёма, а не от самой нагруженной группы', () => {
+    const rows = muscleVolume(
+      [
+        {
+          entries: [
+            { exerciseId: 'bench', sets: [{ weight: 100, reps: 3 }] },
+            { exerciseId: 'squat', sets: [{ weight: 100, reps: 1 }] },
+          ],
+        },
+      ],
+      exerciseById,
+    )
+    expect(rows[0].percent).toBe(100)
+    expect(rows[0].share).toBe(75)
+    expect(rows[1].share).toBe(25)
+  })
+
+  it('группа с собственным весом не выглядит пустой', () => {
+    const rows = muscleVolume(
+      [
+        {
+          entries: [
+            { exerciseId: 'bench', sets: [{ weight: 80, reps: 8 }] },
+            { exerciseId: 'pull', sets: [{ weight: 0, reps: 10 }, { weight: 0, reps: 8 }] },
+          ],
+        },
+      ],
+      new Map([...exerciseById, ['pull', { muscleGroup: 'lats' }]]),
+    )
+    const lats = rows.find((row) => row.key === 'lats')
+    expect(lats.bodyweight).toBe(true)
+    expect(lats.reps).toBe(18)
+    expect(lats.percent).toBe(100)
+    expect(lats.share).toBe(0)
+  })
+
   it('упражнения без группы в каталоге собираются отдельно, а не приписываются чужой', () => {
     const rows = muscleVolume(history, new Map())
     expect(rows).toHaveLength(1)

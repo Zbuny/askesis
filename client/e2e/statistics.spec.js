@@ -27,8 +27,8 @@ test.describe('Статистика с данными', () => {
     await page.getByRole('button', { name: 'Сохранить тренировку' }).click()
     await page.waitForURL(/\/workouts\/[^/]+$/)
 
-    await page.locator('.log-set__field input').first().fill('60', { timeout: SLOW })
-    await page.locator('.log-set__field input').nth(1).fill('8')
+    await page.locator('.log-set__input').first().fill('60', { timeout: SLOW })
+    await page.locator('.log-set__input').nth(1).fill('8')
     await page.getByRole('button', { name: 'Записать сегодняшнюю тренировку' }).click()
     await expect(page.locator('.history-entry').first()).toBeVisible({ timeout: SLOW })
   })

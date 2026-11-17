@@ -7,8 +7,8 @@ test('сохранение личных данных (рост/возраст) �
 
   await expect(page.getByRole('heading', { name: 'Мои данные' })).toBeVisible()
 
-  await page.getByPlaceholder('Рост, см').fill('180')
-  await page.getByPlaceholder('Возраст').fill('28')
+  await page.getByLabel('Рост, см').fill('180')
+  await page.getByLabel('Возраст, лет').fill('28')
   // Форм с кнопкой «Сохранить» на странице две (данные о себе и инвентарь с
   // ограничениями) — обе пишут один профиль, но нажимаем и проверяем свою.
   const myData = page.locator('.profile-sidebar')
@@ -17,8 +17,8 @@ test('сохранение личных данных (рост/возраст) �
   await expect(myData.getByText('Сохранено')).toBeVisible({ timeout: 10000 })
 
   await page.reload()
-  await expect(page.getByPlaceholder('Рост, см')).toHaveValue('180', { timeout: 10000 })
-  await expect(page.getByPlaceholder('Возраст')).toHaveValue('28')
+  await expect(page.getByLabel('Рост, см')).toHaveValue('180', { timeout: 10000 })
+  await expect(page.getByLabel('Возраст, лет')).toHaveValue('28')
 })
 
 test('запись веса и история веса в профиле', async ({ page }) => {
@@ -27,7 +27,7 @@ test('запись веса и история веса в профиле', async
 
   await expect(page.getByRole('heading', { name: 'Мои данные' })).toBeVisible()
 
-  await page.getByPlaceholder('Вес, кг').fill('82')
+  await page.getByLabel('Вес, кг').fill('82')
   await page.getByRole('button', { name: 'Записать' }).click()
 
   await expect(page.locator('.history-list').getByText('82 кг')).toBeVisible({ timeout: 10000 })

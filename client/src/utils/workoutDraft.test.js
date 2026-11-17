@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   builderDraftKey,
   clearBuilderDraft,
-  clearSessionDraft,
   loadBuilderDraft,
   loadSessionDraft,
   saveBuilderDraft,

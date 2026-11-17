@@ -5,6 +5,8 @@ import App from './App.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
 import { ThemeProvider } from './context/ThemeContext.jsx'
 import './index.css'
+// Ради побочного эффекта: ловит beforeinstallprompt до первого рендера.
+import './utils/installPrompt.js'
 
 // Страницы грузятся по частям (React.lazy), и после каждого деплоя старые
 // файлы чанков пропадают с хостинга — вкладка, открытая ДО деплоя, ещё

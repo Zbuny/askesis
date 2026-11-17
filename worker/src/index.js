@@ -2,7 +2,8 @@ const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
 const JWKS_URL = 'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com'
 // llama-3.3-70b-versatile снята с обслуживания 16.08.2026 — Groq отвечает 404.
 const DEFAULT_GROQ_MODEL = 'openai/gpt-oss-120b'
-const DEFAULT_GROQ_VISION_MODEL = 'qwen/qwen3.6-27b'
+// qwen/qwen3.6-27b снята с обслуживания 14.09.2026 — замена по совету Groq.
+const DEFAULT_GROQ_VISION_MODEL = 'qwen/qwen3.8-27b'
 
 const MAX_CANDIDATES = 150
 const MAX_WORKOUTS = 6

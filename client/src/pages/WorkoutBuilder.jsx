@@ -21,8 +21,13 @@ export default function WorkoutBuilder() {
   const isEdit = Boolean(id)
   const navigate = useNavigate()
   const [exercises, setExercises] = useState([])
-  const [title, setTitle] = useState('')
-  const [items, setItems] = useState([])
+  // Черновик новой тренировки читаем сразу при создании состояния, а не в
+  // эффекте. В эффекте он терялся: StrictMode в разработке запускает эффекты
+  // дважды, первый проход успевал сохранить пустую форму поверх черновика, и
+  // второй читал уже пустоту.
+  const [initialDraft] = useState(() => (isEdit ? null : loadBuilderDraft(null)))
+  const [title, setTitle] = useState(() => initialDraft?.title || '')
+  const [items, setItems] = useState(() => initialDraft?.items || [])
   const [loadError, setLoadError] = useState(null)
   const [loading, setLoading] = useState(isEdit)
   const [level, setLevel] = useState('')
@@ -43,11 +48,6 @@ export default function WorkoutBuilder() {
     hydrated.current = false
 
     if (!isEdit) {
-      const draft = loadBuilderDraft(null)
-      if (draft) {
-        setTitle(draft.title)
-        setItems(draft.items)
-      }
       hydrated.current = true
       return
     }
@@ -197,7 +197,7 @@ export default function WorkoutBuilder() {
   return (
     <section>
       <BackLink fallback="/workouts" label="К тренировкам" />
-      <h2>{isEdit ? 'Редактировать тренировку' : 'Собрать тренировку'}</h2>
+      <h1 className="page-title">{isEdit ? 'Редактировать тренировку' : 'Собрать тренировку'}</h1>
 
       <form className="admin-form" onSubmit={handleSubmit}>
         <input placeholder="Название тренировки" value={title} onChange={(e) => setTitle(e.target.value)} required />

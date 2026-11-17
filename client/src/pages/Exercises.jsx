@@ -24,7 +24,7 @@ export default function Exercises() {
 
   return (
     <section>
-      <h2>Библиотека упражнений</h2>
+      <h1 className="page-title">Библиотека упражнений</h1>
       <ExerciseFilterBar
         exercises={exercises}
         filters={filters}

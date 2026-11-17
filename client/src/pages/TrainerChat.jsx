@@ -146,7 +146,7 @@ export default function TrainerChat() {
       <BackLink fallback="/workouts" label="К тренировкам" />
 
       <header className="chat-head">
-        <h2>Чем помочь сегодня?</h2>
+        <h1>Чем помочь сегодня?</h1>
         <span className="chat-head__rule" />
         <p>
           Спросите про технику, объём или восстановление. Нужна программа целиком —{' '}

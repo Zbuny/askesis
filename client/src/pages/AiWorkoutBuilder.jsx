@@ -103,7 +103,7 @@ export default function AiWorkoutBuilder() {
   return (
     <section>
       <BackLink fallback="/workouts" label="К тренировкам" />
-      <h2>ИИ-тренер</h2>
+      <h1 className="page-title">ИИ-тренер</h1>
       <p>Ответьте на пять вопросов — и получите программу, собранную из упражнений вашей библиотеки.</p>
 
       <ol className="wizard-steps">

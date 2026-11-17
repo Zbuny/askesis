@@ -68,20 +68,40 @@ export function muscleVolume(history = [], exerciseById = new Map()) {
         label: group ? translateMuscle(group) : 'Без группы',
         volume: 0,
         sets: 0,
+        reps: 0,
       }
+      const done = entrySets(entry).filter((set) => (Number(set.reps) || 0) > 0)
       current.volume += entryVolume(entry)
-      current.sets += entrySets(entry).filter((set) => (Number(set.reps) || 0) > 0).length
+      current.sets += done.length
+      current.reps += done.reduce((sum, set) => sum + (Number(set.reps) || 0), 0)
       totals.set(key, current)
     })
   })
 
   const rows = [...totals.values()].sort((a, b) => b.volume - a.volume || b.sets - a.sets)
   const max = rows[0]?.volume || 0
-  return rows.map((row) => ({
-    ...row,
-    volume: Math.round(row.volume),
-    percent: max > 0 ? Math.round((row.volume / max) * 100) : 0,
-  }))
+  const maxSets = Math.max(0, ...rows.map((row) => row.sets))
+  const total = rows.reduce((sum, row) => sum + row.volume, 0)
+  return rows.map((row) => {
+    // Упражнения с собственным весом пишутся с нулём в поле веса, и в
+    // килограммах их не видно: подтягивания выглядели бы как «0 кг», будто
+    // спину не тренировали. Для таких групп полоса строится по подходам.
+    const bodyweight = row.volume === 0 && row.sets > 0
+    return {
+      ...row,
+      volume: Math.round(row.volume),
+      bodyweight,
+      // percent — длина полосы относительно самой нагруженной группы;
+      // share — доля от всего объёма. Это разные числа, и подписывать
+      // первое как «% всего объёма» нельзя.
+      percent: bodyweight
+        ? Math.round((row.sets / (maxSets || 1)) * 100)
+        : max > 0
+          ? Math.round((row.volume / max) * 100)
+          : 0,
+      share: total > 0 ? Math.round((row.volume / total) * 100) : 0,
+    }
+  })
 }
 
 // Прогресс силы по упражнению: лучший подход каждой тренировки.

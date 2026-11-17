@@ -9,6 +9,8 @@ import { goalList } from '../utils/goals.js'
 import ProgressChart from '../components/ProgressChart.jsx'
 import TrainingCalendar from '../components/TrainingCalendar.jsx'
 import GoalList from '../components/GoalList.jsx'
+import SplineScene from '../components/SplineScene.jsx'
+import Spotlight from '../components/Spotlight.jsx'
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
 import { useConfirm } from '../hooks/useConfirm.js'
 import { useAsyncAction } from '../hooks/useAsyncAction.js'
@@ -108,7 +110,7 @@ export default function Statistics() {
   if (error) {
     return (
       <section>
-        <h2>Статистика</h2>
+        <h1 className="page-title">Статистика</h1>
         <p className="error">{error}</p>
       </section>
     )
@@ -117,7 +119,7 @@ export default function Statistics() {
   if (history.length === 0) {
     return (
       <section>
-        <h2>Статистика</h2>
+        <h1 className="page-title">Статистика</h1>
         <p>
           Пока нечего показывать. Отметьте первое выполнение на странице тренировки — и здесь появятся
           серия, рекорды, объём и график силы.
@@ -129,7 +131,7 @@ export default function Statistics() {
   return (
     <section className="statistics">
       <div className="statistics__head">
-        <h2>Статистика</h2>
+        <h1 className="page-title">Статистика</h1>
         <div className="period-switch" role="group" aria-label="Период">
           {PERIODS.map((p) => (
             <button
@@ -242,18 +244,54 @@ export default function Statistics() {
       ) : (
         <div className="muscle-bars">
           {muscles.map((muscle) => (
-            <div key={muscle.key} className="muscle-bar">
+            <div key={muscle.key} className={`muscle-bar${muscle.bodyweight ? ' is-bodyweight' : ''}`}>
               <span className="muscle-bar__label">{muscle.label}</span>
               <div className="muscle-bar__track">
                 <span className="muscle-bar__fill" style={{ width: `${muscle.percent}%` }} />
               </div>
               <span className="muscle-bar__value">
-                {muscle.volume.toLocaleString('ru-RU')} кг · {muscle.sets} {pluralRu(muscle.sets, 'подход', 'подхода', 'подходов')}
+                {muscle.bodyweight
+                  ? `свой вес · ${muscle.reps} ${pluralRu(muscle.reps, 'повтор', 'повтора', 'повторов')}`
+                  : `${muscle.volume.toLocaleString('ru-RU')} кг`}
+                {' · '}{muscle.sets} {pluralRu(muscle.sets, 'подход', 'подхода', 'подходов')}
               </span>
             </div>
           ))}
         </div>
       )}
+
+      <h3>3D-модель тела</h3>
+      <div className="spline-showcase">
+        <Spotlight />
+        <div className="spline-showcase__content">
+          <strong className="spline-showcase__title">
+            {muscles.length > 0 ? muscles[0].label : 'Нет данных за период'}
+          </strong>
+          {muscles.length > 0 ? (
+            <p>
+              Самая нагруженная группа за период — {muscles[0].volume.toLocaleString('ru-RU')} кг,
+              {' '}{muscles[0].share}% всего объёма. Модель показывает тело целиком: чем ровнее
+              распределён объём по группам, тем сбалансированнее развитие.
+            </p>
+          ) : (
+            <p>Запишите тренировки за выбранный период — и здесь появится разбор нагрузки по телу.</p>
+          )}
+          <div className="spline-showcase__legend">
+            {muscles.filter((muscle) => !muscle.bodyweight).slice(0, 4).map((muscle) => (
+              <span key={muscle.key}>
+                {muscle.label}
+                <strong>{muscle.share}%</strong>
+              </span>
+            ))}
+          </div>
+        </div>
+        <div className="spline-showcase__stage">
+          <SplineScene
+            scene="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode"
+            className="spline-scene"
+          />
+        </div>
+      </div>
 
       {/* Цели стоят перед рекордами намеренно: рекорд — то, что уже случилось,
           цель — то, ради чего человек сюда пришёл. */}

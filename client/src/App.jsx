@@ -6,6 +6,7 @@ import BottomNav from './components/BottomNav.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import AdminRoute from './components/AdminRoute.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
+import OfflineBanner from './components/OfflineBanner.jsx'
 import Home from './pages/Home.jsx'
 import { PageLoading } from './components/PageState.jsx'
 
@@ -36,8 +37,11 @@ const NotFound = lazy(() => import('./pages/NotFound.jsx'))
 export default function App() {
   return (
     <div className="app">
+      {/* Первая клавиатурная остановка: мимо шапки сразу к содержимому. */}
+      <a className="skip-link" href="#main">Перейти к содержимому</a>
       <Navbar />
-      <main className="content">
+      <OfflineBanner />
+      <main className="content" id="main" tabIndex={-1}>
         <ErrorBoundary>
           <Suspense fallback={<PageLoading />}>
             <Routes>

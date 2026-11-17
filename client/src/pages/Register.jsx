@@ -84,7 +84,7 @@ export default function Register() {
           </div>
 
           <span className="eyebrow">Askesis · Регистрация</span>
-          <h2>Создать аккаунт</h2>
+          <h1>Создать аккаунт</h1>
           <p className="auth-card__subtitle">Минута — и ты внутри системы.</p>
 
           <form onSubmit={handleSubmit}>

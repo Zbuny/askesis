@@ -17,7 +17,7 @@ test.describe('Подтверждение удаления', () => {
   const weightRow = (page, value) => page.locator('.history-list').getByText(`${value} кг`)
 
   async function addWeight(page, value) {
-    await page.getByPlaceholder('Вес, кг').fill(value)
+    await page.getByLabel('Вес, кг').fill(value)
     await page.getByRole('button', { name: 'Записать' }).click()
     await expect(weightRow(page, value)).toBeVisible()
   }

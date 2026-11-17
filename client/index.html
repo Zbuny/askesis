@@ -2,10 +2,25 @@
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#08080a" />
+    <!-- viewport-fit=cover включает env(safe-area-inset-*): без него нижняя
+         панель и панель отдыха на iPhone не знают про полосу жеста «домой». -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#08080a" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f5f4f0" media="(prefers-color-scheme: light)" />
     <meta name="description" content="Askesis — система дисциплины и прогресса. Программы тренировок, библиотека упражнений и учёт результата для тех, кто выбирает контроль." />
-    <link rel="icon" type="image/png" href="/logo.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Askesis" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Askesis — Дисциплина. Прогресс. Контроль." />
+    <meta property="og:description" content="Программы тренировок, журнал подходов и прогресс в одном месте." />
+    <meta property="og:image" content="/icon-512.png" />
+    <meta property="og:locale" content="ru_RU" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

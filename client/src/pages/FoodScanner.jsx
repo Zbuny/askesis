@@ -170,7 +170,7 @@ export default function FoodScanner() {
   return (
     <section>
       <BackLink fallback="/profile" label="К профилю" />
-      <h2>Сканер КБЖУ</h2>
+      <h1 className="page-title">Сканер КБЖУ</h1>
       <p>Сфотографируйте еду — ИИ прикинет калории и БЖУ. Это грубая оценка на глаз, перед сохранением её можно поправить.</p>
 
       {error && <p className="error">{error}</p>}

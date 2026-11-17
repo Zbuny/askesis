@@ -16,7 +16,16 @@ export function ThemeProvider({ children }) {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
-    localStorage.setItem(STORAGE_KEY, theme)
+    // Цвет строки состояния у установленного приложения — по выбранной теме,
+    // а не по системной: иначе светлая тема получает чёрную полосу сверху.
+    document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => {
+      meta.setAttribute('content', theme === 'light' ? '#f5f4f0' : '#08080a')
+    })
+    try {
+      localStorage.setItem(STORAGE_KEY, theme)
+    } catch {
+      // Приватный режим — тема просто не запомнится.
+    }
   }, [theme])
 
   const toggleTheme = useCallback(() => {

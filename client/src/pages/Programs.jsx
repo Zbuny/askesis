@@ -11,7 +11,7 @@ export default function Programs() {
 
   return (
     <section>
-      <h2>Программы тренировок</h2>
+      <h1 className="page-title">Программы тренировок</h1>
       {programs.length === 0 && (
         <EmptyState
           title="Программ пока нет"

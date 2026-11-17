@@ -63,7 +63,7 @@ export default function ExerciseDetail() {
         )}
 
         <div className="exercise-detail__info">
-          <h2>{exerciseName(exercise)}</h2>
+          <h1>{exerciseName(exercise)}</h1>
 
           <div className="exercise-detail__tags">
             {exercise.muscleGroup && <span className="tag">{translateMuscle(exercise.muscleGroup)}</span>}

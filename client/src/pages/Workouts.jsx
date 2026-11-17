@@ -29,7 +29,7 @@ export default function Workouts() {
   return (
     <section>
       <div className="page-head">
-        <h2>Мои тренировки</h2>
+        <h1>Мои тренировки</h1>
         {workouts.length > 0 && (
           <Link to="/workouts/new" className="button">+ Собрать тренировку</Link>
         )}
