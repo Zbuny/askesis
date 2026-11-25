@@ -15,6 +15,7 @@ import { PageLoading } from './components/PageState.jsx'
 // переходу, поэтому первый рендер не тащит за собой ни админку, ни ИИ-тренера.
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'))
 const Statistics = lazy(() => import('./pages/Statistics.jsx'))
+const Character = lazy(() => import('./pages/Character.jsx'))
 const Programs = lazy(() => import('./pages/Programs.jsx'))
 const ProgramDetail = lazy(() => import('./pages/ProgramDetail.jsx'))
 const Exercises = lazy(() => import('./pages/Exercises.jsx'))
@@ -162,6 +163,14 @@ export default function App() {
                 element={
                   <ProtectedRoute>
                     <Statistics />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/character"
+                element={
+                  <ProtectedRoute>
+                    <Character />
                   </ProtectedRoute>
                 }
               />

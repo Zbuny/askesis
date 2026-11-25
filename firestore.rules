@@ -190,6 +190,27 @@ service cloud.firestore {
     // Границы те же, что в client/src/utils/bmi.js: рост в метрах вместо
     // сантиметров и подобные опечатки там уже отсеиваются, правила лишь
     // не дают записать в базу то, что интерфейс и так считает мусором.
+    // Образ персонажа: только известные ключи и короткие строки-идентификаторы.
+    // Какие вещи открыты на каком уровне, правила проверить не могут —
+    // уровень производный и в базе не лежит (см. client/src/utils/wardrobe.js).
+    function avatarStr(a, k) {
+      return !(k in a) || (a[k] is string && a[k].size() <= 24);
+    }
+
+    function validAvatar(a) {
+      return a is map
+        && a.keys().hasOnly(['body', 'skin', 'top', 'topColor', 'bottom', 'bottomColor',
+                             'shoes', 'shoesColor', 'head', 'headColor', 'hair', 'hairColor',
+                             'extra', 'extraColor'])
+        && avatarStr(a, 'body') && avatarStr(a, 'skin')
+        && avatarStr(a, 'top') && avatarStr(a, 'topColor')
+        && avatarStr(a, 'bottom') && avatarStr(a, 'bottomColor')
+        && avatarStr(a, 'shoes') && avatarStr(a, 'shoesColor')
+        && avatarStr(a, 'head') && avatarStr(a, 'headColor')
+        && avatarStr(a, 'hair') && avatarStr(a, 'hairColor')
+        && avatarStr(a, 'extra') && avatarStr(a, 'extraColor');
+    }
+
     function validProfile() {
       let d = request.resource.data;
       return d.keys().size() <= 16
@@ -211,7 +232,8 @@ service cloud.firestore {
         // Пол нужен ровно для одного — основного обмена в дневных нормах
         // КБЖУ (client/src/utils/nutrition.js). Поэтому и значений всего два:
         // формула Миффлина-Сан Жеора различает только их.
-        && (!('sex' in d) || d.sex == null || d.sex in ['male', 'female']);
+        && (!('sex' in d) || d.sex == null || d.sex in ['male', 'female'])
+        && (!('avatar' in d) || d.avatar == null || validAvatar(d.avatar));
     }
 
     match /users/{userId} {

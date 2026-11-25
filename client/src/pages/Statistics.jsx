@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../api/firestore.js'
 import { pluralRu } from '../utils/translate.js'
 import { PERIODS, daySummary, filterByPeriod, kpis, muscleVolume, strengthSeries, trainedExercises } from '../utils/statistics.js'
@@ -9,7 +10,9 @@ import { goalList } from '../utils/goals.js'
 import ProgressChart from '../components/ProgressChart.jsx'
 import TrainingCalendar from '../components/TrainingCalendar.jsx'
 import GoalList from '../components/GoalList.jsx'
-import SplineScene from '../components/SplineScene.jsx'
+import AvatarStage from '../components/AvatarStage.jsx'
+import { physique } from '../utils/physique.js'
+import { avatarLook, normalizeAvatar } from '../utils/wardrobe.js'
 import Spotlight from '../components/Spotlight.jsx'
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
 import { useConfirm } from '../hooks/useConfirm.js'
@@ -23,6 +26,7 @@ export default function Statistics() {
   const [history, setHistory] = useState([])
   const [exercises, setExercises] = useState([])
   const [goals, setGoals] = useState([])
+  const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const { busy: goalBusy, run: runGoal } = useAsyncAction()
@@ -47,6 +51,7 @@ export default function Statistics() {
 
     api.listExercises().then(setExercises).catch(() => {})
     api.listGoals().then(setGoals).catch(() => {})
+    api.getMyProfileData().then(setProfile).catch(() => setProfile({}))
   }, [])
 
   async function handleCreateGoal(goal) {
@@ -74,6 +79,15 @@ export default function Statistics() {
   const goalRows = useMemo(() => goalList(goals, history), [goals, history])
   const muscles = useMemo(() => muscleVolume(scoped, exerciseById), [scoped, exerciseById])
   const available = useMemo(() => trainedExercises(history), [history])
+  // Персонаж растёт из всей истории, а не из выбранного периода: тело не
+  // «худеет», когда переключаешь «неделю» на «месяц».
+  const body = useMemo(() => physique(history, exerciseById), [history, exerciseById])
+  // Уровень здесь не считаем (для него нужен ещё и журнал питания), поэтому
+  // замки не проверяются: образ уже проверен при сохранении на /character.
+  const look = useMemo(
+    () => (profile ? avatarLook(normalizeAvatar(profile.avatar, { level: Infinity, sex: profile.sex })) : null),
+    [profile],
+  )
 
   // Длительность есть не у каждой тренировки: таймер включают не всегда.
   // Считаем график только по тем, где он был, — иначе провалы к нулю
@@ -260,36 +274,32 @@ export default function Statistics() {
         </div>
       )}
 
-      <h3>3D-модель тела</h3>
+      <h3>Персонаж</h3>
       <div className="spline-showcase">
         <Spotlight />
         <div className="spline-showcase__content">
-          <strong className="spline-showcase__title">
-            {muscles.length > 0 ? muscles[0].label : 'Нет данных за период'}
-          </strong>
-          {muscles.length > 0 ? (
-            <p>
-              Самая нагруженная группа за период — {muscles[0].volume.toLocaleString('ru-RU')} кг,
-              {' '}{muscles[0].share}% всего объёма. Модель показывает тело целиком: чем ровнее
-              распределён объём по группам, тем сбалансированнее развитие.
-            </p>
-          ) : (
-            <p>Запишите тренировки за выбранный период — и здесь появится разбор нагрузки по телу.</p>
-          )}
+          <strong className="spline-showcase__title">{body.stage} · {body.percent}%</strong>
+          <p>
+            Фигура растёт из всего журнала: каждый подход прибавляет мышцам, которые в нём работали.
+            {muscles.length > 0 && (
+              <>
+                {' '}За выбранный период больше всего досталось группе «{muscles[0].label.toLowerCase()}» —
+                {' '}{muscles[0].share}% объёма.
+              </>
+            )}
+          </p>
           <div className="spline-showcase__legend">
-            {muscles.filter((muscle) => !muscle.bodyweight).slice(0, 4).map((muscle) => (
-              <span key={muscle.key}>
-                {muscle.label}
-                <strong>{muscle.share}%</strong>
+            {[...body.regions].sort((a, b) => b.growth - a.growth).slice(0, 4).map((region) => (
+              <span key={region.key}>
+                {region.label}
+                <strong>{region.percent}%</strong>
               </span>
             ))}
           </div>
+          <Link to="/character" className="button spline-showcase__cta">Переодеть и посмотреть мышцы</Link>
         </div>
         <div className="spline-showcase__stage">
-          <SplineScene
-            scene="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode"
-            className="spline-scene"
-          />
+          {look && <AvatarStage look={look} growth={body.growth} pump={body.pump} />}
         </div>
       </div>
 

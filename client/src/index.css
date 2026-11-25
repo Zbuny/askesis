@@ -891,7 +891,7 @@ main:focus {
   color: var(--text-faint);
 }
 
-/* ---------- Statistics: 3D-модель тела (Spline) ---------- */
+/* ---------- Statistics: персонаж (3D) ---------- */
 
 /* Всегда тёмная панель, как hero--photo — сцена рассчитана на чёрный фон
    и не подчиняется светлой теме. */
@@ -980,17 +980,47 @@ main:focus {
   outline: none;
 }
 
-.spline-scene {
+.avatar-stage {
   width: 100%;
   height: 100%;
 }
 
-.spline-scene__mount {
+.avatar-canvas {
+  position: relative;
   width: 100%;
   height: 100%;
+  min-height: 320px;
+  /* Вертикальный свайп на телефоне листает страницу, горизонтальный —
+     крутит персонажа. */
+  touch-action: pan-y;
+  cursor: grab;
 }
 
-.spline-scene__fallback {
+.avatar-canvas:active {
+  cursor: grabbing;
+}
+
+.avatar-canvas__gl {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+  outline: none;
+}
+
+.avatar-canvas--failed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+  color: #85858c;
+  font-size: 0.85rem;
+  cursor: default;
+}
+
+.avatar-stage__fallback {
   width: 100%;
   height: 100%;
   min-height: 320px;
@@ -999,17 +1029,23 @@ main:focus {
   justify-content: center;
 }
 
-.spline-scene__loader {
+.avatar-stage__loader {
   width: 28px;
   height: 28px;
   border-radius: 50%;
   border: 2px solid rgba(255, 255, 255, 0.15);
   border-top-color: #d8bb84;
-  animation: spline-loader-spin 0.8s linear infinite;
+  animation: avatar-loader-spin 0.8s linear infinite;
 }
 
-@keyframes spline-loader-spin {
+@keyframes avatar-loader-spin {
   to { transform: rotate(360deg); }
+}
+
+.spline-showcase__cta {
+  align-self: flex-start;
+  margin-top: 1.75rem;
+  padding: 0.85rem 1.6rem;
 }
 
 .spotlight {
@@ -1041,7 +1077,7 @@ main:focus {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .spline-scene__loader {
+  .avatar-stage__loader {
     animation: none;
   }
 }
@@ -8274,5 +8310,354 @@ button.calendar__cell {
   .hero__meta span {
     font-size: 0.68rem;
     letter-spacing: 0.06em;
+  }
+}
+
+/* ---------- Персонаж ---------- */
+
+.character__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.character__lead {
+  margin: 0.25rem 0 0;
+  max-width: 52ch;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.character__badges {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.character__badge {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 120px;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.character__badge small {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-faint);
+}
+
+.character__badge strong {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  color: var(--text);
+}
+
+.character__badge em {
+  font-style: normal;
+  font-size: 0.78rem;
+  color: var(--gold-bright);
+  font-variant-numeric: tabular-nums;
+}
+
+.character__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+/* Панель со сценой всегда тёмная, как витрина в статистике: золотой
+   контровой свет рассчитан на чёрный фон. */
+.avatar-panel {
+  position: relative;
+  overflow: hidden;
+  height: min(640px, calc(100vh - 7rem));
+  min-height: 420px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background:
+    radial-gradient(ellipse 60% 45% at 50% 38%, rgba(216, 187, 132, 0.12), transparent 70%),
+    rgba(4, 4, 5, 0.96);
+}
+
+.avatar-panel__tip {
+  position: absolute;
+  left: 1rem;
+  right: 1rem;
+  bottom: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+  pointer-events: none;
+  color: #85858c;
+  font-size: 0.78rem;
+}
+
+.avatar-panel__tip strong {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  color: #d8bb84;
+}
+
+.avatar-panel__tip span {
+  color: #b4b4bb;
+}
+
+.avatar-panel__pump {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid rgba(216, 187, 132, 0.4);
+  background: rgba(185, 152, 94, 0.14);
+  color: #d8bb84;
+  font-size: 0.72rem;
+  pointer-events: none;
+}
+
+.character__panel {
+  min-width: 0;
+}
+
+.character__tabs {
+  margin-bottom: 1.25rem;
+}
+
+.character__bars .muscle-bar {
+  padding: 0.25rem 0.4rem;
+  margin: 0 -0.4rem;
+  border-radius: var(--radius);
+  cursor: default;
+  transition: background 0.2s var(--ease);
+}
+
+.character__bars .muscle-bar.is-hovered,
+.character__bars .muscle-bar:focus-visible {
+  background: rgba(216, 187, 132, 0.08);
+}
+
+.character__bars .muscle-bar.is-hovered .muscle-bar__label {
+  color: var(--gold-bright);
+}
+
+.character__pump-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 0.45rem;
+  vertical-align: middle;
+  border-radius: 50%;
+  background: var(--gold-bright);
+  box-shadow: 0 0 8px var(--gold-bright);
+}
+
+.character__hint {
+  margin: 1.25rem 0 0;
+  padding: 0.85rem 1rem;
+  border-left: 2px solid var(--gold);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 0.86rem;
+}
+
+.character__hint strong {
+  color: var(--text);
+}
+
+.character__how {
+  margin-top: 1rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.character__how summary {
+  cursor: pointer;
+  color: var(--text-faint);
+}
+
+.character__how p {
+  line-height: 1.6;
+}
+
+.character__empty p {
+  color: var(--text-muted);
+}
+
+.wardrobe {
+  display: grid;
+  gap: 1.1rem;
+}
+
+.wardrobe__group {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.wardrobe__label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-faint);
+}
+
+.wardrobe__items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+button.wardrobe__item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.45rem 0.85rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+button.wardrobe__item:hover:not(:disabled) {
+  border-color: var(--gold);
+  color: var(--text);
+}
+
+button.wardrobe__item.is-active {
+  border-color: var(--gold);
+  background: rgba(185, 152, 94, 0.16);
+  color: var(--gold-bright);
+}
+
+button.wardrobe__item.is-locked {
+  opacity: 0.5;
+  cursor: not-allowed;
+  border-style: dashed;
+}
+
+.wardrobe__item small {
+  font-size: 0.68rem;
+  color: var(--text-faint);
+}
+
+.wardrobe__swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+button.wardrobe__swatch {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: var(--swatch);
+  box-shadow: inset 0 0 0 2px var(--bg);
+}
+
+button.wardrobe__swatch.is-active {
+  border-color: var(--gold-bright);
+  box-shadow: inset 0 0 0 2px var(--bg), 0 0 0 1px var(--gold-bright);
+}
+
+button.wardrobe__swatch.is-locked {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+button.wardrobe__swatch.is-locked::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 15%;
+  right: 15%;
+  height: 2px;
+  background: var(--text);
+  transform: rotate(-45deg);
+}
+
+.wardrobe__next ul {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wardrobe__next li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.wardrobe__next small {
+  color: var(--gold-bright);
+  white-space: nowrap;
+}
+
+.wardrobe__actions {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 0;
+  background: linear-gradient(180deg, transparent, var(--bg) 35%);
+}
+
+.wardrobe__reset {
+  margin-top: 0;
+  padding: 0.6rem 1rem;
+}
+
+.wardrobe__saved {
+  color: var(--gold-bright);
+  font-size: 0.82rem;
+}
+
+.level-row__link {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  text-decoration: none;
+}
+
+.level-row__link:hover {
+  color: var(--gold-bright);
+}
+
+@media (max-width: 900px) {
+  .character__layout {
+    grid-template-columns: 1fr;
+  }
+
+  .avatar-panel {
+    height: 62vh;
+    min-height: 360px;
+    max-height: 520px;
+  }
+
+  /* Кнопка сохранения держится над нижней навигацией, а не под ней. */
+  .wardrobe__actions {
+    bottom: calc(64px + env(safe-area-inset-bottom, 0px));
   }
 }

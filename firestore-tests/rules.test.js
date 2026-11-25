@@ -316,6 +316,14 @@ describe('вес и профиль', () => {
     await assertFails(setDoc(doc(alice(), 'users', ALICE), { limits: 'я'.repeat(401) }))
   })
 
+  it('образ персонажа пишется, но только известные короткие поля', async () => {
+    await assertSucceeds(setDoc(doc(alice(), 'users', ALICE), { avatar: { body: 'm', top: 'tee', topColor: 'gold' } }))
+    await assertFails(setDoc(doc(alice(), 'users', ALICE), { avatar: { top: 'tee', script: 'x' } }))
+    await assertFails(setDoc(doc(alice(), 'users', ALICE), { avatar: { top: 'я'.repeat(25) } }))
+    await assertFails(setDoc(doc(alice(), 'users', ALICE), { avatar: { top: 5 } }))
+    await assertFails(setDoc(doc(alice(), 'users', ALICE), { avatar: 'tee' }))
+  })
+
   it('в чужой профиль не записать', async () => {
     await assertFails(setDoc(doc(alice(), 'users', BOB), { height: 175 }))
   })

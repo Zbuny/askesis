@@ -168,6 +168,7 @@ export default function Dashboard() {
               <div className="level-row__info">
                 <strong>Уровень {summary.level}</strong>
                 <span>{summary.title}</span>
+                <Link to="/character" className="level-row__link">Персонаж →</Link>
               </div>
               <div className="level-bar" role="progressbar" aria-valuenow={summary.percent} aria-valuemin={0} aria-valuemax={100}>
                 <span className="level-bar__fill" style={{ width: `${summary.percent}%` }} />

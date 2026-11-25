@@ -73,6 +73,7 @@ export default function Navbar() {
             <NavLink to="/exercises" onClick={closeMenu}>Упражнения</NavLink>
             <NavLink to="/nutrition" onClick={closeMenu}>Питание</NavLink>
             <NavLink to="/statistics" className="is-in-bottom-nav" onClick={closeMenu}>Статистика</NavLink>
+            <NavLink to="/character" onClick={closeMenu}>Персонаж</NavLink>
             <span className="navbar__links-end">
               <NavLink to="/profile" className="is-in-bottom-nav" onClick={closeMenu}>Профиль</NavLink>
               {isAdmin && <NavLink to="/admin" onClick={closeMenu}>Админка</NavLink>}
