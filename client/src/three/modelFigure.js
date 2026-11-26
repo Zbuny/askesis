@@ -46,6 +46,21 @@ function slotOf(name) {
   return SLOTS.find((s) => name.startsWith(`${s.key}_`)) || null
 }
 
+const ITEM_NAMES = new Set(SLOTS.flatMap((slot) => slot.items.map((item) => `${slot.key}_${item.id}`)))
+
+// Узел вещи. Вещь с двумя материалами (кроссовок с подошвой, хвост с
+// резинкой) GLTFLoader раскладывает на группу с дочерними мешами, и имя
+// меша тогда — имя сетки из Blender («shoes_sneakers_L»), а не вещи.
+// Поэтому ищем вверх по дереву точное имя вещи.
+function itemNode(object) {
+  let node = object
+  while (node) {
+    if (ITEM_NAMES.has(node.name)) return node
+    node = node.parent
+  }
+  return null
+}
+
 function colorFor(materialName, slot, look) {
   if (materialName === 'skin') return look.skinHex
   if (materialName === 'hair') return look.hairHex
@@ -155,11 +170,9 @@ export function createModelFigure(gltf, look) {
 
   model.traverse((object) => {
     if (!object.isMesh) return
-    // Имя вещи — у узла или его родителя (многоматериальные меши glTF
-    // раскладываются на несколько примитивов под одним узлом).
-    const owner = slotOf(object.name) ? object : object.parent && slotOf(object.parent.name) ? object.parent : object
-    const slot = slotOf(owner.name)
-    if (slot && !isItemVisible(owner.name, look)) {
+    const owner = itemNode(object)
+    const slot = owner ? slotOf(owner.name) : null
+    if (owner && !isItemVisible(owner.name, look)) {
       object.visible = false
       return
     }

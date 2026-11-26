@@ -442,6 +442,33 @@ def const(value):
     return lambda P: np.full(len(P), value)
 
 
+def taubin(P, edges, n, iterations, pinned, boundary=None, weight=None, lam=0.5, mu=-0.53):
+    """Сглаживание без усадки: шаг внутрь, шаг наружу.
+
+    Вершины края сглаживаются только вдоль самого края: с соседями лишь с
+    одной стороны обычное сглаживание на краю раскачивается, и кромка
+    выходит рваной. weight — сила сглаживания по вершинам (0..1)."""
+    boundary = np.zeros(n, dtype=bool) if boundary is None else boundary
+    a, b = edges[:, 0], edges[:, 1]
+    # Направленные связи: вершина края слушает только соседей по краю.
+    to_a = ~boundary[a] | boundary[b]
+    to_b = ~boundary[b] | boundary[a]
+    dst = np.concatenate([a[to_a], b[to_b]])
+    src = np.concatenate([b[to_a], a[to_b]])
+    deg = np.bincount(dst, minlength=n).astype(np.float64)
+    deg[deg == 0] = 1
+    scale = np.ones(n) if weight is None else weight
+    P = P.copy()
+    for _ in range(iterations):
+        for k in (lam, mu):
+            acc = np.zeros_like(P)
+            np.add.at(acc, dst, P[src])
+            delta = k * (acc / deg[:, None] - P) * scale[:, None]
+            delta[pinned] = 0
+            P = P + delta
+    return P
+
+
 def drop_islands(bm, share=0.04):
     """Удаляет обрывки после выреза: куски меньше доли самого большого."""
     seen = set()
@@ -472,7 +499,8 @@ def drop_islands(bm, share=0.04):
 
 
 def make_shell(body, field, name, thickness, mat_name='cloth', taper=0.0,
-               face_material=None, keep_keys=True, smooth=0, inflate_after_smooth=0.0):
+               face_material=None, keep_keys=True, smooth=0, inflate_after_smooth=0.0,
+               loose=0, flare=0.0, flare_width=0.05, rim=None, loose_weight=None, flare_where=None):
     """Оболочка из части тела, вырезанная по изолинии поля.
 
     field(P) → «запас» для точек P: > 0 — вещь здесь есть, < 0 — нет. Рёбра,
@@ -482,7 +510,15 @@ def make_shell(body, field, name, thickness, mat_name='cloth', taper=0.0,
     вместе с мышцами.
 
     thickness(P) → толщина по нормали; taper — на сколько метров от края
-    толщина плавно сходит на нет (волосы у линии роста)."""
+    толщина плавно сходит на нет (волосы у линии роста).
+
+    Чтобы это читалось как одежда, а не как краска:
+    loose — сколько шагов сглаживания (Taubin, без усадки): ткань
+    перекидывается через впадины рельефа, а не повторяет каждую;
+    flare — насколько ткань отходит от тела у края (рукав, штанина);
+    rim — у края есть видимая толщина: полоса от кожи до кромки ткани."""
+    if rim is None:
+        rim = mat_name == 'cloth'
     obj = body.copy()
     obj.data = body.data.copy()
     bpy.context.scene.collection.objects.link(obj)
@@ -536,9 +572,26 @@ def make_shell(body, field, name, thickness, mat_name='cloth', taper=0.0,
     bmesh.ops.dissolve_degenerate(bm, dist=1e-5, edges=bm.edges[:])
     bmesh.ops.triangulate(bm, faces=bm.faces[:])
     drop_islands(bm)
+    rim_layer = bm.verts.layers.float.new('rim')
+    pid_layer = bm.verts.layers.int.new('pid')
+    bm.verts.index_update()
+    for v in bm.verts:
+        v[pid_layer] = v.index
+    if rim:
+        boundary = [e for e in bm.edges if e.is_boundary]
+        if boundary:
+            made_rim = bmesh.ops.extrude_edge_only(bm, edges=boundary)
+            for g in made_rim['geom']:
+                if isinstance(g, bmesh.types.BMVert):
+                    g[rim_layer] = 1.0
+                    g[value] = 0.0
     bm.verts.index_update()
     edge_dist = np.array([v[value] for v in bm.verts])
+    rim_mask = np.array([v[rim_layer] > 0.5 for v in bm.verts])
+    pid = np.array([v[pid_layer] for v in bm.verts])
     bm.verts.layers.float.remove(value)
+    bm.verts.layers.float.remove(rim_layer)
+    bm.verts.layers.int.remove(pid_layer)
     bm.to_mesh(obj.data)
     bm.free()
 
@@ -567,6 +620,28 @@ def make_shell(body, field, name, thickness, mat_name='cloth', taper=0.0,
     thick = thickness(base)
     if taper > 0:
         thick = thick * (0.25 + 0.75 * smoothstep(0.0, taper, edge_dist))
+    if flare > 0:
+        # Расширяется только подол (низ рукава, штанины, футболки), но не
+        # ворот и не пояс: иначе пояс шорт отходит и вылезает поверх верха.
+        where = flare_where(base) if flare_where else 1.0
+        thick = thick + flare * (1 - smoothstep(0.0, flare_width, edge_dist)) * where
+    # Толщина — плавное поле, без скачков от вершины к вершине у края.
+    thick = smooth_field(thick, edges_arr, m, 4)
+    # Кромка: каждая её вершина — пара к вершине края ткани. Край
+    # сглаживается вместе с тканью (иначе он рваный), а кромка потом
+    # достраивается от края к коже.
+    partner = np.full(m, -1)
+    if rim_mask.any():
+        first = {}
+        for i in np.where(~rim_mask)[0]:
+            first.setdefault(int(pid[i]), i)
+        for i in np.where(rim_mask)[0]:
+            partner[i] = first.get(int(pid[i]), -1)
+    main_tris = tris[~rim_mask[tris].any(axis=1)] if rim_mask.any() else tris
+    cloth_edges = edges_arr[~rim_mask[edges_arr].any(axis=1)] if rim_mask.any() else edges_arr
+    no_pin = np.zeros(m, dtype=bool)
+    edge_verts = (edge_dist < 1e-6) & ~rim_mask
+    weights = loose_weight(base) if loose_weight else None
 
     def offset(P):
         if smooth:
@@ -575,7 +650,16 @@ def make_shell(body, field, name, thickness, mat_name='cloth', taper=0.0,
             P = smooth_field(P, edges_arr, m, smooth)
             P = P + vertex_normals(P, tris) * inflate_after_smooth
             del boundary
-        return P + vertex_normals(P, tris) * thick[:, None]
+        if loose:
+            P = taubin(P, cloth_edges, m, loose, no_pin | rim_mask, boundary=edge_verts, weight=weights)
+        normals = vertex_normals(P, main_tris)
+        out = P + normals * thick[:, None]
+        rims = np.where(partner >= 0)[0]
+        if len(rims):
+            j = partner[rims]
+            # Кромка уходит под ткань, почти к коже.
+            out[rims] = P[j] + normals[j] * 0.0012
+        return out
 
     if me.shape_keys:
         for key in me.shape_keys.key_blocks:
@@ -782,6 +866,9 @@ def build_clothes(sex, body, co, edges, lm, names, pw, segs):
         made[name] = make_shell(body, field, name, th, **kw)
         return made[name]
 
+    def not_collar(P):
+        return 1 - smoothstep(sz - 0.12, sz - 0.04, P[:, 2])
+
     # --- верх. Подол может заходить на бёдра — там то же правило, что у корпуса.
     # Верх толще низа: где футболка заходит на шорты, она должна лежать поверх.
     if female:
@@ -789,22 +876,32 @@ def build_clothes(sex, body, co, edges, lm, names, pw, segs):
         tank_rule = lambda P: tank_torso(P, scoop_x=0.07, scoop_z=0.09, scoop_c=0.03, arm_w=0.42, arm_h=0.14)  # noqa: E731
     else:
         tank_rule = tank_torso
-    shell('top_tank', garment(tank_rule, {'thigh': 'torso'}), const(0.0065))
+    shell('top_tank', garment(tank_rule, {'thigh': 'torso'}), const(0.0085), loose=8, flare=0.006,
+          flare_width=0.1, flare_where=lambda P: 1 - smoothstep(hz + 0.1, hz + 0.18, P[:, 2]))
     if female:
         def bra(P):
             # Спортивный топ: высокий вырез, узкие проймы, низ под грудью.
             return np.minimum(tank_torso(P, scoop_x=0.06, scoop_z=0.075, scoop_c=0.035, arm_w=0.42, arm_h=0.15),
                               P[:, 2] - (sz - 0.3))
-        shell('top_bra', garment(bra), const(0.0065))
+        shell('top_bra', garment(bra), const(0.0065), loose=4)
     shell('top_tee', garment(shirt_torso, {'thigh': 'torso', 'upperArm': lambda i, P: along(i, 'upperArm', 0.5)}),
-          const(0.0065))
+          const(0.0095), loose=12, flare=0.008, flare_width=0.1, flare_where=not_collar)
     sleeves = {'thigh': 'torso', 'upperArm': 1.0, 'forearm': lambda i, P: along(i, 'forearm', 0.93)}
-    shell('top_longsleeve', garment(shirt_torso, sleeves), const(0.0068))
-    shell('top_hoodie', garment(shirt_torso, sleeves), const(0.011))
+    shell('top_longsleeve', garment(shirt_torso, sleeves), const(0.0095), loose=12, flare=0.006, flare_width=0.1,
+          flare_where=not_collar)
+    shell('top_hoodie', garment(shirt_torso, sleeves), const(0.017), loose=30, flare=0.006, flare_where=not_collar)
 
     # --- низ
     def below_waist(P):
         return waist - P[:, 2]
+
+    def below_belt(P):
+        return 1 - smoothstep(waist - 0.16, waist - 0.06, P[:, 2])
+
+    def waistband(base):
+        # Под футболкой у пояса низ прилегает плотно — иначе его кромка
+        # проступает поверх ткани верха.
+        return lambda P: base - (base - 0.0025) * smoothstep(waist - 0.12, waist - 0.03, P[:, 2])
 
     # Подол ниже ягодичной складки: горизонтальный срез через саму складку
     # выхватывал бы из неё кусок, и сзади на краю появлялись зазубрины.
@@ -815,9 +912,10 @@ def build_clothes(sex, body, co, edges, lm, names, pw, segs):
 
     # Подол шорт — по горизонтали и на корпусе, и на бёдрах: иначе сзади, у
     # ягодичной складки, край ступенькой идёт по стыку частей.
-    shell('bottom_shorts', garment(shorts_rule, {'thigh': 'torso'}), const(0.0038))
+    shell('bottom_shorts', garment(shorts_rule, {'thigh': 'torso'}), waistband(0.0065), loose=12, loose_weight=below_belt,
+          flare=0.014, flare_width=0.09, flare_where=lambda P: 1 - smoothstep(leg_hem_z + 0.08, leg_hem_z + 0.14, P[:, 2]))
     legs = {'thigh': 1.0, 'shin': lambda i, P: along(i, 'shin', 0.93)}
-    shell('bottom_joggers', garment(below_waist, legs), const(0.0045))
+    shell('bottom_joggers', garment(below_waist, legs), waistband(0.0075), loose=14, loose_weight=below_belt)
     shell('bottom_tights', garment(below_waist, legs), const(0.0022))
 
     # --- обувь: выпуклая оболочка стопы — гладкая форма без пальцев.
@@ -861,25 +959,27 @@ def build_clothes(sex, body, co, edges, lm, names, pw, segs):
     def head_up(P):
         return P[:, 2] - eye_z
 
-    shell('hair_buzz', scalp, const(0.0025), mat_name='hair', taper=0.008)
-    shell('hair_short', scalp, lambda P: 0.006 + 0.012 * smoothstep(0.02, 0.1, head_up(P)), mat_name='hair', taper=0.02)
-    shell('hair_mohawk', scalp, lambda P: 0.002 + 0.04 * bump(P[:, 0] / 0.022) * smoothstep(0.0, 0.05, head_up(P)),
-          mat_name='hair', taper=0.008)
+    shell('hair_buzz', scalp, const(0.0018), mat_name='hair', taper=0.006)
+    # Короткая — объём на макушке и чёлка спереди.
+    shell('hair_short', scalp, lambda P: 0.008 + 0.03 * smoothstep(0.02, 0.11, head_up(P))
+          + 0.012 * smoothstep(0.0, 0.08, -(P[:, 1] - hc[1])), mat_name='hair', taper=0.025, loose=6)
+    shell('hair_mohawk', scalp, lambda P: 0.0018 + 0.065 * bump(P[:, 0] / 0.026) * smoothstep(-0.02, 0.06, head_up(P)),
+          mat_name='hair', taper=0.006)
     bun_base = make_shell(body, scalp, 'hair_bun', const(0.004), mat_name='hair', taper=0.015)
     tail_base = make_shell(body, scalp, 'hair_ponytail', const(0.004), mat_name='hair', taper=0.015)
 
     back_y = co[head_sel][:, 1].max()
     front_y = co[head_sel & (co[:, 2] > eye_z + 0.05) & (co[:, 2] < eye_z + 0.08)][:, 1].min()
     bun = static_object('bun_ball', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
-        radius=0.042, location=(0, back_y - 0.02, eye_z + 0.085)), 'hair')
+        radius=0.052, location=(0, back_y - 0.012, eye_z + 0.095)), 'hair')
     # Хвост: основание на затылке, свисает вниз и чуть назад. Ось конуса
     # после поворота на 20° вокруг X — (0, −sin, cos): вершина-основание вверху.
     tilt = math.radians(20)
     axis = Vector((0, -math.sin(tilt), math.cos(tilt)))
     root = Vector((0, back_y - 0.005, eye_z + 0.055))
     tail = static_object('tail', lambda: bpy.ops.mesh.primitive_cone_add(
-        vertices=24, radius1=0.011, radius2=0.03, depth=0.22,
-        location=root - axis * 0.11, rotation=(tilt, 0, 0)), 'hair')
+        vertices=24, radius1=0.012, radius2=0.036, depth=0.28,
+        location=root - axis * 0.14, rotation=(tilt, 0, 0)), 'hair')
     tie = static_object('tie', lambda: bpy.ops.mesh.primitive_torus_add(
         major_radius=0.026, minor_radius=0.007, location=root - axis * 0.018,
         rotation=(tilt, 0, 0)), 'cloth')
@@ -887,7 +987,7 @@ def build_clothes(sex, body, co, edges, lm, names, pw, segs):
     join([tail_base, tail, tie], 'hair_ponytail')
 
     shell('head_headband', head_field(0.035, 0.45, 0.015, 0.4, upper=(0.062, 0.45, 0.042, 0.4)), const(0.006))
-    cap_shell = make_shell(body, head_field(0.03, 0.45, 0.0, 0.4), 'head_cap', const(0.011))
+    cap_shell = make_shell(body, head_field(0.03, 0.45, 0.0, 0.4), 'head_cap', const(0.016), loose=6)
 
     def make_brim():
         bpy.ops.mesh.primitive_cylinder_add(vertices=48, radius=1, depth=0.007,
@@ -904,7 +1004,8 @@ def build_clothes(sex, body, co, edges, lm, names, pw, segs):
 
     brim = static_object('brim', make_brim, 'cloth')
     join([cap_shell, brim], 'head_cap')
-    shell('head_beanie', head_field(0.0, 0.45, -0.03, 0.4), lambda P: 0.012 + 0.006 * smoothstep(0.03, 0.1, head_up(P)))
+    shell('head_beanie', head_field(0.0, 0.45, -0.03, 0.4), lambda P: 0.016 + 0.012 * smoothstep(0.03, 0.11, head_up(P)),
+          loose=8)
 
     leaves = []
     ring_z = eye_z + 0.045
