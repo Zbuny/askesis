@@ -29,24 +29,34 @@ export function influenceFor(growth = 0, pump = 0) {
   return UNTRAINED + (1 - UNTRAINED) * g + PUMP_BOOST * Math.max(0, Math.min(1, pump))
 }
 
-// Головные уборы, под которыми объёмная причёска не помещается.
+// Кепка и шапка закрывают макушку: под ними вместо причёски видны только
+// виски и затылок (hairunder). То, что свисает ниже убора — хвост и длинные
+// пряди (hairtail_<причёска>), — видно и в головном уборе.
 const COVERING_HATS = new Set(['cap', 'beanie'])
-const BULKY_HAIR = new Set(['short', 'mohawk', 'bun'])
 
 export function isItemVisible(name, look) {
+  const covered = COVERING_HATS.has(look.head)
+  if (name === 'hairunder') return covered && look.hair !== 'none'
+  if (name.startsWith('hairtail_')) return look.hair === name.slice('hairtail_'.length)
   const slot = SLOTS.find((s) => name.startsWith(`${s.key}_`))
   if (!slot) return true
   const id = name.slice(slot.key.length + 1)
   if (look[slot.key] !== id) return false
-  if (slot.key === 'hair' && COVERING_HATS.has(look.head) && BULKY_HAIR.has(id)) return false
+  if (slot.key === 'hair' && covered) return false
   return true
 }
 
 function slotOf(name) {
+  if (name === 'hairunder' || name.startsWith('hairtail_')) return SLOTS.find((s) => s.key === 'hair')
   return SLOTS.find((s) => name.startsWith(`${s.key}_`)) || null
 }
 
-const ITEM_NAMES = new Set(SLOTS.flatMap((slot) => slot.items.map((item) => `${slot.key}_${item.id}`)))
+const HAIR_IDS = SLOTS.find((slot) => slot.key === 'hair').items.map((item) => item.id)
+const ITEM_NAMES = new Set([
+  ...SLOTS.flatMap((slot) => slot.items.map((item) => `${slot.key}_${item.id}`)),
+  ...HAIR_IDS.map((id) => `hairtail_${id}`),
+  'hairunder',
+])
 
 // Узел вещи. Вещь с двумя материалами (кроссовок с подошвой, хвост с
 // резинкой) GLTFLoader раскладывает на группу с дочерними мешами, и имя

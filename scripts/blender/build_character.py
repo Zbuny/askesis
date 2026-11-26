@@ -657,8 +657,10 @@ def make_shell(body, field, name, thickness, mat_name='cloth', taper=0.0,
         rims = np.where(partner >= 0)[0]
         if len(rims):
             j = partner[rims]
-            # Кромка уходит под ткань, почти к коже.
-            out[rims] = P[j] + normals[j] * 0.0012
+            # Кромка — толщина ткани: от края внутрь на несколько миллиметров,
+            # а не до самой кожи (у широких штанин это 8 см и выглядит манжетой).
+            fabric = np.minimum(0.005, thick[j] * 0.8)
+            out[rims] = P[j] + normals[j] * (thick[j] - fabric)[:, None]
         return out
 
     if me.shape_keys:
@@ -743,6 +745,60 @@ def make_shoe(name, points, lifter=False):
             band.append(1 if (cy - 0.04 < c[1] < cy - 0.01 and c[2] > 0.035) else idx[poly.index])
         me.polygons.foreach_set('material_index', np.array(band))
         me.update()
+    return obj
+
+
+def blob(name, balls, mat_name='hair', resolution=0.006, threshold=0.6, max_faces=5000):
+    """Объёмная форма из шариков-метаболов → меш. balls: [((x, y, z), радиус)]."""
+    mb = bpy.data.metaballs.new(name)
+    mb.resolution = resolution
+    mb.render_resolution = resolution
+    mb.threshold = threshold
+    holder = bpy.data.objects.new(name + '_mb', mb)
+    bpy.context.scene.collection.objects.link(holder)
+    for co_, radius in balls:
+        el = mb.elements.new(type='BALL')
+        el.co = co_
+        el.radius = radius
+        el.stiffness = 1.3
+    bpy.context.view_layer.update()
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    mesh = bpy.data.meshes.new_from_object(holder.evaluated_get(depsgraph))
+    bpy.data.objects.remove(holder, do_unlink=True)
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.scene.collection.objects.link(obj)
+    if len(mesh.polygons) > max_faces:
+        select_only(obj)
+        dec = obj.modifiers.new('dec', 'DECIMATE')
+        dec.ratio = max_faces / len(mesh.polygons)
+        bpy.ops.object.modifier_apply(modifier=dec.name)
+    obj.data.materials.clear()
+    obj.data.materials.append(material(mat_name))
+    for p in obj.data.polygons:
+        p.use_smooth = True
+    return obj
+
+
+def roughen(obj, scale=30.0, stretch=1.0, amp=0.004):
+    """Прядевая фактура: шум по нормали. stretch < 1 вытягивает шум
+    вдоль вертикали — получаются пряди, а не бугры."""
+    from mathutils import noise
+    if obj is None:
+        return obj
+    me = obj.data
+    n = len(me.vertices)
+    P = np.empty(n * 3)
+    me.vertices.foreach_get('co', P)
+    P = P.reshape(-1, 3)
+    me.calc_loop_triangles()
+    tris = np.empty(len(me.loop_triangles) * 3, dtype=np.int64)
+    me.loop_triangles.foreach_get('vertices', tris)
+    N = vertex_normals(P, tris.reshape(-1, 3))
+    vals = np.array([noise.noise(Vector((p[0] * scale, p[1] * scale, p[2] * scale * stretch)))
+                     for p in P])
+    P = P + N * (vals * amp)[:, None]
+    me.vertices.foreach_set('co', P.ravel())
+    me.update()
     return obj
 
 
@@ -917,6 +973,25 @@ def build_clothes(sex, body, co, edges, lm, names, pw, segs):
     legs = {'thigh': 1.0, 'shin': lambda i, P: along(i, 'shin', 0.93)}
     shell('bottom_joggers', garment(below_waist, legs), waistband(0.0075), loose=14, loose_weight=below_belt)
     shell('bottom_tights', garment(below_waist, legs), const(0.0022))
+    # Широкие штаны: прямые штанины, расширяются от колена к низу и
+    # закрывают щиколотку; у пояса прилегают, как и всё остальное.
+    knee_z, ankle_z = lm['kneeL'][2], lm['ankleL'][2]
+
+    def wide(P):
+        # Прямая штанина: ниже колена ткань держит постоянный радиус от оси
+        # голени, а не повторяет сужение к щиколотке.
+        radial = np.full(len(P), np.inf)
+        for side in ('L', 'R'):
+            a, b, _ = segs['shin' + side][0]
+            radial = np.minimum(radial, seg_coords(P, a, b)[1])
+        target = 0.095 if not female else 0.085
+        tube = np.maximum(0.0, target - radial)
+        blend = smoothstep(knee_z + 0.3, knee_z - 0.15, P[:, 2])
+        return waistband(0.009)(P) + tube * blend
+
+    shell('bottom_wide', garment(below_waist, {'thigh': 1.0, 'shin': lambda i, P: along(i, 'shin', 0.985)}),
+          wide, loose=30, loose_weight=below_belt, flare=0.008, flare_width=0.08,
+          flare_where=lambda P: 1 - smoothstep(knee_z, knee_z + 0.1, P[:, 2]))
 
     # --- обувь: выпуклая оболочка стопы — гладкая форма без пальцев.
     feet_field = garment(parts={'foot': 1.0, 'shin': lambda i, P: along(i, 'shin', 0.94, keep_below=False)})
@@ -959,32 +1034,107 @@ def build_clothes(sex, body, co, edges, lm, names, pw, segs):
     def head_up(P):
         return P[:, 2] - eye_z
 
-    shell('hair_buzz', scalp, const(0.0018), mat_name='hair', taper=0.006)
-    # Короткая — объём на макушке и чёлка спереди.
-    shell('hair_short', scalp, lambda P: 0.008 + 0.03 * smoothstep(0.02, 0.11, head_up(P))
-          + 0.012 * smoothstep(0.0, 0.08, -(P[:, 1] - hc[1])), mat_name='hair', taper=0.025, loose=6)
-    shell('hair_mohawk', scalp, lambda P: 0.0018 + 0.065 * bump(P[:, 0] / 0.026) * smoothstep(-0.02, 0.06, head_up(P)),
-          mat_name='hair', taper=0.006)
-    bun_base = make_shell(body, scalp, 'hair_bun', const(0.004), mat_name='hair', taper=0.015)
-    tail_base = make_shell(body, scalp, 'hair_ponytail', const(0.004), mat_name='hair', taper=0.015)
-
+    # --- волосы. Короткие — оболочка по коже головы с прядевой фактурой;
+    # объёмные (пучок, хвост, длинные, афро) — метаболы: из шариков
+    # собирается одна гладкая форма, а шум по нормали даёт пряди.
     back_y = co[head_sel][:, 1].max()
     front_y = co[head_sel & (co[:, 2] > eye_z + 0.05) & (co[:, 2] < eye_z + 0.08)][:, 1].min()
-    bun = static_object('bun_ball', lambda: bpy.ops.mesh.primitive_uv_sphere_add(
-        radius=0.052, location=(0, back_y - 0.012, eye_z + 0.095)), 'hair')
-    # Хвост: основание на затылке, свисает вниз и чуть назад. Ось конуса
-    # после поворота на 20° вокруг X — (0, −sin, cos): вершина-основание вверху.
-    tilt = math.radians(20)
-    axis = Vector((0, -math.sin(tilt), math.cos(tilt)))
-    root = Vector((0, back_y - 0.005, eye_z + 0.055))
-    tail = static_object('tail', lambda: bpy.ops.mesh.primitive_cone_add(
-        vertices=24, radius1=0.012, radius2=0.036, depth=0.28,
-        location=root - axis * 0.14, rotation=(tilt, 0, 0)), 'hair')
+    ring = co[head_sel & (np.abs(co[:, 2] - (eye_z + 0.03)) < 0.01)]
+    half_w = np.abs(ring[:, 0]).max() if len(ring) else 0.075
+    hy = hc[1]
+
+    def hair_shell(name, thickness, taper=0.02, field=None, **kw):
+        obj = make_shell(body, field or scalp, name, thickness, mat_name='hair', taper=taper, **kw)
+        return obj
+
+    # Ёжик — почти по коже; короткая — объём на макушке и чёлка.
+    roughen(hair_shell('hair_buzz', const(0.0022), taper=0.006), scale=90, stretch=1.0, amp=0.0006)
+    short = hair_shell('hair_short', lambda P: 0.009 + 0.032 * smoothstep(0.02, 0.11, head_up(P))
+                       + 0.014 * smoothstep(0.0, 0.08, -(P[:, 1] - hy)), taper=0.025, loose=6)
+    roughen(short, scale=38, stretch=0.6, amp=0.004)
+
+    # Ирокез: ёжик по бокам и гребень из вытянутых прядей по середине.
+    mohawk_base = hair_shell('hair_mohawk', const(0.002), taper=0.006)
+    crest = []
+    for i in range(16):
+        t = i / 15
+        y = front_y + 0.025 + t * (back_y - front_y - 0.04)
+        # Высота кожи головы на линии гребня — по ближайшим вершинам головы.
+        near = co[head_sel & (np.abs(co[:, 0]) < 0.012) & (np.abs(co[:, 1] - y) < 0.01)]
+        z0 = near[:, 2].max() if len(near) else top
+        height = 0.07 * (1 - 0.55 * abs(t - 0.35))
+        crest += [((0, y, z0 + height * 0.3), 0.026), ((0, y, z0 + height * 0.65), 0.02), ((0, y, z0 + height), 0.013)]
+    crest_obj = blob('crest', crest, 'hair', resolution=0.005)
+    roughen(crest_obj, scale=30, stretch=0.35, amp=0.006)
+    join([mohawk_base, crest_obj], 'hair_mohawk')
+
+    # Пучок: гладко зачёсанные волосы и крупный узел на макушке.
+    bun_base = hair_shell('hair_bun', const(0.005), taper=0.015)
+    bun_z = top - 0.005
+    bun_obj = blob('bun', [((0, back_y - 0.045, bun_z + 0.02), 0.05), ((0, back_y - 0.03, bun_z - 0.01), 0.035)],
+                   'hair', resolution=0.005)
+    roughen(bun_obj, scale=40, stretch=1.0, amp=0.003)
+    join([bun_base, bun_obj], 'hair_bun')
+
+    # Хвост: зачёс + отдельный узел с хвостом и резинкой (виден и под кепкой).
+    hair_shell('hair_ponytail', const(0.005), taper=0.015)
+    root_pt = np.array([0.0, back_y - 0.005, eye_z + 0.05])
+    tail_balls = []
+    for i in range(22):
+        t = i / 21
+        p = root_pt + np.array([0.0, 0.035 * math.sin(t * 1.4), -0.3 * t])
+        tail_balls.append((tuple(p), 0.03 * (1 - 0.55 * t) + 0.01))
+    tail = blob('tail', tail_balls, 'hair', resolution=0.005)
+    roughen(tail, scale=30, stretch=0.2, amp=0.004)
     tie = static_object('tie', lambda: bpy.ops.mesh.primitive_torus_add(
-        major_radius=0.026, minor_radius=0.007, location=root - axis * 0.018,
-        rotation=(tilt, 0, 0)), 'cloth')
-    join([bun_base, bun], 'hair_bun')
-    join([tail_base, tail, tie], 'hair_ponytail')
+        major_radius=0.028, minor_radius=0.008, location=tuple(root_pt + np.array([0, 0.008, -0.015])),
+        rotation=(math.radians(15), 0, 0)), 'cloth')
+    join([tail, tie], 'hairtail_ponytail')
+
+    # Длинные: объём сверху + шторка до лопаток вокруг затылка и за ушами.
+    long_top = hair_shell('hair_long', lambda P: 0.01 + 0.02 * smoothstep(0.02, 0.11, head_up(P)), taper=0.02, loose=6)
+    roughen(long_top, scale=32, stretch=0.25, amp=0.004)
+    curtain = []
+    levels = 16
+    for level in range(levels):
+        drop = level * 0.02
+        z = eye_z + 0.04 - drop
+        spread = 1.0 if drop < 0.1 else max(0.55, 1.0 - 1.2 * (drop - 0.1))
+        for k in range(-9, 10):
+            ang = math.radians(k * 11.5) * spread  # 0 — затылок, ±103° — за ушами
+            ry = (back_y - hy) + 0.006 + 0.28 * drop
+            rx = half_w + 0.01 + 0.1 * drop
+            x = math.sin(ang) * rx
+            y = hy + math.cos(ang) * ry
+            curtain.append(((x, y, z), 0.03))
+    curtain_obj = blob('curtain', curtain, 'hair', resolution=0.006)
+    roughen(curtain_obj, scale=26, stretch=0.15, amp=0.005)
+    curtain_obj.name = 'hairtail_long'
+
+    # Афро: шар кудрей вокруг головы, лицо открыто.
+    afro_base = hair_shell('hair_afro', const(0.006), taper=0.01)
+    afro_balls = []
+    center = np.array([0.0, hy + 0.012, eye_z + 0.055])
+    for i in range(70):
+        # Равномерно по сфере (спираль Фибоначчи).
+        zz = 1 - 2 * (i + 0.5) / 70
+        r = math.sqrt(max(0.0, 1 - zz * zz))
+        phi = i * math.pi * (3 - math.sqrt(5))
+        d = np.array([r * math.cos(phi), r * math.sin(phi), zz])
+        p = center + d * np.array([0.1, 0.11, 0.1])
+        fwd = -(p[1] - hy)
+        if fwd > 0.03 and p[2] < eye_z + 0.075:
+            continue  # лицо и лоб
+        if p[2] < eye_z - 0.05:
+            continue  # ниже ушей
+        afro_balls.append((tuple(p), 0.045))
+    afro = blob('afro', afro_balls, 'hair', resolution=0.006)
+    roughen(afro, scale=55, stretch=1.0, amp=0.007)
+    join([afro_base, afro], 'hair_afro')
+
+    # Под кепкой и шапкой: только виски и затылок ниже края убора.
+    hair_shell('hairunder', const(0.005), taper=0.01,
+               field=head_field(0.035, 0.5, 0.035, 1.05, upper=(0.03, 0.45, 0.0, 0.4)))
 
     shell('head_headband', head_field(0.035, 0.45, 0.015, 0.4, upper=(0.062, 0.45, 0.042, 0.4)), const(0.006))
     cap_shell = make_shell(body, head_field(0.03, 0.45, 0.0, 0.4), 'head_cap', const(0.016), loose=6)
@@ -1084,8 +1234,11 @@ OUTFITS = [
     ('a', ['top_tee', 'bottom_shorts', 'shoes_sneakers', 'head_cap', 'extra_wristbands']),
     ('b', ['top_tank', 'bottom_joggers', 'shoes_lifters', 'hair_mohawk', 'extra_belt']),
     ('c', ['top_hoodie', 'bottom_tights', 'shoes_sneakers', 'head_beanie', 'extra_gloves']),
-    ('d', ['top_longsleeve', 'bottom_shorts', 'hair_ponytail', 'head_headband', 'extra_medal']),
+    ('d', ['top_longsleeve', 'bottom_shorts', 'hair_ponytail', 'hairtail_ponytail', 'head_headband', 'extra_medal']),
     ('e', ['top_bra', 'bottom_tights', 'hair_bun', 'head_laurel']),
+    ('f', ['top_tee', 'bottom_wide', 'shoes_sneakers', 'hair_long', 'hairtail_long']),
+    ('g', ['top_tank', 'bottom_wide', 'shoes_sneakers', 'hair_afro']),
+    ('h', ['top_hoodie', 'bottom_wide', 'shoes_sneakers', 'head_cap', 'hairunder', 'hairtail_ponytail']),
 ]
 
 

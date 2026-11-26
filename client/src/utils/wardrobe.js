@@ -69,6 +69,7 @@ export const SLOTS = [
       { id: 'shorts', label: 'Шорты', level: 1 },
       { id: 'joggers', label: 'Джоггеры', level: 1 },
       { id: 'tights', label: 'Тайтсы', level: 4 },
+      { id: 'wide', label: 'Широкие штаны', level: 1 },
     ],
   },
   {
@@ -106,6 +107,8 @@ export const SLOTS = [
       { id: 'mohawk', label: 'Ирокез', level: 7 },
       { id: 'bun', label: 'Пучок', level: 1 },
       { id: 'ponytail', label: 'Хвост', level: 1 },
+      { id: 'long', label: 'Длинные', level: 1 },
+      { id: 'afro', label: 'Афро', level: 4 },
     ],
   },
   {

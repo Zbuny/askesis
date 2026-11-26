@@ -75,6 +75,7 @@ const BOTTOM_ZONES = {
   shorts: ['pelvis', 'thigh'],
   joggers: ['pelvis', 'thigh', 'shin'],
   tights: ['pelvis', 'thigh', 'shin'],
+  wide: ['pelvis', 'thigh', 'shin'],
 }
 
 function makeMaterial(hex, { roughness = 0.62, metalness = 0 } = {}) {
@@ -446,7 +447,7 @@ export function createFigure(look) {
 
   const hidesHair = look.head === 'beanie'
   if (look.hair !== 'none' && !hidesHair) {
-    const fuller = look.hair === 'short' || look.hair === 'bun' || look.hair === 'ponytail'
+    const fuller = ['short', 'bun', 'ponytail', 'long', 'afro'].includes(look.hair)
     cap(root, {
       pos: [0, headY, -0.004],
       size: fuller ? [r * 0.99, r * 1.17, r * 1.07] : [r * 0.96, r * 1.15, r * 1.04],

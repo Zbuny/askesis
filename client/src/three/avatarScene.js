@@ -101,6 +101,9 @@ export function createAvatarScene(host, { autoRotate = true, interactive = true 
     onHover: null,
   }
 
+  // Отладка в режиме разработки: сцена доступна из консоли как __avatar.
+  if (import.meta.env.DEV && typeof window !== 'undefined') window.__avatar = { state, scene, camera, pivot }
+
   function swapFigure(figure) {
     if (state.figure) {
       pivot.remove(state.figure.root)

@@ -25,9 +25,15 @@ describe('isItemVisible', () => {
     expect(isItemVisible('eye_L', look)).toBe(true)
   })
 
-  it('объёмная причёска прячется под кепку, хвост — нет', () => {
-    expect(isItemVisible('hair_short', { ...look, head: 'cap' })).toBe(false)
-    expect(isItemVisible('hair_ponytail', { ...look, hair: 'ponytail', head: 'cap' })).toBe(true)
+  it('под кепкой видны виски и затылок, а хвост и длинные пряди — целиком', () => {
+    const capped = { ...look, head: 'cap' }
+    expect(isItemVisible('hair_short', capped)).toBe(false)
+    expect(isItemVisible('hairunder', capped)).toBe(true)
+    expect(isItemVisible('hairunder', look)).toBe(false)
+    expect(isItemVisible('hairunder', { ...capped, hair: 'none' })).toBe(false)
+    expect(isItemVisible('hairtail_ponytail', { ...capped, hair: 'ponytail' })).toBe(true)
+    expect(isItemVisible('hairtail_long', { ...look, hair: 'long' })).toBe(true)
+    expect(isItemVisible('hairtail_long', look)).toBe(false)
     expect(isItemVisible('hair_short', { ...look, head: 'headband' })).toBe(true)
   })
 })
