@@ -7,6 +7,8 @@
 
 import * as THREE from 'three'
 import { createFigure } from './figure.js'
+import { createModelFigure } from './modelFigure.js'
+import { loadCharacterModel } from './modelLoader.js'
 
 function prefersReducedMotion() {
   return typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
@@ -99,14 +101,44 @@ export function createAvatarScene(host, { autoRotate = true, interactive = true 
     onHover: null,
   }
 
-  function setLook(look) {
+  function swapFigure(figure) {
     if (state.figure) {
       pivot.remove(state.figure.root)
       state.figure.dispose()
     }
-    state.figure = createFigure(look)
-    pivot.add(state.figure.root)
+    state.figure = figure
+    pivot.add(figure.root)
     requestFrame()
+  }
+
+  // Модель (~4 МБ) грузится один раз на фигуру. Пока её нет — гладкая
+  // процедурная фигура; если загрузка не удалась, она так и остаётся.
+  let lookVersion = 0
+  function setLook(look) {
+    const version = ++lookVersion
+    const models = state.models || (state.models = {})
+    if (models[look.body]) {
+      swapFigure(createModelFigure(models[look.body], look))
+      return
+    }
+    if (!state.figure || state.figure.procedural !== look.body) {
+      const figure = createFigure(look)
+      figure.procedural = look.body
+      swapFigure(figure)
+    }
+    loadCharacterModel(look.body)
+      .then((gltf) => {
+        models[look.body] = gltf
+        if (disposed || version !== lookVersion) return
+        swapFigure(createModelFigure(gltf, look))
+      })
+      .catch(() => {
+        // Нет сети или файла — остаётся процедурная фигура, но в актуальной одежде.
+        if (disposed || version !== lookVersion) return
+        const figure = createFigure(look)
+        figure.procedural = look.body
+        swapFigure(figure)
+      })
   }
 
   function setGrowth(growth = {}, pump = {}) {
@@ -154,7 +186,9 @@ export function createAvatarScene(host, { autoRotate = true, interactive = true 
     pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
     raycaster.setFromCamera(pointer, camera)
     const hit = raycaster.intersectObjects(state.figure.pickables, false)[0]
-    return hit?.object.userData.region || null
+    if (!hit) return null
+    const { regionOf, region } = hit.object.userData
+    return (regionOf ? regionOf(hit) : region) || null
   }
 
   function setHovered(region) {
@@ -254,16 +288,15 @@ export function createAvatarScene(host, { autoRotate = true, interactive = true 
       }
     }
 
-    state.figure?.update({
+    const pending = state.figure?.update({
       growth: state.growth,
       pump: state.pump,
       highlight: state.highlight || state.hovered,
       time,
-      breathe: !reduced,
     })
     renderer.render(scene, camera)
 
-    if (needsMotion() || settling || Math.abs(state.velocity) > 0.0005) requestFrame()
+    if (needsMotion() || settling || pending || Math.abs(state.velocity) > 0.0005) requestFrame()
   }
 
   requestFrame()
