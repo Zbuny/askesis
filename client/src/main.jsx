@@ -5,6 +5,8 @@ import App from './App.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
 import { ThemeProvider } from './context/ThemeContext.jsx'
 import './index.css'
+// Тема «Киберпанк» — поверх основной, включается data-theme="cyber".
+import './styles/theme-cyber.css'
 // Ради побочного эффекта: ловит beforeinstallprompt до первого рендера.
 import './utils/installPrompt.js'
 

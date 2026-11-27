@@ -37,15 +37,19 @@ export default function Navbar() {
           Askesis
         </Link>
         <div className="navbar__bar-actions">
-          <button
-            type="button"
-            className="navbar__theme-toggle"
-            onClick={toggleTheme}
-            aria-label={theme === 'dark' ? 'Включить светлую тему' : 'Включить тёмную тему'}
-            title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
-          >
-            {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
-          </button>
+          {/* Киберпанк бывает только тёмным, и выключают его в профиле:
+              случайное касание кнопки в шапке не должно сбрасывать тему. */}
+          {theme !== 'cyber' && (
+            <button
+              type="button"
+              className="navbar__theme-toggle"
+              onClick={toggleTheme}
+              aria-label={theme === 'dark' ? 'Включить светлую тему' : 'Включить тёмную тему'}
+              title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
+            >
+              {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+            </button>
+          )}
           <button
             type="button"
             className="navbar__toggle"

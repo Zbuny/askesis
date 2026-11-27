@@ -32,10 +32,18 @@
       (function () {
         try {
           var stored = localStorage.getItem('askesis:theme')
-          var theme = stored === 'light' || stored === 'dark'
+          var theme = stored === 'light' || stored === 'dark' || stored === 'cyber'
             ? stored
             : (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
           document.documentElement.dataset.theme = theme
+          // Шрифты киберпанка — до первой отрисовки, чтобы не мигали.
+          if (theme === 'cyber') {
+            var link = document.createElement('link')
+            link.id = 'askesis-cyber-fonts'
+            link.rel = 'stylesheet'
+            link.href = 'https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Oswald:wght@500;600;700&display=swap'
+            document.head.appendChild(link)
+          }
         } catch (e) {
           document.documentElement.dataset.theme = 'dark'
         }

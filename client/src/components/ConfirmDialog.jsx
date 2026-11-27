@@ -48,12 +48,12 @@ export default function ConfirmDialog({
       <div className="confirm__actions">
         {/* Фокус — на отмене: диалог показывают перед необратимым действием,
             и случайный Enter не должен ничего удалять. */}
-        <button type="button" onClick={onCancel} disabled={busy} autoFocus>
+        <button type="button" className="button button--secondary" onClick={onCancel} disabled={busy} autoFocus>
           {cancelLabel}
         </button>
         <button
           type="button"
-          className={danger ? 'is-danger' : ''}
+          className={danger ? 'button button--danger is-danger' : 'button'}
           onClick={onConfirm}
           disabled={busy}
         >

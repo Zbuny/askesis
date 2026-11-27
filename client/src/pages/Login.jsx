@@ -78,7 +78,7 @@ export default function Login() {
               <span>Пароль</span>
               <input type="password" autoComplete="current-password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
             </label>
-            <button type="submit" className="auth-card__submit" disabled={submitting}>
+            <button type="submit" className="button button--block auth-card__submit" disabled={submitting}>
               {submitting ? 'Входим...' : 'Войти'}
             </button>
           </form>
@@ -103,7 +103,7 @@ export default function Login() {
                 <span>Email для сброса пароля</span>
                 <input type="email" autoComplete="email" placeholder="you@mail.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
               </label>
-              <button type="submit" className="auth-card__submit" disabled={resetting}>
+              <button type="submit" className="button button--block auth-card__submit" disabled={resetting}>
                 {resetting ? 'Отправляем...' : 'Отправить письмо для сброса'}
               </button>
               {resetSent && <p className="eyebrow">Письмо отправлено — проверьте почту.</p>}
@@ -112,7 +112,7 @@ export default function Login() {
 
           <div className="auth-card__divider"><span>или</span></div>
 
-          <button type="button" className="auth-card__google" onClick={handleGoogle} disabled={submitting}>
+          <button type="button" className="button button--secondary button--block auth-card__google" onClick={handleGoogle} disabled={submitting}>
             Войти через Google
           </button>
 
