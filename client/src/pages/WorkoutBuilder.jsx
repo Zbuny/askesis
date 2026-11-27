@@ -1,20 +1,26 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api/firestore.js'
 import { exerciseName } from '../utils/translate.js'
 import { useAsyncAction } from '../hooks/useAsyncAction.js'
-import ExercisePicker from '../components/ExercisePicker.jsx'
+import { useDragReorder } from '../hooks/useDragReorder.js'
+import ExerciseSheet from '../components/ExerciseSheet.jsx'
 import BackLink from '../components/BackLink.jsx'
 import { PageError, PageLoading } from '../components/PageState.jsx'
 import { hasExerciseMedia } from '../utils/exerciseFrames.js'
 import ExerciseAnimation from '../components/ExerciseAnimation.jsx'
 import LoadAnalysis from '../components/LoadAnalysis.jsx'
 import { classifyReps } from '../utils/repRanges.js'
+import { moveItem } from '../utils/reorder.js'
+import { editItemField, MAX_REPS, MAX_SETS, normalizePlanItems } from '../utils/programItems.js'
 import {
   clearBuilderDraft,
   loadBuilderDraft,
+  loadPickDraft,
   saveBuilderDraft,
+  savePickDraft,
 } from '../utils/workoutDraft.js'
+import '../styles/builder.css'
 
 export default function WorkoutBuilder() {
   const { id } = useParams()
@@ -33,11 +39,12 @@ export default function WorkoutBuilder() {
   const [level, setLevel] = useState('')
   const { busy: saving, error, setError, run } = useAsyncAction()
   const hydrated = useRef(false)
-  // Перетаскивание пунктов мышью/пальцем. itemRefs хранит DOM-узлы <li> —
-  // по ним меряем, куда сейчас указывает палец, и на сколько раздвинуть
-  // соседей, чтобы освободить место. drag — null, пока ничего не тащат.
-  const itemRefs = useRef(new Map())
-  const [drag, setDrag] = useState(null)
+  // Библиотека открывается нижней панелью. picks — отмеченные, но ещё не
+  // добавленные упражнения в порядке нажатия. Они переживают переход на
+  // страницу упражнения из панели: вернувшись, человек видит панель с тем
+  // же выбором (см. loadPickDraft).
+  const [picks, setPicks] = useState(() => loadPickDraft(isEdit ? id : null))
+  const [sheetOpen, setSheetOpen] = useState(() => picks.length > 0)
 
   useEffect(() => {
     api.listExercises().then(setExercises).catch((e) => setLoadError(e.message))
@@ -76,99 +83,59 @@ export default function WorkoutBuilder() {
     saveBuilderDraft(isEdit ? id : null, { title, items })
   }, [title, items, id, isEdit])
 
+  useEffect(() => {
+    savePickDraft(isEdit ? id : null, picks)
+  }, [picks, id, isEdit])
+
   const exerciseById = useMemo(() => new Map(exercises.map((ex) => [ex.id, ex])), [exercises])
   const addedIds = useMemo(() => new Set(items.map((item) => item.exerciseId)), [items])
+  const ids = useMemo(() => items.map((item) => item.exerciseId), [items])
 
-  function addExercise(ex) {
-    setItems((prev) => {
-      if (prev.some((item) => item.exerciseId === ex.id)) return prev
-      return [...prev, { exerciseId: ex.id, exerciseName: exerciseName(ex), targetSets: 3, targetReps: 10 }]
-    })
+  function togglePick(ex) {
+    setPicks((prev) => (prev.includes(ex.id) ? prev.filter((pid) => pid !== ex.id) : [...prev, ex.id]))
   }
+
+  // Добавляем в том порядке, в каком упражнения отмечали.
+  function addPicked() {
+    const fresh = picks
+      .filter((pid) => !addedIds.has(pid) && exerciseById.has(pid))
+      .map((pid) => ({
+        exerciseId: pid,
+        exerciseName: exerciseName(exerciseById.get(pid)),
+        targetSets: 3,
+        targetReps: 10,
+      }))
+    setItems((prev) => [...prev, ...fresh])
+    setPicks([])
+    setSheetOpen(false)
+  }
+
+  const closeSheet = useCallback(() => {
+    setSheetOpen(false)
+    setPicks([])
+  }, [])
 
   function removeExercise(exerciseId) {
     setItems((prev) => prev.filter((item) => item.exerciseId !== exerciseId))
   }
 
-  function moveExercise(exerciseId, direction) {
-    setItems((prev) => {
-      const index = prev.findIndex((item) => item.exerciseId === exerciseId)
-      if (index < 0) return prev
-      const next = index + direction
-      if (next < 0 || next >= prev.length) return prev
-      const copy = [...prev]
-      const [moved] = copy.splice(index, 1)
-      copy.splice(next, 0, moved)
-      return copy
-    })
+  // raw — строка из поля ввода. Пустое поле остаётся пустым (''), иначе
+  // Number('') === 0 тут же вписал бы ноль обратно и стереть его было бы
+  // нельзя. В числа приводим перед сохранением (normalizePlanItems).
+  function updateItem(exerciseId, field, raw) {
+    setItems((prev) => prev.map((item) => (item.exerciseId === exerciseId ? editItemField(item, field, raw) : item)))
   }
 
-  function updateItem(exerciseId, field, value) {
-    setItems((prev) => prev.map((item) => (item.exerciseId === exerciseId ? { ...item, [field]: value } : item)))
-  }
-
-  // Сколько пунктов сейчас лежат выше clientY — их индекс в списке без
-  // перетаскиваемого элемента. Пока идёт жест, сам список не переставляем
-  // (перечитывать items на каждый пиксель незачем), поэтому позиции соседей
-  // стабильны и их можно смерить напрямую через DOM.
-  function targetIndexFromY(draggedId, clientY) {
-    let index = 0
-    for (const item of items) {
-      if (item.exerciseId === draggedId) continue
-      const el = itemRefs.current.get(item.exerciseId)
-      if (el && clientY > el.getBoundingClientRect().top + el.offsetHeight / 2) index++
-    }
-    return index
-  }
-
-  function handleDragStart(e, exerciseId, index) {
-    // Подходы/повторы и «Убрать» должны работать как обычно — тащим только
-    // если палец или курсор лёг на саму строку, а не на элемент управления.
-    if (e.target.closest('.admin-list__actions')) return
-    if (e.pointerType === 'mouse' && e.button !== 0) return
-    const el = itemRefs.current.get(exerciseId)
-    if (!el) return
-    e.preventDefault()
-    e.currentTarget.setPointerCapture(e.pointerId)
-    setDrag({ id: exerciseId, fromIndex: index, targetIndex: index, startY: e.clientY, y: 0, height: el.offsetHeight })
-  }
-
-  function handleDragMove(e) {
-    if (!drag) return
-    setDrag((prev) => prev && { ...prev, y: e.clientY - prev.startY, targetIndex: targetIndexFromY(prev.id, e.clientY) })
-  }
-
-  function handleDragEnd() {
-    setDrag((prev) => {
-      if (!prev) return null
-      if (prev.targetIndex !== prev.fromIndex) {
-        setItems((list) => {
-          const copy = [...list]
-          const from = copy.findIndex((item) => item.exerciseId === prev.id)
-          if (from < 0) return list
-          const [moved] = copy.splice(from, 1)
-          copy.splice(prev.targetIndex, 0, moved)
-          return copy
-        })
-      }
-      return null
-    })
-  }
-
-  function dragRowStyle(exerciseId, index) {
-    if (!drag) return undefined
-    if (drag.id === exerciseId) return { transform: `translateY(${drag.y}px)` }
-    // Раздвигаем только тех соседей, что оказались между стартом и текущей
-    // целью перетаскивания — остальные стоят на месте.
-    const offset = drag.height + 1
-    if (drag.fromIndex > drag.targetIndex && index >= drag.targetIndex && index < drag.fromIndex) {
-      return { transform: `translateY(${offset}px)` }
-    }
-    if (drag.fromIndex < drag.targetIndex && index > drag.fromIndex && index <= drag.targetIndex) {
-      return { transform: `translateY(-${offset}px)` }
-    }
-    return undefined
-  }
+  const moveExercise = useCallback((from, to) => setItems((prev) => moveItem(prev, from, to)), [])
+  const labelOf = useCallback(
+    (exerciseId) => items.find((item) => item.exerciseId === exerciseId)?.exerciseName || 'Упражнение',
+    [items],
+  )
+  const { drag, rowRef, handleProps, rowStyle, announcement } = useDragReorder({
+    ids,
+    onMove: moveExercise,
+    labelOf,
+  })
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -176,13 +143,19 @@ export default function WorkoutBuilder() {
       setError('Укажите название и добавьте хотя бы одно упражнение')
       return
     }
+    const normalized = normalizePlanItems(items)
+    if (normalized.error) {
+      setError(normalized.error)
+      return
+    }
+    const payload = normalized.items
     try {
       if (isEdit) {
-        await run(() => api.updateWorkout({ id, title, items }))
+        await run(() => api.updateWorkout({ id, title, items: payload }))
         clearBuilderDraft(id)
         navigate(`/workouts/${id}`)
       } else {
-        const result = await run(() => api.createWorkout({ title, items }))
+        const result = await run(() => api.createWorkout({ title, items: payload }))
         clearBuilderDraft(null)
         navigate(`/workouts/${result.id}`)
       }
@@ -199,85 +172,115 @@ export default function WorkoutBuilder() {
       <BackLink fallback="/workouts" label="К тренировкам" />
       <h1 className="page-title">{isEdit ? 'Редактировать тренировку' : 'Собрать тренировку'}</h1>
 
-      <form className="admin-form" onSubmit={handleSubmit}>
+      <form className="admin-form builder-form" onSubmit={handleSubmit}>
         <input placeholder="Название тренировки" value={title} onChange={(e) => setTitle(e.target.value)} required />
 
-        <h3>Выбрано ({items.length})</h3>
-        {items.length === 0 && <p>Добавьте упражнения из списка ниже.</p>}
-        <ul className={`admin-list workout-items${drag ? ' is-reordering' : ''}`}>
+        <h3 className="builder__heading">
+          Упражнения <span>{items.length}</span>
+        </h3>
+        {items.length === 0 && <p className="builder__empty">Пока пусто. Откройте библиотеку и отметьте упражнения.</p>}
+        <ol className={`workout-items${drag ? ' is-reordering' : ''}`}>
           {items.map((item, index) => {
             const zone = classifyReps(item.targetReps)
+            const exercise = exerciseById.get(item.exerciseId)
+            const canDrag = items.length > 1
             return (
               <li
                 key={item.exerciseId}
-                ref={(el) => {
-                  if (el) itemRefs.current.set(item.exerciseId, el)
-                  else itemRefs.current.delete(item.exerciseId)
-                }}
-                className={drag?.id === item.exerciseId ? 'is-dragging' : undefined}
-                style={dragRowStyle(item.exerciseId, index)}
-                tabIndex={0}
-                aria-label={`${item.exerciseName}. Потяните строку или используйте стрелки вверх/вниз, чтобы изменить порядок`}
-                // Тащим за саму строку — отдельная ручка на узком экране
-                // только отжимала название за край (см. скриншот в задаче).
-                onPointerDown={(e) => handleDragStart(e, item.exerciseId, index)}
-                onPointerMove={handleDragMove}
-                onPointerUp={handleDragEnd}
-                onPointerCancel={handleDragEnd}
-                onKeyDown={(e) => {
-                  if (e.target !== e.currentTarget) return
-                  if (e.key === 'ArrowUp') {
-                    e.preventDefault()
-                    moveExercise(item.exerciseId, -1)
-                  } else if (e.key === 'ArrowDown') {
-                    e.preventDefault()
-                    moveExercise(item.exerciseId, 1)
-                  }
-                }}
+                ref={rowRef(item.exerciseId)}
+                className={`plan-row${drag?.id === item.exerciseId ? ' is-dragging' : ''}`}
+                style={rowStyle(item.exerciseId, index)}
               >
-                <span className="picked">
-                  {hasExerciseMedia(exerciseById.get(item.exerciseId)) && (
-                    <span className="picked__media">
-                      <ExerciseAnimation
-                        exercise={exerciseById.get(item.exerciseId)}
-                        alt={item.exerciseName}
-                        animate={false}
+                {canDrag ? (
+                  <button
+                    type="button"
+                    className="drag-handle"
+                    aria-label={`Переместить: ${item.exerciseName}, позиция ${index + 1} из ${items.length}. Стрелки вверх и вниз меняют порядок`}
+                    title="Потяните, чтобы изменить порядок"
+                    {...handleProps(item.exerciseId, index)}
+                  >
+                    <svg viewBox="0 0 12 20" width="12" height="20" aria-hidden="true" focusable="false">
+                      <circle cx="3" cy="4" r="1.6" />
+                      <circle cx="9" cy="4" r="1.6" />
+                      <circle cx="3" cy="10" r="1.6" />
+                      <circle cx="9" cy="10" r="1.6" />
+                      <circle cx="3" cy="16" r="1.6" />
+                      <circle cx="9" cy="16" r="1.6" />
+                    </svg>
+                  </button>
+                ) : (
+                  <span className="drag-handle drag-handle--placeholder" aria-hidden="true" />
+                )}
+
+                <div className="plan-row__main">
+                  <div className="plan-row__head">
+                    {hasExerciseMedia(exercise) && (
+                      <span className="plan-row__media">
+                        <ExerciseAnimation exercise={exercise} alt={item.exerciseName} animate={false} />
+                      </span>
+                    )}
+                    <span className="plan-row__title">
+                      <span className="plan-row__num">{String(index + 1).padStart(2, '0')}</span>
+                      <span className="plan-row__name">{item.exerciseName}</span>
+                    </span>
+                  </div>
+
+                  <div className="plan-row__params">
+                    <label className="plan-field">
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min="1"
+                        max={MAX_SETS}
+                        value={item.targetSets}
+                        onChange={(e) => updateItem(item.exerciseId, 'targetSets', e.target.value)}
+                        aria-label={`Подходы: ${item.exerciseName}`}
                       />
-                    </span>
-                  )}
-                  <span className="picked__name">{item.exerciseName}</span>
-                  {zone && (
-                    <span className={`rep-zone rep-zone--${zone.tone}`} title={zone.hint}>
-                      {zone.label}
-                    </span>
-                  )}
-                </span>
-                <span className="admin-list__actions">
-                  <input
-                    type="number"
-                    min="1"
-                    className="number-input"
-                    value={item.targetSets}
-                    onChange={(e) => updateItem(item.exerciseId, 'targetSets', Number(e.target.value))}
-                    title="Подходы"
-                    aria-label={`Подходы: ${item.exerciseName}`}
-                  />
-                  ×
-                  <input
-                    type="number"
-                    min="1"
-                    className="number-input"
-                    value={item.targetReps}
-                    onChange={(e) => updateItem(item.exerciseId, 'targetReps', Number(e.target.value))}
-                    title="Повторы"
-                    aria-label={`Повторы: ${item.exerciseName}`}
-                  />
-                  <button type="button" className="is-danger" onClick={() => removeExercise(item.exerciseId)}>Убрать</button>
-                </span>
+                      <span aria-hidden="true">подходы</span>
+                    </label>
+                    <span className="plan-row__x" aria-hidden="true">×</span>
+                    <label className="plan-field">
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min="0"
+                        max={MAX_REPS}
+                        value={item.targetReps}
+                        onChange={(e) => updateItem(item.exerciseId, 'targetReps', e.target.value)}
+                        aria-label={`Повторы: ${item.exerciseName}`}
+                        title="0 - до отказа"
+                      />
+                      <span aria-hidden="true">{item.targetReps === 0 ? 'до отказа' : 'повторы'}</span>
+                    </label>
+                    {zone && (
+                      <span className={`rep-zone rep-zone--${zone.tone} plan-row__zone`} title={zone.hint}>
+                        {zone.label}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  className="plan-row__remove"
+                  onClick={() => removeExercise(item.exerciseId)}
+                  aria-label={`Убрать: ${item.exerciseName}`}
+                  title="Убрать из тренировки"
+                >
+                  <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
+                    <path d="M3.5 3.5l9 9M12.5 3.5l-9 9" />
+                  </svg>
+                </button>
               </li>
             )
           })}
-        </ul>
+        </ol>
+        <p className="builder__live" aria-live="polite">{announcement}</p>
+
+        <button type="button" className="builder__add" onClick={() => setSheetOpen(true)}>
+          <span className="builder__add-icon" aria-hidden="true">+</span>
+          Добавить упражнения
+        </button>
 
         <LoadAnalysis items={items} exerciseById={exerciseById} level={level} />
 
@@ -288,7 +291,15 @@ export default function WorkoutBuilder() {
 
       {error && <p className="error">{error}</p>}
 
-      <ExercisePicker exercises={exercises} addedIds={addedIds} onAdd={addExercise} />
+      <ExerciseSheet
+        open={sheetOpen}
+        exercises={exercises}
+        addedIds={addedIds}
+        picks={picks}
+        onToggle={togglePick}
+        onSubmit={addPicked}
+        onClose={closeSheet}
+      />
     </section>
   )
 }

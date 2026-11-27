@@ -48,3 +48,18 @@ export async function login(page, { email, password }) {
   // а не в профиль, как раньше.
   await page.waitForURL(/\/(dashboard|profile)/, { timeout: AUTH_TIMEOUT })
 }
+
+// Упражнения в конструктор добавляются через нижнюю панель библиотеки:
+// отмечаем каждое по названию (первое совпадение в поиске) и жмём
+// «Добавить (N)» один раз.
+export async function addExercises(page, names) {
+  await page.getByRole('button', { name: 'Добавить упражнения' }).click()
+  const sheet = page.locator('.sheet')
+  const search = sheet.getByPlaceholder('Поиск по названию или группе мышц...')
+  for (const name of names) {
+    await search.fill(name)
+    await sheet.locator('.picker__item').first().getByRole('button', { name: /^Выбрать/ }).click()
+  }
+  await sheet.getByRole('button', { name: `Добавить (${names.length})` }).click()
+  await sheet.waitFor({ state: 'hidden' })
+}
