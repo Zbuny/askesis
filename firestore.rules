@@ -93,19 +93,21 @@ service cloud.firestore {
     // В языке правил Firestore нет цикла/map по спискам, а Cloud Functions,
     // которые проверили бы весь список одной функцией, недоступны на
     // Spark-плане (см. шапку файла) — поэтому поэлементно проверяем только
-    // первые 10 позиций явным индексом. Реальная тренировка короче; общий
-    // размер списка всё равно ограничен ниже отдельным потолком в 60.
+    // первые позиции явным индексом; общий размер списка ограничен ниже
+    // отдельным потолком в 60.
+    //
+    // Почему первые 3, а не 10. У Firestore потолок — 1000 вычисленных
+    // выражений на запрос, и вызов функции на элемент списка стоит около
+    // сотни выражений, сколько бы полей в элементе ни было. Проверка 10
+    // позиций выбирала потолок уже на 6-10 упражнениях: длинная тренировка
+    // и её лог получали permission-denied («Нет доступа к этой записи»).
+    // Проверка первых 3 стоит одинаково при любой длине списка. Защиты это
+    // не убавляет: позиции дальше проверенных и раньше не проверялись, так
+    // что мусор можно было положить в 11-ю — теперь в 4-ю.
     function validWorkoutItems(items) {
-      return (items.size() < 1  || validWorkoutItem(items[0]))
-        && (items.size() < 2  || validWorkoutItem(items[1]))
-        && (items.size() < 3  || validWorkoutItem(items[2]))
-        && (items.size() < 4  || validWorkoutItem(items[3]))
-        && (items.size() < 5  || validWorkoutItem(items[4]))
-        && (items.size() < 6  || validWorkoutItem(items[5]))
-        && (items.size() < 7  || validWorkoutItem(items[6]))
-        && (items.size() < 8  || validWorkoutItem(items[7]))
-        && (items.size() < 9  || validWorkoutItem(items[8]))
-        && (items.size() < 10 || validWorkoutItem(items[9]));
+      return (items.size() < 1 || validWorkoutItem(items[0]))
+        && (items.size() < 2 || validWorkoutItem(items[1]))
+        && (items.size() < 3 || validWorkoutItem(items[2]));
     }
 
     function validWorkout() {
@@ -149,19 +151,13 @@ service cloud.firestore {
         && (!('rir' in entry) || (entry.rir is number && entry.rir >= 0 && entry.rir <= 3));
     }
 
-    // Та же оговорка про отсутствие циклов в правилах — проверяем первые
-    // 10 записей журнала явным индексом (см. validWorkoutItems выше).
+    // Та же оговорка про отсутствие циклов и про потолок в 1000 выражений —
+    // проверяем первые 3 записи журнала явным индексом (см. validWorkoutItems
+    // выше: при 10 проверках лог из 6 упражнений уже не сохранялся).
     function validWorkoutLogEntries(entries) {
-      return (entries.size() < 1  || validWorkoutLogEntry(entries[0]))
-        && (entries.size() < 2  || validWorkoutLogEntry(entries[1]))
-        && (entries.size() < 3  || validWorkoutLogEntry(entries[2]))
-        && (entries.size() < 4  || validWorkoutLogEntry(entries[3]))
-        && (entries.size() < 5  || validWorkoutLogEntry(entries[4]))
-        && (entries.size() < 6  || validWorkoutLogEntry(entries[5]))
-        && (entries.size() < 7  || validWorkoutLogEntry(entries[6]))
-        && (entries.size() < 8  || validWorkoutLogEntry(entries[7]))
-        && (entries.size() < 9  || validWorkoutLogEntry(entries[8]))
-        && (entries.size() < 10 || validWorkoutLogEntry(entries[9]));
+      return (entries.size() < 1 || validWorkoutLogEntry(entries[0]))
+        && (entries.size() < 2 || validWorkoutLogEntry(entries[1]))
+        && (entries.size() < 3 || validWorkoutLogEntry(entries[2]));
     }
 
     function validWorkoutLog() {
