@@ -117,14 +117,14 @@ export default function Register() {
               <span>Я согласен на обработку персональных данных</span>
             </label>
 
-            <button type="submit" className="auth-card__submit" disabled={submitting}>
+            <button type="submit" className="button button--block auth-card__submit" disabled={submitting}>
               {submitting ? 'Создаём...' : 'Создать аккаунт'}
             </button>
           </form>
 
           <div className="auth-card__divider"><span>или</span></div>
 
-          <button type="button" className="auth-card__google" onClick={handleGoogle} disabled={submitting}>
+          <button type="button" className="button button--secondary button--block auth-card__google" onClick={handleGoogle} disabled={submitting}>
             Войти через Google
           </button>
 

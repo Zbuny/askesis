@@ -1,0 +1,586 @@
+/* ==========================================================================
+   Тема «Киберпанк»: <html data-theme="cyber">.
+
+   Почти чёрный фон, янтарь вместо золота как основной неон, тонкие
+   светящиеся рамки, срезанные углы и HUD-уголки у карточек, моноширинный
+   шрифт для цифр, подписей и кнопок. Скан-линии и редкий глитч заголовков —
+   в меру: при prefers-reduced-motion всё движение выключается, остаётся
+   только неподвижная картинка.
+
+   Тема живёт поверх тёмной основы: правила светлой схемы смотрят на
+   data-theme='light' и сюда не попадают, а всё, что не переопределено ниже,
+   берётся из тёмной темы через те же переменные.
+   ========================================================================== */
+
+:root[data-theme='cyber'] {
+  color-scheme: dark;
+
+  --bg: #050505;
+  --bg-soft: #0a0907;
+  --surface: #0c0b09;
+  --surface-hover: #15120c;
+  --border: rgba(255, 182, 39, 0.16);
+  --border-strong: rgba(255, 182, 39, 0.38);
+  --text: #f4ead6;
+  --text-muted: #b8aa8c;
+  --text-faint: #958a72;
+
+  --gold: #ffb627;
+  --gold-bright: #ffcf5c;
+  --silver: #cfc6b2;
+  --accent: var(--gold);
+  --accent-contrast: #050505;
+  --danger: #ff6b57;
+
+  --radius: 0px;
+  --radius-lg: 0px;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  --font-display: 'Oswald', 'Space Grotesk', 'Arial Narrow', system-ui, sans-serif;
+  --font-numeric: 'JetBrains Mono', 'Cascadia Mono', 'Consolas', ui-monospace, monospace;
+  --font-mono: 'JetBrains Mono', 'Cascadia Mono', 'Consolas', ui-monospace, monospace;
+  --gold-glow: 0 0 0 1px rgba(255, 182, 39, 0.45), 0 0 24px -6px rgba(255, 182, 39, 0.55);
+
+  /* Неон и HUD. */
+  --neon: #ffb627;
+  --neon-hot: #ffe08a;
+  --neon-dim: rgba(255, 182, 39, 0.5);
+  --neon-glow: 0 0 6px rgba(255, 182, 39, 0.55), 0 0 18px rgba(255, 182, 39, 0.25);
+  --glitch-a: rgba(255, 64, 64, 0.75);
+  --glitch-b: rgba(255, 214, 102, 0.75);
+  --hud-cut: 12px;
+  --hud-tick: 14px;
+
+  /* Кнопки: та же механика, другие переменные. Плоский неон, без кромки,
+     угол срезан глубже, подпись моноширинная. */
+  --btn-font: var(--font-mono);
+  --btn-size: 0.74rem;
+  --btn-size-sm: 0.7rem;
+  --btn-weight: 700;
+  --btn-tracking: 0.16em;
+  --btn-cut: 12px;
+  --btn-cut-sm: 9px;
+  --btn-drop: 0px;
+  --btn-lift: 0px;
+
+  --btn-primary-face: linear-gradient(90deg, #ffb627 0%, #ffd36b 45%, #ffb627 55%, #f29e0c 100%);
+  --btn-primary-size: 240% 100%;
+  --btn-primary-pos: 0% 0;
+  --btn-primary-pos-hover: 100% 0;
+  --btn-primary-rim: #ffe08a;
+  --btn-primary-plate: transparent;
+  --btn-primary-fg: #050505;
+  --btn-primary-fg-hover: #050505;
+  --btn-primary-glow: 0 0 12px rgba(255, 182, 39, 0.6);
+  --btn-glow-rest: 0 0 7px rgba(255, 182, 39, 0.32);
+
+  --btn-secondary-base: #070706;
+  --btn-secondary-sweep: #2a1f08;
+  --btn-secondary-rim: rgba(255, 182, 39, 0.6);
+  --btn-secondary-rim-hover: #ffcf5c;
+  --btn-secondary-plate: transparent;
+  --btn-secondary-fg: #ffcf5c;
+  --btn-secondary-fg-hover: #ffe08a;
+
+  --btn-accent-rim: #ffb627;
+  --btn-accent-fg: #ffe08a;
+
+  --btn-danger-face: linear-gradient(90deg, #ff6b57, #ff8a6b);
+  --btn-danger-rim: #ffb4a3;
+  --btn-danger-plate: transparent;
+  --btn-danger-fg: #050505;
+  --btn-danger-glow: 0 0 12px rgba(255, 107, 87, 0.55);
+  --btn-danger-sweep: #ff6b57;
+  --btn-danger-soft-rim: rgba(255, 107, 87, 0.65);
+  --btn-danger-soft-fg: #ff8f7d;
+
+  --btn-ghost-fg: var(--text-muted);
+  --btn-ghost-fg-hover: var(--neon-hot);
+  --btn-ghost-line: var(--neon);
+
+  --btn-disabled-face: #12110e;
+  --btn-disabled-rim: rgba(255, 182, 39, 0.14);
+  --btn-disabled-fg: #7d7463;
+  --btn-focus: var(--neon-hot);
+}
+
+/* ---------- Фон: сетка, виньетка, скан-линии ---------- */
+
+:root[data-theme='cyber'] body {
+  background:
+    radial-gradient(ellipse 120% 80% at 50% -10%, rgba(255, 182, 39, 0.09), transparent 60%),
+    radial-gradient(ellipse 80% 60% at 100% 110%, rgba(255, 120, 20, 0.06), transparent 60%),
+    linear-gradient(rgba(255, 182, 39, 0.045) 1px, transparent 1px) 0 0 / 40px 40px,
+    linear-gradient(90deg, rgba(255, 182, 39, 0.045) 1px, transparent 1px) 0 0 / 40px 40px,
+    var(--bg);
+  background-attachment: fixed;
+}
+
+/* Скан-линии поверх всего: не ловят касания и почти не видны, но дают
+   экрану «электронную» фактуру. */
+:root[data-theme='cyber'] body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  background: repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.11) 0 1px, transparent 1px 4px);
+}
+
+/* Медленная световая полоса — как развёртка старого монитора. */
+:root[data-theme='cyber'] body::before {
+  content: '';
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: -20vh;
+  height: 20vh;
+  z-index: 9998;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent, rgba(255, 182, 39, 0.035) 50%, transparent);
+  animation: cyber-sweep 9s linear infinite;
+}
+
+@keyframes cyber-sweep {
+  to { transform: translateY(140vh); }
+}
+
+:root[data-theme='cyber'] ::selection {
+  background: var(--neon);
+  color: #050505;
+}
+
+:root[data-theme='cyber'] {
+  scrollbar-color: rgba(255, 182, 39, 0.4) var(--bg);
+}
+
+:root[data-theme='cyber'] ::-webkit-scrollbar-thumb {
+  background: rgba(255, 182, 39, 0.35);
+  border-radius: 0;
+}
+
+/* ---------- Типографика ---------- */
+
+:root[data-theme='cyber'] :is(h1, h2) {
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 18px rgba(255, 182, 39, 0.18);
+}
+
+:root[data-theme='cyber'] h3 {
+  letter-spacing: 0.03em;
+}
+
+/* Глитч главного заголовка: редкий короткий сбой раз в несколько секунд. */
+:root[data-theme='cyber'] :is(.glass-hero, .page-head, .hero) h1 {
+  animation: cyber-glitch 7s steps(1, end) infinite;
+}
+
+@keyframes cyber-glitch {
+  0%, 93%, 100% {
+    transform: none;
+    text-shadow: 0 0 18px rgba(255, 182, 39, 0.18);
+    clip-path: none;
+  }
+  94% {
+    transform: translate(-2px, 0) skewX(-6deg);
+    text-shadow: 2px 0 var(--glitch-a), -2px 0 var(--glitch-b);
+    clip-path: inset(10% 0 45% 0);
+  }
+  95% {
+    transform: translate(2px, 0);
+    text-shadow: -3px 0 var(--glitch-a), 3px 0 var(--glitch-b);
+    clip-path: inset(55% 0 5% 0);
+  }
+  96% {
+    transform: translate(-1px, 0) skewX(4deg);
+    text-shadow: 1px 0 var(--glitch-a), -1px 0 var(--glitch-b);
+    clip-path: none;
+  }
+}
+
+/* Подписи — как строки терминала: моноширинный шрифт и «//» вместо черты. */
+:root[data-theme='cyber'] .eyebrow {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  color: var(--neon);
+  text-shadow: 0 0 8px rgba(255, 182, 39, 0.45);
+}
+
+:root[data-theme='cyber'] .eyebrow::before {
+  content: '//';
+  width: auto;
+  height: auto;
+  background: none;
+  color: var(--neon-dim);
+}
+
+:root[data-theme='cyber'] :is(label, legend, th, time, small, .hero__meta span) {
+  font-family: var(--font-mono);
+  letter-spacing: 0.06em;
+}
+
+:root[data-theme='cyber'] :is(code, kbd, samp, .uid-block__value) {
+  font-family: var(--font-mono);
+  color: var(--neon-hot);
+}
+
+:root[data-theme='cyber'] a:not([class]) {
+  color: var(--gold-bright);
+  text-decoration-color: var(--neon-dim);
+}
+
+/* ---------- Шапка и нижняя панель ---------- */
+
+:root[data-theme='cyber'] .navbar {
+  background: rgba(5, 5, 5, 0.86);
+  border-bottom: 1px solid rgba(255, 182, 39, 0.3);
+  box-shadow: 0 1px 0 rgba(255, 182, 39, 0.08), 0 8px 24px -16px rgba(255, 182, 39, 0.45);
+}
+
+:root[data-theme='cyber'] .navbar__logo {
+  font-family: var(--font-mono);
+  letter-spacing: 0.24em;
+  color: var(--neon-hot);
+  text-shadow: var(--neon-glow);
+}
+
+:root[data-theme='cyber'] .navbar__logo:hover {
+  animation: cyber-jitter 0.3s steps(2, end) 1;
+}
+
+:root[data-theme='cyber'] .navbar__links :is(a, button):not(.button) {
+  font-family: var(--font-mono);
+  letter-spacing: 0.12em;
+}
+
+:root[data-theme='cyber'] .navbar__links a.active:not(.button) {
+  color: var(--neon-hot);
+  text-shadow: 0 0 10px rgba(255, 182, 39, 0.6);
+}
+
+:root[data-theme='cyber'] .navbar__links a.active::after {
+  background: var(--neon);
+  box-shadow: var(--neon-glow);
+}
+
+:root[data-theme='cyber'] .navbar__links button {
+  border-radius: 0;
+  border-color: var(--border-strong);
+}
+
+@media (max-width: 760px) {
+  :root[data-theme='cyber'] .bottom-nav {
+    background: rgba(5, 5, 5, 0.95);
+    border-top: 1px solid rgba(255, 182, 39, 0.35);
+    box-shadow: 0 -8px 24px -16px rgba(255, 182, 39, 0.5);
+  }
+
+  :root[data-theme='cyber'] .bottom-nav__item {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.08em;
+  }
+
+  :root[data-theme='cyber'] .bottom-nav__item.active {
+    color: var(--neon-hot);
+    text-shadow: 0 0 8px rgba(255, 182, 39, 0.6);
+  }
+
+  :root[data-theme='cyber'] .bottom-nav__item.active svg {
+    filter: drop-shadow(0 0 5px rgba(255, 182, 39, 0.7));
+  }
+}
+
+:root[data-theme='cyber'] .bottom-nav__action {
+  border-radius: 0;
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  background: var(--neon);
+  color: #050505;
+  box-shadow: none;
+}
+
+/* ---------- Поверхности: тонкая неоновая рамка, срезанные углы, HUD ----------
+   Крупные «витринные» блоки срезаются по двум углам (clip-path) с
+   прорисованной диагональю; на рабочих блоках, где внутри поля и меню,
+   срез не ставим, чтобы не обрезать выпадашки и рамки фокуса, — там
+   только уголки-скобки, как у прицела. */
+
+:root[data-theme='cyber'] :is(
+  .glass-hero,
+  .glass-card,
+  .today-card,
+  .feature-card,
+  .program-card,
+  .exercise-card,
+  .record-card,
+  .achievement,
+  .streak-card,
+  .muscle-card,
+  .empty-state
+) {
+  border-radius: 0;
+  border: 1px solid var(--border-strong);
+  background-color: rgba(12, 11, 9, 0.92);
+  backdrop-filter: none;
+  box-shadow: inset 0 0 0 1px rgba(255, 182, 39, 0.04), inset 0 0 40px -20px rgba(255, 182, 39, 0.25);
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--hud-cut)) 0,
+    100% var(--hud-cut),
+    100% 100%,
+    var(--hud-cut) 100%,
+    0 calc(100% - var(--hud-cut))
+  );
+  background-image:
+    linear-gradient(225deg, transparent calc(var(--hud-cut) * 0.7071 - 1px), var(--neon) calc(var(--hud-cut) * 0.7071 - 1px) calc(var(--hud-cut) * 0.7071 + 0.5px), transparent calc(var(--hud-cut) * 0.7071 + 0.5px)),
+    linear-gradient(45deg, transparent calc(var(--hud-cut) * 0.7071 - 1px), var(--neon) calc(var(--hud-cut) * 0.7071 - 1px) calc(var(--hud-cut) * 0.7071 + 0.5px), transparent calc(var(--hud-cut) * 0.7071 + 0.5px)),
+    linear-gradient(var(--neon), var(--neon)),
+    linear-gradient(var(--neon), var(--neon)),
+    linear-gradient(var(--neon), var(--neon)),
+    linear-gradient(var(--neon), var(--neon));
+  background-size:
+    var(--hud-cut) var(--hud-cut),
+    var(--hud-cut) var(--hud-cut),
+    var(--hud-tick) 1px,
+    1px var(--hud-tick),
+    var(--hud-tick) 1px,
+    1px var(--hud-tick);
+  background-position:
+    100% 0,
+    0 100%,
+    0 0,
+    0 0,
+    100% 100%,
+    100% 100%;
+  background-repeat: no-repeat;
+}
+
+:root[data-theme='cyber'] :is(.glass-card, .feature-card, .program-card, .exercise-card):hover {
+  border-color: var(--neon);
+  background-color: rgba(30, 22, 8, 0.92);
+  transform: none;
+}
+
+/* Фото в карточке «сегодня» и свечение героя живут в псевдоэлементах —
+   под янтарную гамму их тонируем, а не убираем. */
+:root[data-theme='cyber'] .today-card--cover::before {
+  filter: grayscale(1) sepia(0.6) hue-rotate(-12deg) saturate(1.6) contrast(1.15);
+  opacity: 0.4;
+}
+
+:root[data-theme='cyber'] .today-card::after,
+:root[data-theme='cyber'] .glass-hero__glow {
+  background: radial-gradient(circle, rgba(255, 182, 39, 0.16), transparent 65%);
+}
+
+/* HUD-метка в углу героя: «статус системы» с мигающей точкой. */
+:root[data-theme='cyber'] .glass-hero::after {
+  content: 'SYS // ONLINE';
+  position: absolute;
+  top: 14px;
+  right: calc(var(--hud-cut) + 12px);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.2em;
+  color: var(--neon-dim);
+  padding-left: 14px;
+  background: radial-gradient(circle at 4px 50%, var(--neon) 0 3px, transparent 3.5px);
+  animation: cyber-blink 1.6s steps(1, end) infinite;
+}
+
+/* На телефоне метке негде встать рядом с заголовком. */
+@media (max-width: 640px) {
+  :root[data-theme='cyber'] .glass-hero::after {
+    display: none;
+  }
+}
+
+@keyframes cyber-blink {
+  50% { background-image: none; }
+}
+
+/* Рабочие блоки: скобки по углам вместо среза. */
+:root[data-theme='cyber'] :is(
+  .admin-form,
+  .log-exercise,
+  .timer,
+  .calendar,
+  .plan-card,
+  .wizard-panel,
+  .day-card,
+  .readiness,
+  .targets,
+  .goal,
+  .coach,
+  .review,
+  .progress-chart,
+  .confirm,
+  .picker__item,
+  .admin-list li,
+  .program-exercise-list li,
+  .rest-timer,
+  .chat-feed,
+  .chat-composer
+) {
+  border-radius: 0;
+  border-color: var(--border-strong);
+  background-image:
+    linear-gradient(var(--neon), var(--neon)),
+    linear-gradient(var(--neon), var(--neon)),
+    linear-gradient(var(--neon), var(--neon)),
+    linear-gradient(var(--neon), var(--neon));
+  background-size: var(--hud-tick) 1px, 1px var(--hud-tick), var(--hud-tick) 1px, 1px var(--hud-tick);
+  background-position: 0 0, 0 0, 100% 100%, 100% 100%;
+  background-repeat: no-repeat;
+}
+
+:root[data-theme='cyber'] .confirm {
+  background-color: #0c0b09;
+  box-shadow: 0 0 0 1px rgba(255, 182, 39, 0.25), 0 0 60px -20px rgba(255, 182, 39, 0.45);
+}
+
+:root[data-theme='cyber'] .confirm::backdrop {
+  background:
+    repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.3) 0 1px, transparent 1px 3px),
+    rgba(3, 3, 3, 0.8);
+}
+
+/* ---------- Поля ввода ---------- */
+
+:root[data-theme='cyber'] :is(input:not([type='checkbox'], [type='radio'], [type='range']), select, textarea) {
+  border-radius: 0;
+  background-color: #080807;
+  border-color: rgba(255, 182, 39, 0.28);
+  caret-color: var(--neon);
+  font-family: var(--font-mono);
+  letter-spacing: 0;
+}
+
+:root[data-theme='cyber'] :is(input, select, textarea):focus-visible {
+  outline: 1px solid var(--neon);
+  outline-offset: 0;
+  border-color: var(--neon);
+  box-shadow: 0 0 0 3px rgba(255, 182, 39, 0.18), 0 0 16px -4px rgba(255, 182, 39, 0.6);
+}
+
+:root[data-theme='cyber'] :is(input[type='checkbox'], input[type='radio'], input[type='range']) {
+  accent-color: var(--neon);
+}
+
+/* ---------- Фокус ---------- */
+
+:root[data-theme='cyber'] :is(a, button, [tabindex]):focus-visible {
+  outline: 2px solid var(--neon-hot);
+  outline-offset: 3px;
+}
+
+/* ---------- Цифры как на табло ---------- */
+
+:root[data-theme='cyber'] :is(
+  .hero__meta strong,
+  .ring__value,
+  .streak-card strong,
+  .record-card strong,
+  .timer__value,
+  .rest-timer__value,
+  .level-bar,
+  .glass-card strong
+) {
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+  color: var(--neon-hot);
+  text-shadow: 0 0 10px rgba(255, 182, 39, 0.4);
+}
+
+/* Полосы прогресса и шкалы — неоновой нитью. */
+:root[data-theme='cyber'] :is(.level-bar, .muscle-bar__track) {
+  border-radius: 0;
+}
+
+/* Пилюли, чипы, бейджи и шкалы — без скруглений: в этой теме всё
+   прямоугольное, выбранное горит неоном. */
+:root[data-theme='cyber'] :is(
+  .feature-card__tag,
+  .program-card__badge,
+  .part,
+  .badge-recommended,
+  .bmi__scale,
+  .rep-zone,
+  .load-analysis__zone,
+  .ai-import__badge,
+  .attach__toggle,
+  .chat-pills button,
+  .next-target button,
+  .account__badge,
+  .level-bar__fill,
+  .chip,
+  .period-switch,
+  .muscle-bar__fill,
+  .readiness__options button,
+  .session-coach__quick button,
+  .targets__bar,
+  .targets__fill,
+  .goal__scale,
+  .goal__fill,
+  .log-rir__options button,
+  .review__record,
+  .session-demo__take,
+  .avatar-panel__pump,
+  button.wardrobe__item,
+  .calendar__cell
+) {
+  border-radius: 0;
+}
+
+:root[data-theme='cyber'] :is(.part, .chip, .chat-pills button, .readiness__options button, .log-rir__options button, .session-coach__quick button) {
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+}
+
+:root[data-theme='cyber'] :is(.part.is-selected, .chip.is-active, .period-switch button.is-active, .readiness__options button.is-selected, .log-rir__options button.is-selected) {
+  box-shadow: 0 0 12px -2px rgba(255, 182, 39, 0.6);
+}
+
+:root[data-theme='cyber'] .session-coach-fab {
+  border-radius: 0;
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+}
+
+/* ---------- Кнопки ---------- */
+/* Форма и механика общие (index.css), здесь только характер темы:
+   постоянное слабое свечение (--btn-glow-rest) и короткий сбой при наведении. */
+
+:root[data-theme='cyber'] :is(.button, .button--secondary, .button--danger):hover:not(:disabled) {
+  animation: cyber-jitter 0.28s steps(2, end) 1;
+}
+
+@keyframes cyber-jitter {
+  0% { transform: translate(-1px, 0); text-shadow: 1px 0 var(--glitch-a), -1px 0 var(--glitch-b); }
+  50% { transform: translate(1px, 0); text-shadow: -1px 0 var(--glitch-a), 1px 0 var(--glitch-b); }
+  100% { transform: none; text-shadow: none; }
+}
+
+/* ---------- Подвал ---------- */
+
+:root[data-theme='cyber'] .footer {
+  border-top: 1px solid rgba(255, 182, 39, 0.2);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+
+/* ---------- Без движения ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-theme='cyber'] body::before {
+    display: none;
+  }
+
+  :root[data-theme='cyber'] :is(.glass-hero, .page-head, .hero) h1,
+  :root[data-theme='cyber'] .glass-hero::after,
+  :root[data-theme='cyber'] .navbar__logo:hover,
+  :root[data-theme='cyber'] :is(.button, .button--secondary, .button--danger):hover {
+    animation: none;
+  }
+}

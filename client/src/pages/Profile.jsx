@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useTheme } from '../context/ThemeContext.jsx'
 import { api } from '../api/firestore.js'
 import { useAsyncAction } from '../hooks/useAsyncAction.js'
 import { friendlyErrorMessage } from '../utils/errors.js'
@@ -397,6 +398,8 @@ export default function Profile() {
             {accountNotice && <p className="uid-block__hint">{accountNotice}</p>}
           </div>
 
+          <ThemePicker />
+
           <h3>Мой ID</h3>
           <div className="uid-block">
             <code className="uid-block__value">{user?.uid}</code>
@@ -529,5 +532,38 @@ export default function Profile() {
 
       <ConfirmDialog {...confirmProps} />
     </section>
+  )
+}
+
+// Оформление хранится на устройстве, а не в профиле: на телефоне в зале
+// и на рабочем ноутбуке человеку может хотеться разного.
+const THEME_OPTIONS = [
+  { value: 'dark', label: 'Современная, тёмная', hint: 'Основная тема: графит и золото' },
+  { value: 'light', label: 'Современная, светлая', hint: 'Та же тема для яркого света' },
+  { value: 'cyber', label: 'Киберпанк', hint: 'Чёрный, янтарный неон, HUD' },
+]
+
+function ThemePicker() {
+  const { theme, setTheme } = useTheme()
+  return (
+    <fieldset className="theme-picker">
+      <legend><h3>Оформление</h3></legend>
+      {THEME_OPTIONS.map((option) => (
+        <label key={option.value} className={`theme-picker__option theme-picker__option--${option.value}`}>
+          <input
+            type="radio"
+            name="app-theme"
+            value={option.value}
+            checked={theme === option.value}
+            onChange={() => setTheme(option.value)}
+          />
+          <span className="theme-picker__swatch" aria-hidden="true" />
+          <span className="theme-picker__text">
+            <strong>{option.label}</strong>
+            <span>{option.hint}</span>
+          </span>
+        </label>
+      ))}
+    </fieldset>
   )
 }

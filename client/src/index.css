@@ -539,70 +539,464 @@ main:focus {
   margin: 0 auto;
 }
 
-/* ---------- Buttons ---------- */
+/* ---------- Buttons ----------
+   Один язык для всех кнопок приложения: «слиток с гранью».
+   Срезаны два противоположных угла (фаска), под кнопкой лежит тёмная
+   кромка, как у блина штанги: при нажатии кнопка проседает на неё.
+   Основная отлита из шлифованного золота, вторичная из графита (на светлой
+   теме из белой эмали), при наведении у вторичной слева направо идёт
+   заливка. Всё рисуется двумя псевдоэлементами со своим clip-path:
+   ::before — обод и кромка, ::after — лицевая пластина. Сам элемент не
+   обрезается, поэтому рамка фокуса видна целиком.
 
-.button {
+   Классы: .button (основная), .button--secondary, .button--ghost,
+   .button--danger, .button--icon, .button--sm, .button--nav, .button--block.
+   Кнопки внутри старых блоков (таймер, админка, формы, ИИ-действия)
+   подключены к тем же правилам списком ниже, без своих разовых стилей.
+   Темы меняют только переменные --btn-*, форма и поведение общие. */
+
+:root {
+  --btn-h: 48px;
+  --btn-h-sm: 44px;
+  --btn-pad: 1.6rem;
+  --btn-pad-sm: 1.05rem;
+  --btn-cut: 9px;
+  --btn-cut-sm: 7px;
+  --btn-drop: 3px;
+  --btn-font: var(--font-display);
+  --btn-size: 0.76rem;
+  --btn-size-sm: 0.7rem;
+  --btn-weight: 600;
+  --btn-tracking: 0.14em;
+  --btn-transform: uppercase;
+  --btn-lift: -1px;
+  --btn-speed: 0.16s;
+
+  /* Основная: шлифованное золото, блик уезжает при наведении. */
+  --btn-primary-face: linear-gradient(105deg, #b48a45 0%, #e9cf98 28%, #c9a462 46%, #f3dcab 62%, #b8914d 100%);
+  --btn-primary-size: 220% 100%;
+  --btn-primary-pos: 0% 0;
+  --btn-primary-pos-hover: 100% 0;
+  --btn-primary-rim: #f0d9a6;
+  --btn-primary-plate: #5e4720;
+  --btn-primary-fg: #120d05;
+  --btn-primary-fg-hover: #120d05;
+  --btn-primary-glow: 0 8px 14px rgba(185, 152, 94, 0.38);
+
+  /* Вторичная: графит, обод золотеет, заливка идёт слева. */
+  --btn-secondary-base: #18191c;
+  --btn-secondary-sweep: #23231f;
+  --btn-secondary-rim: rgba(255, 255, 255, 0.2);
+  --btn-secondary-rim-hover: var(--gold);
+  --btn-secondary-plate: rgba(0, 0, 0, 0.6);
+  --btn-secondary-fg: var(--text);
+  --btn-secondary-fg-hover: var(--gold-bright);
+
+  /* Акцентная вторичная — действия ИИ-тренера: золотой обод сразу. */
+  --btn-accent-rim: rgba(216, 187, 132, 0.6);
+  --btn-accent-fg: var(--gold-bright);
+
+  --btn-danger-face: linear-gradient(180deg, #cf7067, #b0534b);
+  --btn-danger-rim: #e08f86;
+  --btn-danger-plate: #55211d;
+  --btn-danger-glow: 0 8px 14px rgba(176, 83, 75, 0.38);
+  --btn-danger-sweep: #b0534b;
+  --btn-danger-fg: #fff5f3;
+  /* Опасная вторичная (в строке списка): видна сразу, не только по ховеру. */
+  --btn-danger-soft-rim: rgba(207, 112, 103, 0.55);
+  --btn-danger-soft-fg: #e0918a;
+
+  --btn-ghost-fg: var(--text-muted);
+  --btn-ghost-fg-hover: var(--text);
+  --btn-ghost-line: var(--gold);
+
+  --btn-disabled-face: #1a1b1e;
+  --btn-disabled-rim: rgba(255, 255, 255, 0.08);
+  --btn-disabled-fg: #76767c;
+  --btn-focus: var(--gold-bright);
+}
+
+:root[data-theme='light'] {
+  --btn-primary-rim: #e2c387;
+  --btn-primary-plate: #6b5224;
+  --btn-primary-glow: 0 6px 12px rgba(122, 92, 38, 0.28);
+
+  --btn-secondary-base: #ffffff;
+  --btn-secondary-sweep: #f6efe0;
+  --btn-secondary-rim: rgba(10, 9, 6, 0.24);
+  --btn-secondary-rim-hover: #a3803f;
+  --btn-secondary-plate: rgba(10, 9, 6, 0.2);
+  --btn-secondary-fg: var(--text);
+  --btn-secondary-fg-hover: #6b5224;
+
+  --btn-accent-rim: rgba(138, 106, 52, 0.6);
+  --btn-accent-fg: #6b5224;
+
+  --btn-danger-face: linear-gradient(180deg, #b9554d, #9c3f38);
+  --btn-danger-rim: #c9665e;
+  --btn-danger-plate: #5a1f1a;
+  --btn-danger-sweep: #9c3f38;
+  --btn-danger-fg: #ffffff;
+  --btn-danger-soft-rim: rgba(168, 69, 62, 0.5);
+  --btn-danger-soft-fg: #9c3f38;
+
+  --btn-ghost-fg: var(--text-muted);
+  --btn-ghost-fg-hover: var(--text);
+
+  --btn-disabled-face: #ecebe6;
+  --btn-disabled-rim: rgba(10, 9, 6, 0.1);
+  --btn-disabled-fg: #6f6f75;
+  --btn-focus: #8a6a34;
+}
+
+/* --- Скелет: общий для всех видов ---
+   :where() держит специфичность нулевой: раскладка конкретного блока
+   (ширина, отступы) спокойно переопределяет кнопку, а вид задают только
+   переменные ниже. Кнопки старых блоков без класса подключены списком. */
+.button,
+.button--ghost,
+:where(.chat-composer__bar button,
+  .session-coach__composer button,
+  .admin-form__actions button:not([type='button']),
+  .plan-card button,
+  .timer button,
+  .admin-list__actions button,
+  .admin-list li > button,
+  .picker__item button,
+  .ai-import__actions button,
+  .ai-import__card button,
+  .chat-actions button,
+  .coach__actions button,
+  .uid-block button,
+  .profile-field__summary button,
+  .account__actions button,
+  .crop__actions button:not(.button),
+  .admin-form__actions button[type='button'],
+  .readiness__head button,
+  .goal__head button,
+  .calendar__head button,
+  .wizard-actions button:not(.button),
+  .crash__actions button,
+  .rest-timer button) {
+  --c: var(--btn-cut);
+  --press: 0px;
+  --drop: var(--btn-drop);
+  --face: var(--btn-primary-face);
+  --face-size: var(--btn-primary-size);
+  --face-pos: var(--btn-primary-pos);
+  --face-pos-hover: var(--btn-primary-pos-hover);
+  --rim: var(--btn-primary-rim);
+  --plate: var(--btn-primary-plate);
+  --fg: var(--btn-primary-fg);
+  --fg-hover: var(--btn-primary-fg-hover);
+  --glow: var(--btn-primary-glow);
+  /* Свечение в покое: в основной теме его нет, киберпанк задаёт своё. */
+  --glow-now: var(--btn-glow-rest, 0 0 0 transparent);
+
+  position: relative;
+  isolation: isolate;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-top: 2rem;
-  padding: 1.05rem 2.6rem;
-  background: linear-gradient(180deg, #ffffff 0%, #ece7db 100%);
-  color: var(--accent-contrast);
-  border-radius: var(--radius-lg);
+  gap: 0.6em;
+  min-height: var(--btn-h);
+  padding: 0 var(--btn-pad);
+  margin-bottom: var(--drop);
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--fg);
+  font-family: var(--btn-font);
+  font-size: var(--btn-size);
+  font-weight: var(--btn-weight);
+  letter-spacing: var(--btn-tracking);
+  text-transform: var(--btn-transform);
+  line-height: 1.2;
+  text-align: center;
   text-decoration: none;
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 0.76rem;
-  text-transform: uppercase;
-  letter-spacing: 0.15em;
-  border: 1px solid #ffffff;
   cursor: pointer;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 18px 38px -18px rgba(185, 152, 94, 0.5);
-  transition: background 0.25s var(--ease), color 0.2s var(--ease), border-color 0.25s var(--ease), transform 0.2s var(--ease), box-shadow 0.25s var(--ease);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transform: translateY(var(--press));
+  filter: drop-shadow(var(--glow-now));
+  transition:
+    transform var(--btn-speed) var(--ease),
+    color 0.22s var(--ease),
+    filter 0.25s var(--ease);
+
+  &::before,
+  &::after {
+    content: '';
+    position: absolute;
+    pointer-events: none;
+  }
+
+  /* Обод сверху и кромка снизу: кромка выглядывает на --drop пикселей. */
+  &::before {
+    inset: 0 0 calc(var(--press) - var(--drop)) 0;
+    z-index: -2;
+    background: linear-gradient(180deg, var(--rim) 0 calc(100% - var(--drop) + var(--press) - 1px), var(--plate) 0);
+    clip-path: polygon(var(--c) 0, 100% 0, 100% calc(100% - var(--c)), calc(100% - var(--c)) 100%, 0 100%, 0 var(--c));
+    transition: inset var(--btn-speed) var(--ease);
+  }
+
+  /* Лицевая пластина — на пиксель меньше обода. */
+  &::after {
+    inset: 1px;
+    z-index: -1;
+    background: var(--face);
+    background-size: var(--face-size);
+    background-position: var(--face-pos);
+    clip-path: polygon(calc(var(--c) - 0.4px) 0, 100% 0, 100% calc(100% - var(--c) + 0.4px), calc(100% - var(--c) + 0.4px) 100%, 0 100%, 0 calc(var(--c) - 0.4px));
+    transition: background-position 0.45s var(--ease);
+  }
+
+  & svg {
+    width: 1.15em;
+    height: 1.15em;
+    flex: none;
+  }
+
+  &:hover:not(:disabled):not([aria-disabled='true']) {
+    --press: var(--btn-lift);
+    --glow-now: var(--glow);
+    --face-pos: var(--face-pos-hover);
+    color: var(--fg-hover);
+  }
+
+  &:active:not(:disabled):not([aria-disabled='true']) {
+    --press: var(--drop);
+    --glow-now: 0 0 0 transparent;
+    transition-duration: 0.07s;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--btn-focus);
+    outline-offset: 3px;
+  }
+
+  &:disabled,
+  &[aria-disabled='true'] {
+    --glow-now: 0 0 0 transparent;
+    --face: linear-gradient(var(--btn-disabled-face), var(--btn-disabled-face));
+    --face-size: 100% 100%;
+    --rim: var(--btn-disabled-rim);
+    --plate: var(--btn-disabled-rim);
+    --fg: var(--btn-disabled-fg);
+    --fg-hover: var(--btn-disabled-fg);
+    cursor: not-allowed;
+  }
+
+  &[aria-busy='true'] {
+    cursor: progress;
+  }
 }
 
-.button:hover {
-  background: linear-gradient(180deg, var(--gold-bright) 0%, #c2a066 100%);
-  border-color: var(--gold-bright);
-  color: var(--accent-contrast);
-  transform: translateY(-1px);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.3) inset, 0 22px 44px -16px rgba(185, 152, 94, 0.6);
+/* Отступ сверху у основной кнопки — на него опираются герой и пустые
+   состояния; в рядах кнопок блоки обнуляют его сами. */
+.button {
+  margin-top: 2rem;
 }
 
-/* На светлой странице белая заливка кнопки сливается с фоном без тёмной
-   окантовки — граница и тень берут на себя работу тёмного бордера/свечения. */
-:root[data-theme='light'] .button {
-  border-color: rgba(10, 9, 6, 0.14);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 14px 28px -16px rgba(10, 9, 6, 0.22);
+/* --- Виды --- */
+.button--secondary,
+:where(.plan-card button,
+  .timer button,
+  .admin-list__actions button,
+  .admin-list li > button,
+  .picker__item button,
+  .ai-import__actions button,
+  .ai-import__card button,
+  .chat-actions button,
+  .coach__actions button,
+  .uid-block button,
+  .profile-field__summary button,
+  .account__actions button,
+  .crop__actions button:not(.button),
+  .admin-form__actions button[type='button'],
+  .readiness__head button,
+  .goal__head button,
+  .calendar__head button,
+  .wizard-actions button:not(.button),
+  .crash__actions button,
+  .rest-timer button) {
+  --face: linear-gradient(90deg, var(--btn-secondary-sweep) 0 50%, var(--btn-secondary-base) 50% 100%);
+  --face-size: 200% 100%;
+  --face-pos: 100% 0;
+  --face-pos-hover: 0% 0;
+  --rim: var(--btn-secondary-rim);
+  --plate: var(--btn-secondary-plate);
+  --fg: var(--btn-secondary-fg);
+  --fg-hover: var(--btn-secondary-fg-hover);
+  --glow: 0 0 0 transparent;
+
+  &:hover:not(:disabled):not([aria-disabled='true']) {
+    --rim: var(--btn-secondary-rim-hover);
+  }
+
+  /* Необратимое действие во вторичном виде: красный обод виден сразу,
+     а не только по ховеру, иначе на телефоне его не отличить. */
+  &.is-danger:not(:disabled) {
+    --rim: var(--btn-danger-soft-rim);
+    --fg: var(--btn-danger-soft-fg);
+    --fg-hover: var(--btn-danger-fg);
+    --face: linear-gradient(90deg, var(--btn-danger-sweep) 0 50%, var(--btn-secondary-base) 50% 100%);
+  }
+
+  &.is-danger:hover:not(:disabled):not([aria-disabled='true']) {
+    --rim: var(--btn-danger-rim);
+  }
 }
 
-:root[data-theme='light'] .button:hover {
-  border-color: var(--gold-bright);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.3) inset, 0 18px 34px -14px rgba(163, 128, 63, 0.4);
+/* Действия ИИ-тренера: золотой обод сразу. */
+:where(.ai-import__actions button,
+  .chat-actions button,
+  .coach__actions button) {
+  --rim: var(--btn-accent-rim);
+  --fg: var(--btn-accent-fg);
+}
+
+.button--danger {
+  --face: var(--btn-danger-face);
+  --face-size: 100% 100%;
+  --face-pos: 0 0;
+  --face-pos-hover: 0 0;
+  --rim: var(--btn-danger-rim);
+  --plate: var(--btn-danger-plate);
+  --fg: var(--btn-danger-fg);
+  --fg-hover: var(--btn-danger-fg);
+  --glow: var(--btn-danger-glow);
 }
 
 .button--ghost {
-  background: transparent;
-  border: 1px solid transparent;
-  color: var(--text-faint);
-  text-decoration: none;
-  text-underline-offset: 4px;
+  --glow-now: 0 0 0 transparent;
+  --face: none;
+  --rim: transparent;
+  --plate: transparent;
+  --drop: 0px;
+  --fg: var(--btn-ghost-fg);
+  --fg-hover: var(--btn-ghost-fg-hover);
+  --glow: 0 0 0 transparent;
+  padding-inline: 1rem;
+  text-underline-offset: 6px;
+  text-decoration-thickness: 1px;
+
+  &:hover:not(:disabled):not([aria-disabled='true']) {
+    --press: 0px;
+    text-decoration-line: underline;
+    text-decoration-color: var(--btn-ghost-line);
+  }
+
+  &:disabled {
+    --face: none;
+    --rim: transparent;
+    --plate: transparent;
+  }
 }
 
-.button--ghost:hover {
-  color: var(--text-muted);
-  background: transparent;
-  transform: none;
-  text-decoration: underline;
-  text-decoration-color: var(--border-strong);
+/* --- Размеры --- */
+.button--sm,
+:where(.plan-card button,
+  .timer button,
+  .admin-list__actions button,
+  .admin-list li > button,
+  .picker__item button,
+  .ai-import__actions button,
+  .ai-import__card button,
+  .chat-actions button,
+  .coach__actions button,
+  .uid-block button,
+  .profile-field__summary button,
+  .account__actions button,
+  .crop__actions button:not(.button),
+  .admin-form__actions button[type='button'],
+  .readiness__head button,
+  .goal__head button,
+  .calendar__head button) {
+  --c: var(--btn-cut-sm);
+  min-height: var(--btn-h-sm);
+  padding-inline: var(--btn-pad-sm);
+  font-size: var(--btn-size-sm);
+  letter-spacing: calc(var(--btn-tracking) * 0.75);
+}
+
+.button--icon,
+:where(.calendar__head button) {
+  --c: var(--btn-cut-sm);
+  min-width: var(--btn-h);
+  padding: 0;
+}
+
+.button--icon.button--sm {
+  min-width: var(--btn-h-sm);
+}
+
+.button--block {
+  display: flex;
+  width: 100%;
 }
 
 .button--nav {
   margin-top: 0;
-  padding: 0.55rem 1.35rem;
+  min-height: var(--btn-h-sm);
+  padding-inline: 1.2rem;
   font-size: 0.68rem;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset, 0 8px 20px -12px rgba(185, 152, 94, 0.45);
+}
+
+/* Крутилка внутри кнопки: <span class="button__spinner" aria-hidden="true" /> */
+.button__spinner {
+  width: 1.1em;
+  height: 1.1em;
+  flex: none;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  animation: button-spin 0.7s linear infinite;
+}
+
+@keyframes button-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button,
+.button--ghost,
+:where(.chat-composer__bar button,
+  .session-coach__composer button,
+  .admin-form__actions button:not([type='button']),
+  .plan-card button,
+  .timer button,
+  .admin-list__actions button,
+  .admin-list li > button,
+  .picker__item button,
+  .ai-import__actions button,
+  .ai-import__card button,
+  .chat-actions button,
+  .coach__actions button,
+  .uid-block button,
+  .profile-field__summary button,
+  .account__actions button,
+  .crop__actions button:not(.button),
+  .admin-form__actions button[type='button'],
+  .readiness__head button,
+  .goal__head button,
+  .calendar__head button,
+  .wizard-actions button:not(.button),
+  .crash__actions button,
+  .rest-timer button) {
+    --btn-lift: 0px;
+    transition: none;
+
+    &::before,
+    &::after {
+      transition: none;
+    }
+  }
+
+  .button__spinner {
+    animation-duration: 2.4s;
+  }
 }
 
 /* ---------- Tilt card ---------- */
@@ -1045,7 +1439,6 @@ main:focus {
 .spline-showcase__cta {
   align-self: flex-start;
   margin-top: 1.75rem;
-  padding: 0.85rem 1.6rem;
 }
 
 .spotlight {
@@ -1830,26 +2223,10 @@ main:focus {
 
 .auth-card__submit {
   margin-top: 0.5rem;
-  padding: 1rem;
-  border-radius: 4px;
-  border: 1px solid #ffffff;
-  background: linear-gradient(180deg, #ffffff 0%, #ece7db 100%);
-  color: var(--accent-contrast);
-  font-family: var(--font-display);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  font-size: 0.78rem;
-  cursor: pointer;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 16px 34px -16px rgba(185, 152, 94, 0.5);
-  transition: background 0.25s var(--ease), border-color 0.25s var(--ease), transform 0.2s var(--ease), box-shadow 0.25s var(--ease);
 }
 
-.auth-card__submit:hover {
-  background: linear-gradient(180deg, var(--gold-bright) 0%, #c2a066 100%);
-  border-color: var(--gold-bright);
-  transform: translateY(-1px);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.3) inset, 0 20px 40px -14px rgba(185, 152, 94, 0.6);
+.auth-card__google {
+  margin-top: 0;
 }
 
 /* Согласие на обработку персональных данных при регистрации. */
@@ -1894,25 +2271,16 @@ main:focus {
   background: var(--border);
 }
 
-.auth-card__google {
-  width: 100%;
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-  padding: 0.9rem;
-  border-radius: 4px;
-  font-family: var(--font-display);
-  font-weight: 500;
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  cursor: pointer;
-  transition: border-color 0.2s var(--ease), color 0.2s var(--ease);
-}
-
-.auth-card__google:hover {
-  border-color: var(--border-strong);
-  color: var(--text);
+/* Карточка входа всегда тёмная, даже в светлой теме, поэтому вторичная
+   кнопка в ней берёт тёмные значения. В киберпанке своя палитра. */
+:root:not([data-theme='cyber']) .auth-card {
+  --btn-secondary-base: #18191c;
+  --btn-secondary-sweep: #23231f;
+  --btn-secondary-rim: rgba(255, 255, 255, 0.2);
+  --btn-secondary-plate: rgba(0, 0, 0, 0.6);
+  --btn-secondary-fg: #f3f3f1;
+  --btn-secondary-fg-hover: #d8bb84;
+  --btn-focus: #d8bb84;
 }
 
 .auth-card__footer {
@@ -2015,29 +2383,6 @@ main:focus {
   display: flex;
   gap: 0.6rem;
   margin-top: 0.25rem;
-}
-
-.admin-form__actions button {
-  padding: 0.65rem 1.4rem;
-  border-radius: var(--radius);
-  border: 1px solid var(--text);
-  background: var(--text);
-  /* Заливка — это var(--text), поэтому подпись должна контрастировать именно
-     с ней, то есть равняться var(--bg): var(--accent-contrast) тут не
-     годится — он всегда тёмный, а в светлой теме заливка тоже тёмная. */
-  color: var(--bg);
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  cursor: pointer;
-  transition: background 0.2s var(--ease), color 0.2s var(--ease);
-}
-
-.admin-form__actions button:hover {
-  background: var(--gold-bright);
-  border-color: var(--gold-bright);
 }
 
 .admin-form__actions button[type='button'] {
@@ -2176,66 +2521,6 @@ main:focus {
 .number-input:focus {
   outline: none;
   border-color: var(--gold);
-}
-
-.admin-list__actions button {
-  background: none;
-  border: 1px solid var(--border-strong);
-  color: var(--text-muted);
-  border-radius: var(--radius);
-  padding: 0.4rem 0.85rem;
-  font-family: var(--font-display);
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  cursor: pointer;
-  transition: border-color 0.2s var(--ease), color 0.2s var(--ease);
-}
-
-.admin-list__actions button:hover {
-  border-color: var(--gold);
-  color: var(--gold-bright);
-}
-
-/* Страховка: кнопка прямо в строке списка, без обёртки __actions,
-   иначе она отрисовалась бы системным серым прямоугольником. */
-.admin-list li > button {
-  background: none;
-  border: 1px solid var(--border-strong);
-  color: var(--text-muted);
-  border-radius: var(--radius);
-  padding: 0.4rem 0.85rem;
-  font-family: var(--font-display);
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  cursor: pointer;
-  transition: border-color 0.2s var(--ease), color 0.2s var(--ease);
-}
-
-.admin-list li > button:hover:not(:disabled) {
-  border-color: var(--gold);
-  color: var(--gold-bright);
-}
-
-.admin-list li > button:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-/* Необратимые действия (удалить/убрать) помечаем цветом сразу, не только
-   по ховеру — иначе на тач-экране разница с обычной кнопкой не видна. */
-.admin-list__actions button.is-danger,
-.admin-list li > button.is-danger {
-  border-color: rgba(185, 97, 91, 0.4);
-  color: var(--danger);
-}
-
-.admin-list__actions button.is-danger:hover:not(:disabled),
-.admin-list li > button.is-danger:hover:not(:disabled) {
-  border-color: var(--danger);
-  color: var(--danger);
-  background: rgba(185, 97, 91, 0.08);
 }
 
 .checkbox-field {
@@ -2448,28 +2733,6 @@ main:focus {
 
 .picker__item button {
   flex-shrink: 0;
-  padding: 0.5rem 0.9rem;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  background: none;
-  color: var(--text-muted);
-  font-family: var(--font-display);
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  cursor: pointer;
-  transition: border-color 0.2s var(--ease), color 0.2s var(--ease);
-}
-
-.picker__item button:hover:not(:disabled) {
-  border-color: var(--gold);
-  color: var(--gold-bright);
-}
-
-.picker__item button:disabled {
-  border-color: transparent;
-  color: var(--gold);
-  cursor: default;
 }
 
 .picker__more {
@@ -2790,28 +3053,6 @@ main:focus {
   color: var(--text);
 }
 
-.calendar__head button {
-  width: 2rem;
-  height: 2rem;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  background: none;
-  color: var(--text-muted);
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: border-color 0.2s var(--ease), color 0.2s var(--ease);
-}
-
-.calendar__head button:hover:not(:disabled) {
-  border-color: var(--gold);
-  color: var(--gold-bright);
-}
-
-.calendar__head button:disabled {
-  opacity: 0.3;
-  cursor: default;
-}
-
 .calendar__weekdays,
 .calendar__grid {
   display: grid;
@@ -3008,30 +3249,6 @@ main:focus {
   margin-top: 1.75rem;
 }
 
-.wizard-actions button:not(.button) {
-  padding: 0.7rem 1.5rem;
-  background: none;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  color: var(--text-muted);
-  font-family: var(--font-display);
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  cursor: pointer;
-  transition: border-color 0.2s var(--ease), color 0.2s var(--ease);
-}
-
-.wizard-actions button:not(.button):hover:not(:disabled) {
-  border-color: var(--gold);
-  color: var(--gold-bright);
-}
-
-.wizard-actions button:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
 .wizard-actions .button {
   margin-top: 0;
 }
@@ -3076,25 +3293,6 @@ main:focus {
   font-variant-numeric: tabular-nums;
 }
 
-.plan-card button {
-  padding: 0.6rem 1.3rem;
-  background: none;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  color: var(--text-muted);
-  font-family: var(--font-display);
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  cursor: pointer;
-  transition: border-color 0.2s var(--ease), color 0.2s var(--ease);
-}
-
-.plan-card button:hover:not(:disabled) {
-  border-color: var(--gold);
-  color: var(--gold-bright);
-}
-
 /* ---------- Workout timer ---------- */
 
 .timer {
@@ -3124,29 +3322,6 @@ main:focus {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--text-muted);
-}
-
-.timer button {
-  background: none;
-  border: 1px solid var(--border-strong);
-  color: var(--text-muted);
-  border-radius: var(--radius);
-  padding: 0.55rem 1.2rem;
-  font-family: var(--font-display);
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  cursor: pointer;
-  transition: border-color 0.2s var(--ease), color 0.2s var(--ease);
-}
-
-.timer button:hover {
-  border-color: var(--gold);
-  color: var(--gold-bright);
-}
-
-.timer button {
-  min-height: 44px;
 }
 
 /* Идущая тренировка прилипает под шапкой: время и «сколько подходов
@@ -3273,33 +3448,16 @@ main:focus {
 }
 
 .rest-timer button {
-  min-width: 48px;
-  min-height: 48px;
-  padding: 0 0.7rem;
-  border: 1px solid var(--border-strong);
-  border-radius: 10px;
-  background: var(--bg);
-  color: var(--text);
   font-family: var(--font-numeric);
   font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: border-color 0.18s var(--ease), color 0.18s var(--ease), transform 0.12s var(--ease);
-}
-
-.rest-timer button:hover {
-  border-color: var(--gold);
-  color: var(--gold-bright);
-}
-
-.rest-timer button:active {
-  transform: scale(0.95);
+  letter-spacing: 0.04em;
+  padding-inline: 0.8rem;
 }
 
 .rest-timer .rest-timer__skip {
-  font-family: var(--font-display);
-  font-size: 0.78rem;
-  letter-spacing: 0.06em;
+  font-family: var(--btn-font);
+  font-size: var(--btn-size-sm);
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
@@ -3322,9 +3480,10 @@ main:focus {
 }
 
 .rest-timer.is-finished .rest-timer__skip {
-  background: var(--accent-contrast);
-  border-color: var(--accent-contrast);
-  color: var(--gold-bright);
+  --face: linear-gradient(var(--accent-contrast), var(--accent-contrast));
+  --rim: var(--accent-contrast);
+  --fg: var(--gold-bright);
+  --fg-hover: var(--gold-bright);
 }
 
 @keyframes rest-pulse {
@@ -3435,33 +3594,9 @@ main:focus {
   margin-top: 0.8rem;
 }
 
-.ai-import__actions button {
-  padding: 0.65rem 1.25rem;
-  border: 1px solid var(--gold);
-  border-radius: var(--radius);
-  background: rgba(185, 152, 94, 0.12);
-  color: var(--gold-bright);
-  font-family: var(--font-display);
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  cursor: pointer;
-  transition: background 0.2s var(--ease);
-}
-
-.ai-import__actions button:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
-.ai-import__actions button:not(:disabled):hover {
-  background: rgba(185, 152, 94, 0.22);
-}
-
-.ai-import__clear {
-  border-color: var(--border-strong) !important;
-  background: none !important;
-  color: var(--text-muted) !important;
+.ai-import__actions .ai-import__clear {
+  --rim: var(--btn-secondary-rim);
+  --fg: var(--btn-secondary-fg);
 }
 
 .ai-import__summary {
@@ -3503,25 +3638,6 @@ main:focus {
 .ai-import__card li small {
   color: var(--gold);
   white-space: nowrap;
-}
-
-.ai-import__card button {
-  padding: 0.5rem 1rem;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  background: none;
-  color: var(--text);
-  font-family: var(--font-display);
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  cursor: pointer;
-  transition: border-color 0.2s var(--ease), color 0.2s var(--ease);
-}
-
-.ai-import__card button:hover {
-  border-color: var(--gold);
-  color: var(--gold-bright);
 }
 
 /* ---------- Кнопки ИИ-тренера ---------- */
@@ -4035,38 +4151,6 @@ main:focus {
   color: var(--text-faint);
 }
 
-.chat-composer__bar button {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.6rem 1.25rem;
-  border: 1px solid #ffffff;
-  border-radius: 10px;
-  background: linear-gradient(180deg, #ffffff 0%, #ece7db 100%);
-  color: var(--accent-contrast);
-  font-family: var(--font-display);
-  font-size: 0.72rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.09em;
-  cursor: pointer;
-  transition: background 0.25s var(--ease), transform 0.2s var(--ease), opacity 0.2s var(--ease);
-}
-
-.chat-composer__bar button:disabled {
-  opacity: 0.4;
-  cursor: default;
-  background: rgba(255, 255, 255, 0.06);
-  border-color: var(--border);
-  color: var(--text-faint);
-}
-
-.chat-composer__bar button:not(:disabled):hover {
-  background: linear-gradient(180deg, var(--gold-bright) 0%, #c2a066 100%);
-  border-color: var(--gold-bright);
-  transform: translateY(-1px);
-}
-
 .chat-spinner {
   width: 12px;
   height: 12px;
@@ -4120,29 +4204,6 @@ main:focus {
   margin-top: 1.75rem;
 }
 
-.chat-actions button {
-  padding: 0.7rem 1.3rem;
-  border: 1px solid var(--gold);
-  border-radius: 10px;
-  background: rgba(185, 152, 94, 0.1);
-  color: var(--gold-bright);
-  font-family: var(--font-display);
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  cursor: pointer;
-  transition: background 0.2s var(--ease);
-}
-
-.chat-actions button:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.chat-actions button:not(:disabled):hover {
-  background: rgba(185, 152, 94, 0.2);
-}
-
 .chat-actions__hint {
   font-size: 0.78rem;
   color: var(--text-faint);
@@ -4164,9 +4225,6 @@ main:focus {
     text-align: center;
   }
 
-  .chat-composer__bar button {
-    justify-content: center;
-  }
 }
 
 /* Анимации фона и всплытий заметны, поэтому уважаем системную настройку. */
@@ -4592,25 +4650,6 @@ main:focus {
   overflow-wrap: anywhere;
 }
 
-.uid-block button {
-  padding: 0.6rem 1.1rem;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  background: none;
-  color: var(--text-muted);
-  font-family: var(--font-display);
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  cursor: pointer;
-  transition: border-color 0.2s var(--ease), color 0.2s var(--ease);
-}
-
-.uid-block button:hover {
-  border-color: var(--gold);
-  color: var(--gold-bright);
-}
-
 .uid-block__hint {
   margin-top: 0.6rem;
   color: var(--text-faint);
@@ -4683,32 +4722,97 @@ main:focus {
   margin-top: 0.85rem;
 }
 
-/* Те же очертания, что у кнопки рядом с UID: обе — второстепенные действия
-   в одной колонке, и выглядеть они обязаны одинаково. */
-.profile-field__summary button,
-.account__actions button {
-  padding: 0.6rem 1.1rem;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  background: none;
-  color: var(--text-muted);
-  font-family: var(--font-display);
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+/* ---------- Выбор оформления (профиль) ---------- */
+
+.theme-picker {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0 0 2rem;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.theme-picker legend {
+  padding: 0;
+  margin-bottom: 0.75rem;
+}
+
+.theme-picker__option {
+  position: relative;
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  align-items: center;
+  gap: 0.9rem;
+  min-height: 60px;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
   cursor: pointer;
-  transition: border-color 0.2s var(--ease), color 0.2s var(--ease);
+  transition: border-color 0.2s var(--ease), background 0.2s var(--ease);
 }
 
-.profile-field__summary button:hover:not(:disabled),
-.account__actions button:hover:not(:disabled) {
+.theme-picker__option:hover {
+  border-color: var(--border-strong);
+}
+
+.theme-picker__option:has(input:checked) {
   border-color: var(--gold);
-  color: var(--gold-bright);
+  background: var(--surface-hover);
+  box-shadow: inset 0 0 0 1px var(--gold);
 }
 
-.account__actions button:disabled {
-  opacity: 0.5;
-  cursor: default;
+.theme-picker__option:has(input:focus-visible) {
+  outline: 2px solid var(--gold-bright);
+  outline-offset: 2px;
+}
+
+/* Сама радиокнопка скрыта визуально, но остаётся в фокусе и для чтения. */
+.theme-picker__option input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+}
+
+.theme-picker__swatch {
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--border-strong);
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+}
+
+.theme-picker__option--dark .theme-picker__swatch {
+  background: linear-gradient(135deg, #131316 0 55%, #d8bb84 55% 100%);
+}
+
+.theme-picker__option--light .theme-picker__swatch {
+  background: linear-gradient(135deg, #f5f4f0 0 55%, #a3803f 55% 100%);
+}
+
+.theme-picker__option--cyber .theme-picker__swatch {
+  background:
+    repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.35) 0 1px, transparent 1px 3px),
+    linear-gradient(135deg, #050505 0 55%, #ffb627 55% 100%);
+  box-shadow: 0 0 10px rgba(255, 182, 39, 0.45);
+}
+
+.theme-picker__text {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.theme-picker__text strong {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.theme-picker__text span {
+  font-size: 0.78rem;
+  color: var(--text-muted);
 }
 
 /* ---------- 404 ---------- */
@@ -4760,23 +4864,6 @@ main:focus {
   justify-content: center;
   flex-wrap: wrap;
   margin-top: 1.5rem;
-}
-
-.crash__actions button {
-  padding: 0.65rem 1.4rem;
-  border-radius: var(--radius);
-  border: 1px solid var(--border-strong);
-  background: transparent;
-  color: var(--text-muted);
-  font-family: var(--font-display);
-  font-weight: 600;
-  cursor: pointer;
-  transition: color 0.2s ease, border-color 0.2s ease;
-}
-
-.crash__actions button:hover {
-  color: var(--text);
-  border-color: var(--text);
 }
 
 /* ---------- Progress chart ---------- */
@@ -5778,16 +5865,10 @@ main:focus {
 }
 
 /* Единственная кнопка экрана с золотым ореолом — главное действие видно
-   издалека, остальные кнопки сайта остаются спокойными. */
+   издалека, остальные кнопки сайта остаются спокойными. Ореол — через
+   --btn-glow-rest, чтобы он повторял срезанный силуэт кнопки. */
 .today-card__cta {
-  display: inline-flex;
-  gap: 0.6rem;
-  box-shadow: var(--gold-glow);
-}
-
-.today-card__cta svg {
-  width: 16px;
-  height: 16px;
+  --btn-glow-rest: 0 10px 22px rgba(185, 152, 94, 0.35);
 }
 
 .stat-tile {
@@ -6027,7 +6108,11 @@ main:focus {
 .confirm__actions {
   display: flex;
   justify-content: flex-end;
-  gap: 0.6rem;
+  gap: 0.75rem;
+}
+
+.confirm__actions .button {
+  margin-top: 0;
 }
 
 @media (max-width: 480px) {
@@ -6460,20 +6545,6 @@ button.calendar__cell {
 
 .readiness__head button {
   flex-shrink: 0;
-  padding: 0.35rem 0.8rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: transparent;
-  color: var(--text-faint);
-  font-family: var(--font-body);
-  font-size: 0.75rem;
-  cursor: pointer;
-  transition: color 0.2s var(--ease), border-color 0.2s var(--ease);
-}
-
-.readiness__head button:hover {
-  color: var(--text);
-  border-color: var(--border-strong);
 }
 
 /* Свёрнутый чек-ин — одна строка над первым упражнением, а не экран шкал. */
@@ -6488,13 +6559,6 @@ button.calendar__cell {
 .readiness--compact .readiness__head strong {
   font-size: 0.92rem;
   line-height: 1.35;
-}
-
-.readiness--compact .readiness__head button {
-  min-height: 40px;
-  padding: 0 0.95rem;
-  color: var(--text-muted);
-  border-color: var(--border-strong);
 }
 
 .readiness--compact .readiness__advice {
@@ -6764,26 +6828,6 @@ button.calendar__cell {
   border-color: var(--gold);
 }
 
-.session-coach__composer button {
-  min-height: 48px;
-  padding: 0 1.1rem;
-  border: 1px solid var(--text);
-  border-radius: var(--radius-lg);
-  background: var(--text);
-  color: var(--bg);
-  font-family: var(--font-display);
-  font-size: 0.74rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  cursor: pointer;
-}
-
-.session-coach__composer button:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
 /* На телефоне — лист снизу: до него дотягивается большой палец, а верх
    страницы с названием тренировки остаётся виден. Кнопка поднимается над
    нижней панелью навигации. */
@@ -6949,23 +6993,6 @@ button.calendar__cell {
   flex-wrap: wrap;
   gap: 0.6rem;
   margin-top: 0.9rem;
-}
-
-.crop__actions button:not(.button) {
-  padding: 0.65rem 1.1rem;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  background: transparent;
-  color: var(--text-muted);
-  font-family: var(--font-body);
-  font-size: 0.82rem;
-  cursor: pointer;
-  transition: color 0.2s var(--ease), border-color 0.2s var(--ease);
-}
-
-.crop__actions button:not(.button):hover:not(:disabled) {
-  color: var(--text);
-  border-color: var(--text-faint);
 }
 
 /* ---------- Дневные нормы КБЖУ ---------- */
@@ -7236,19 +7263,6 @@ button.calendar__cell {
 
 .goal__head button {
   flex-shrink: 0;
-  padding: 0.35rem 0.7rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: transparent;
-  color: var(--text-faint);
-  font-size: 0.72rem;
-  cursor: pointer;
-  transition: color 0.2s var(--ease), border-color 0.2s var(--ease);
-}
-
-.goal__head button:hover {
-  color: var(--danger);
-  border-color: var(--danger);
 }
 
 .goal__scale {
@@ -7515,32 +7529,6 @@ button.calendar__cell {
   align-items: center;
   gap: 0.9rem;
   margin-top: 1.35rem;
-}
-
-.coach__actions button {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.65rem 1.2rem;
-  border: 1px solid var(--gold);
-  border-radius: 10px;
-  background: rgba(185, 152, 94, 0.1);
-  color: var(--gold-bright);
-  font-family: var(--font-display);
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  cursor: pointer;
-  transition: background 0.2s var(--ease);
-}
-
-.coach__actions button:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.coach__actions button:not(:disabled):hover {
-  background: rgba(185, 152, 94, 0.2);
 }
 
 .coach__link {
@@ -7873,8 +7861,7 @@ button.calendar__cell {
 
   .coach__actions button {
     flex: 1 1 100%;
-    justify-content: center;
-  }
+}
 }
 
 @media (prefers-reduced-motion: reduce) {
