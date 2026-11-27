@@ -23,7 +23,9 @@ test.describe('Статистика с данными', () => {
     // Собираем тренировку и записываем выполнение — иначе показывать нечего.
     await page.goto('/workouts/new')
     await page.getByPlaceholder('Название тренировки').fill('День груди')
-    await page.getByRole('button', { name: 'Добавить' }).first().click({ timeout: SLOW })
+    await page.getByRole('button', { name: 'Добавить упражнения' }).click({ timeout: SLOW })
+    await page.locator('.sheet .picker__item').first().getByRole('button', { name: /^Выбрать/ }).click({ timeout: SLOW })
+    await page.locator('.sheet').getByRole('button', { name: 'Добавить (1)' }).click()
     await page.getByRole('button', { name: 'Сохранить тренировку' }).click()
     await page.waitForURL(/\/workouts\/[^/]+$/)
 

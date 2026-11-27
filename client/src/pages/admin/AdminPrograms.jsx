@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../../api/firestore.js'
 import { exerciseName } from '../../utils/translate.js'
-import { formatReps, programItems } from '../../utils/programItems.js'
+import {
+  editItemField,
+  formatReps,
+  MAX_REPS,
+  MAX_SETS,
+  normalizePlanItems,
+  programItems,
+} from '../../utils/programItems.js'
 import { useAsyncAction } from '../../hooks/useAsyncAction.js'
 import ExercisePicker from '../../components/ExercisePicker.jsx'
 import ConfirmDialog from '../../components/ConfirmDialog.jsx'
@@ -93,10 +100,12 @@ export default function AdminPrograms() {
     setForm((prev) => ({ ...prev, items: prev.items.filter((item) => item.exerciseId !== exerciseId) }))
   }
 
-  function updateItem(exerciseId, field, value) {
+  // Пустое поле во время правки хранится как '' (иначе Number('') === 0
+  // возвращал ноль и стереть его было нельзя); в числа — перед сохранением.
+  function updateItem(exerciseId, field, raw) {
     setForm((prev) => ({
       ...prev,
-      items: prev.items.map((item) => (item.exerciseId === exerciseId ? { ...item, [field]: value } : item)),
+      items: prev.items.map((item) => (item.exerciseId === exerciseId ? editItemField(item, field, raw) : item)),
     }))
   }
 
@@ -106,8 +115,17 @@ export default function AdminPrograms() {
       setError('Добавьте хотя бы одно упражнение')
       return
     }
+    const normalized = normalizePlanItems(form.items, (item) => {
+      const ex = exerciseById.get(item.exerciseId)
+      return ex ? exerciseName(ex) : item.exerciseId
+    })
+    if (normalized.error) {
+      setError(normalized.error)
+      return
+    }
+    const payload = { ...form, items: normalized.items }
     try {
-      await run(() => (form.id ? api.updateProgram(form) : api.createProgram(form)))
+      await run(() => (form.id ? api.updateProgram(payload) : api.createProgram(payload)))
       setForm(emptyForm)
       load()
     } catch {
@@ -228,21 +246,25 @@ export default function AdminPrograms() {
                 <span className="admin-list__actions">
                   <input
                     type="number"
+                    inputMode="numeric"
                     min="1"
+                    max={MAX_SETS}
                     className="number-input"
                     value={item.targetSets}
-                    onChange={(e) => updateItem(item.exerciseId, 'targetSets', Number(e.target.value))}
+                    onChange={(e) => updateItem(item.exerciseId, 'targetSets', e.target.value)}
                     title="Подходы"
                     aria-label={`Подходы: ${ex ? exerciseName(ex) : item.exerciseId}`}
                   />
                   ×
                   <input
                     type="number"
-                    min="1"
+                    inputMode="numeric"
+                    min="0"
+                    max={MAX_REPS}
                     className="number-input"
                     value={item.targetReps}
-                    onChange={(e) => updateItem(item.exerciseId, 'targetReps', Number(e.target.value))}
-                    title="Повторы"
+                    onChange={(e) => updateItem(item.exerciseId, 'targetReps', e.target.value)}
+                    title="Повторы, 0 - до отказа"
                     aria-label={`Повторы: ${ex ? exerciseName(ex) : item.exerciseId}`}
                   />
                   <button type="button" className="is-danger" onClick={() => removeExercise(item.exerciseId)}>Убрать</button>

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { uniqueEmail, register } from './helpers.js'
+import { uniqueEmail, register, addExercises } from './helpers.js'
 
 test('черновик конструктора переживает переход к упражнению', async ({ page }) => {
   const email = uniqueEmail('e2e-draft-builder')
@@ -8,20 +8,23 @@ test('черновик конструктора переживает перех�
   await page.goto('/workouts/new')
   await page.getByPlaceholder('Название тренировки').fill('Черновик A')
 
-  await page.getByPlaceholder('Поиск по названию или группе мышц...').fill('Отжимания')
-  await page.locator('.picker__item').first().getByRole('button', { name: 'Добавить' }).click()
-  await expect(page.getByText('Выбрано (1)')).toBeVisible()
+  await addExercises(page, ['Отжимания', 'Жим лёжа'])
+  await expect(page.locator('.workout-items > li')).toHaveCount(2)
 
-  await page.getByPlaceholder('Поиск по названию или группе мышц...').fill('Жим лёжа')
-  await page.locator('.picker__item').first().getByRole('button', { name: 'Добавить' }).click()
-  await expect(page.getByText('Выбрано (2)')).toBeVisible()
-
-  await page.locator('.picker__item').first().getByRole('link').click()
+  // Отмеченное, но ещё не добавленное упражнение тоже не теряется: панель
+  // ведёт на страницу упражнения, а по возвращении открыта с тем же выбором.
+  await page.getByRole('button', { name: 'Добавить упражнения' }).click()
+  const sheet = page.locator('.sheet')
+  await sheet.getByPlaceholder('Поиск по названию или группе мышц...').fill('Присед')
+  await sheet.locator('.picker__item').first().getByRole('button', { name: /^Выбрать/ }).click()
+  await sheet.locator('.picker__item').first().getByRole('link').click()
   await page.getByRole('heading', { name: 'Как выполнять' }).scrollIntoViewIfNeeded()
   await page.getByRole('button', { name: 'К библиотеке' }).click()
 
   await expect(page.getByPlaceholder('Название тренировки')).toHaveValue('Черновик A')
-  await expect(page.getByText('Выбрано (2)')).toBeVisible()
+  await expect(page.locator('.workout-items > li')).toHaveCount(2)
+  await expect(sheet).toBeVisible()
+  await expect(sheet.getByRole('button', { name: 'Добавить (1)' })).toBeVisible()
 })
 
 test('черновик лога переживает «Как выполнять»', async ({ page }) => {
@@ -30,8 +33,7 @@ test('черновик лога переживает «Как выполнять
 
   await page.goto('/workouts/new')
   await page.getByPlaceholder('Название тренировки').fill('Черновик лога')
-  await page.getByPlaceholder('Поиск по названию или группе мышц...').fill('Отжимания')
-  await page.locator('.picker__item').first().getByRole('button', { name: 'Добавить' }).click()
+  await addExercises(page, ['Отжимания'])
   await page.getByRole('button', { name: 'Сохранить тренировку' }).click()
   await page.waitForURL(/\/workouts\/[^/]+$/)
 
@@ -53,9 +55,8 @@ test('сборка тренировки, лог выполнения и стат
   await page.goto('/workouts/new')
   await page.getByPlaceholder('Название тренировки').fill('E2E Тестовая тренировка')
 
-  await page.getByPlaceholder('Поиск по названию или группе мышц...').fill('Отжимания')
-  await page.locator('.picker__item').first().getByRole('button', { name: 'Добавить' }).click()
-  await expect(page.getByText('Выбрано (1)')).toBeVisible()
+  await addExercises(page, ['Отжимания'])
+  await expect(page.locator('.workout-items > li')).toHaveCount(1)
 
   await page.getByRole('button', { name: 'Сохранить тренировку' }).click()
   await page.waitForURL(/\/workouts\/[^/]+$/)
@@ -97,8 +98,7 @@ test('замена упражнения знает про ограничения
 
   await page.goto('/workouts/new')
   await page.getByPlaceholder('Название тренировки').fill('E2E Замена с ограничением')
-  await page.getByPlaceholder('Поиск по названию или группе мышц...').fill('Жим лёжа')
-  await page.locator('.picker__item').first().getByRole('button', { name: 'Добавить' }).click()
+  await addExercises(page, ['Жим лёжа'])
   await page.getByRole('button', { name: 'Сохранить тренировку' }).click()
   await page.waitForURL(/\/workouts\/[^/]+$/)
 
@@ -113,4 +113,82 @@ test('замена упражнения знает про ограничения
   await expect(panel.getByRole('button', { name: /Отжимания/ })).toContainText(
     'Похоже на ваши ограничения — осторожно',
   )
+})
+
+test('конструктор: несколько упражнений разом, порядок за ручку и пустые поля', async ({ page }) => {
+  const email = uniqueEmail('e2e-builder-ux')
+  await register(page, { name: 'E2E Конструктор', email, password: 'password123' })
+
+  await page.goto('/workouts/new')
+  await page.getByPlaceholder('Название тренировки').fill('E2E Порядок')
+
+  // Отмечаем три упражнения — номера на карточках идут в порядке нажатия,
+  // в том же порядке они и встают в план.
+  await page.getByRole('button', { name: 'Добавить упражнения' }).click()
+  const sheet = page.locator('.sheet')
+  await expect(sheet).toBeVisible()
+  const search = sheet.getByPlaceholder('Поиск по названию или группе мышц...')
+  const names = ['Жим лёжа', 'Отжимания', 'Присед']
+  for (const [i, name] of names.entries()) {
+    await search.fill(name)
+    const card = sheet.locator('.picker__item').first()
+    await card.getByRole('button', { name: /^Выбрать/ }).click()
+    await expect(card.locator('.picker__order')).toHaveText(String(i + 1))
+  }
+  await sheet.getByRole('button', { name: 'Добавить (3)' }).click()
+  await expect(sheet).toBeHidden()
+
+  const rows = page.locator('.workout-items > li')
+  await expect(rows).toHaveCount(3)
+  await expect(rows.nth(0)).toContainText('Жим лёжа')
+  await expect(rows.nth(1)).toContainText('Отжимания')
+
+  // Esc и клик по фону закрывают панель.
+  await page.getByRole('button', { name: 'Добавить упражнения' }).click()
+  await expect(sheet).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(sheet).toBeHidden()
+  await page.getByRole('button', { name: 'Добавить упражнения' }).click()
+  await expect(sheet).toBeVisible()
+  await page.mouse.click(10, 10)
+  await expect(sheet).toBeHidden()
+
+  // Перетаскивание за ручку: первый пункт — в самый низ.
+  // Весь список — в середину экрана: иначе точка жеста уходит за край окна,
+  // а у края включается автопрокрутка и сдвигает цель.
+  await page.locator('.workout-items').evaluate((el) => el.scrollIntoView({ block: 'center' }))
+  const handle = rows.nth(0).locator('.drag-handle')
+  const box = await handle.boundingBox()
+  const lastBox = await rows.nth(2).boundingBox()
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.down()
+  // Пункт встаёт после соседа, как только палец проходит его середину.
+  await page.mouse.move(box.x + box.width / 2, lastBox.y + lastBox.height / 2 + 12, { steps: 8 })
+  await page.mouse.up()
+  await expect(rows.nth(2)).toContainText('Жим лёжа')
+  await expect(rows.nth(0)).toContainText('Отжимания')
+
+  // С клавиатуры: фокус на ручке, стрелка вверх поднимает пункт.
+  await rows.nth(2).locator('.drag-handle').focus()
+  await page.keyboard.press('ArrowUp')
+  await expect(rows.nth(1)).toContainText('Жим лёжа')
+  await expect(rows.nth(1).locator('.drag-handle')).toBeFocused()
+
+  // Ноль стирается целиком, а пустое поле не уходит в базу.
+  const sets = page.getByLabel('Подходы: Отжимания')
+  await sets.fill('')
+  await expect(sets).toHaveValue('')
+  await page.getByRole('button', { name: 'Сохранить тренировку' }).click()
+  await expect(page.getByText(/Отжимания: подходов должно быть от 1/)).toBeVisible()
+  await sets.fill('4')
+
+  // 0 повторов — «до отказа», это допустимо.
+  const reps = page.getByLabel('Повторы: Отжимания')
+  await reps.fill('')
+  await expect(reps).toHaveValue('')
+  await reps.fill('0')
+
+  await page.getByRole('button', { name: 'Сохранить тренировку' }).click()
+  await page.waitForURL(/\/workouts\/[^/]+$/)
+  await expect(page.getByText('Цель: 4 × до отказа')).toBeVisible()
 })

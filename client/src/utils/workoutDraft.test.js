@@ -3,14 +3,17 @@ import {
   builderDraftKey,
   clearBuilderDraft,
   loadBuilderDraft,
+  loadPickDraft,
   loadSessionDraft,
   saveBuilderDraft,
+  savePickDraft,
   saveSessionDraft,
   sessionDraftKey,
 } from './workoutDraft.js'
 
 afterEach(() => {
   localStorage.clear()
+  sessionStorage.clear()
 })
 
 describe('builder draft', () => {
@@ -69,5 +72,24 @@ describe('keys', () => {
     expect(builderDraftKey(null)).toBe('askesis:draft:builder:new')
     expect(builderDraftKey('abc')).toBe('askesis:draft:builder:abc')
     expect(sessionDraftKey('abc')).toBe('askesis:draft:session:abc')
+  })
+})
+
+describe('pick draft', () => {
+  it('помнит порядок отмеченных упражнений', () => {
+    savePickDraft(null, ['b', 'a'])
+    expect(loadPickDraft(null)).toEqual(['b', 'a'])
+    expect(loadPickDraft('w1')).toEqual([])
+  })
+
+  it('пустой выбор стирает черновик', () => {
+    savePickDraft('w1', ['a'])
+    savePickDraft('w1', [])
+    expect(loadPickDraft('w1')).toEqual([])
+  })
+
+  it('не падает на мусоре в хранилище', () => {
+    sessionStorage.setItem('askesis:draft:picks:new', '{oops')
+    expect(loadPickDraft(null)).toEqual([])
   })
 })
