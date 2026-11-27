@@ -224,6 +224,23 @@ describe('форма и размер тренировки', () => {
     const items = [{ exerciseId: 'ex1' }]
     await assertSucceeds(setDoc(doc(alice(), 'workouts', 'ok'), { ...workout(), items }))
   })
+
+  // Та же регрессия с потолком в 1000 выражений, что и у лога: тренировка
+  // на 10 упражнений из конструктора не сохранялась.
+  it('длинная тренировка из конструктора (6-60 упражнений) сохраняется', async () => {
+    for (const count of [6, 10, 20, 60]) {
+      const items = Array.from({ length: count }, (_, i) => ({
+        exerciseId: `Exercise_${i}`,
+        exerciseName: `Упражнение ${i}`,
+        targetSets: 4,
+        targetReps: 8,
+        targetRepsMax: 10,
+      }))
+      await assertSucceeds(
+        setDoc(doc(alice(), 'workouts', `long-${count}`), { ...workout(), programId: 'p1', items }),
+      )
+    }
+  })
 })
 
 describe('форма лога выполнения', () => {
@@ -257,6 +274,64 @@ describe('форма лога выполнения', () => {
     await assertSucceeds(setDoc(doc(alice(), 'workoutLogs', 'ok3'), { ...workoutLog(), entries: withRir(3) }))
     await assertFails(setDoc(doc(alice(), 'workoutLogs', 'bad'), { ...workoutLog(), entries: withRir(9) }))
     await assertFails(setDoc(doc(alice(), 'workoutLogs', 'bad'), { ...workoutLog(), entries: withRir('много') }))
+  })
+
+  // Ровно то, что собирает handleLogSession в WorkoutDetail.jsx и отправляет
+  // logWorkoutSession в api/firestore.js: несколько упражнений, подходы из
+  // setsToLog (пустой вес становится 0 — упражнение с собственным весом),
+  // необязательные followedTarget и rir, таймер не включали.
+  it('реальная запись из клиента сохраняется целиком', async () => {
+    const real = {
+      ownerId: ALICE,
+      workoutId: 'w1',
+      workoutTitle: 'Личный сплит: верх',
+      date: '2026-11-27T15:30:00.000Z',
+      startedAt: null,
+      durationMinutes: null,
+      entries: [
+        {
+          exerciseId: 'Barbell_Bench_Press',
+          exerciseName: 'Жим штанги лёжа',
+          sets: [{ weight: 60, reps: 8 }, { weight: 62.5, reps: 7 }, { weight: 62.5, reps: 6 }],
+          followedTarget: true,
+          rir: 1,
+        },
+        { exerciseId: 'Pushups', exerciseName: 'Отжимания', sets: [{ weight: 0, reps: 15 }, { weight: 0, reps: 0 }] },
+        { exerciseId: 'Plank', exerciseName: '', sets: [{ weight: 0, reps: 1 }], rir: 0 },
+      ],
+      createdAt: '2026-11-27T15:30:00.000Z',
+    }
+    await assertSucceeds(setDoc(doc(alice(), 'workoutLogs', 'real'), real))
+    await assertSucceeds(
+      setDoc(doc(alice(), 'workoutLogs', 'real-timer'), {
+        ...real,
+        startedAt: '2026-11-27T14:30:00.000Z',
+        durationMinutes: 60,
+      }),
+    )
+  })
+
+  // Регрессия: правило проверяло 10 позиций списка и упиралось в потолок
+  // Firestore в 1000 вычисленных выражений — лог из 6+ упражнений получал
+  // permission-denied, в интерфейсе «Нет доступа к этой записи».
+  it('длинная тренировка (6-60 упражнений со всеми полями) сохраняется', async () => {
+    for (const count of [6, 8, 10, 12, 30, 60]) {
+      const entries = Array.from({ length: count }, (_, i) => ({
+        exerciseId: `Exercise_${i}`,
+        exerciseName: `Упражнение ${i}`,
+        sets: [{ weight: 42.5, reps: 10 }, { weight: 42.5, reps: 8 }, { weight: 40, reps: 8 }],
+        followedTarget: true,
+        rir: 0,
+      }))
+      await assertSucceeds(
+        setDoc(doc(alice(), 'workoutLogs', `long-${count}`), {
+          ...workoutLog(),
+          startedAt: '2026-11-27T14:30:00.000Z',
+          durationMinutes: 75,
+          entries,
+        }),
+      )
+    }
   })
 
   it('в запись упражнения нельзя налить произвольных полей', async () => {
