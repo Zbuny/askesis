@@ -170,33 +170,8 @@
   letter-spacing: 0.03em;
 }
 
-/* Глитч главного заголовка: редкий короткий сбой раз в несколько секунд. */
-:root[data-theme='cyber'] :is(.glass-hero, .page-head, .hero) h1 {
-  animation: cyber-glitch 7s steps(1, end) infinite;
-}
-
-@keyframes cyber-glitch {
-  0%, 93%, 100% {
-    transform: none;
-    text-shadow: 0 0 18px rgba(255, 182, 39, 0.18);
-    clip-path: none;
-  }
-  94% {
-    transform: translate(-2px, 0) skewX(-6deg);
-    text-shadow: 2px 0 var(--glitch-a), -2px 0 var(--glitch-b);
-    clip-path: inset(10% 0 45% 0);
-  }
-  95% {
-    transform: translate(2px, 0);
-    text-shadow: -3px 0 var(--glitch-a), 3px 0 var(--glitch-b);
-    clip-path: inset(55% 0 5% 0);
-  }
-  96% {
-    transform: translate(-1px, 0) skewX(4deg);
-    text-shadow: 1px 0 var(--glitch-a), -1px 0 var(--glitch-b);
-    clip-path: none;
-  }
-}
+/* Глитч заголовков — ниже, в разделе «Глитч»: вспышки запускает
+   components/CyberGlitch.jsx, здесь только вид. */
 
 /* Подписи — как строки терминала: моноширинный шрифт и «//» вместо черты. */
 :root[data-theme='cyber'] .eyebrow {
@@ -570,6 +545,253 @@
   font-size: 0.8rem;
 }
 
+/* ---------- Глитч ----------
+   Вспышки ставит components/CyberGlitch.jsx: класс .is-glitching живёт
+   ~320 мс у одного элемента за раз, .glitch-strong - у заголовков ошибок
+   и 404. Дубли текста для срезов - ::before/::after с attr(data-text) и
+   пустым альтернативным текстом (через «/»), поэтому читалка их не озвучивает.
+   Каждая вспышка - не больше трёх смен кадра, пауза между ними не короче
+   секунды: ниже порога «три вспышки в секунду». Только transform, opacity
+   и clip-path - ни одна анимация не двигает соседей. */
+
+:root[data-theme='cyber'] {
+  /* Сбой в палитре темы, без чужого неона: бледное золото и медь
+     вместо привычных циана с малиновым. */
+  --glitch-pale: rgba(255, 232, 170, 0.9);
+  --glitch-ember: rgba(214, 92, 18, 0.9);
+}
+
+:root[data-theme='cyber'] :is(.is-glitching:not(.navbar__logo), .glitch-strong) {
+  position: relative;
+}
+
+:root[data-theme='cyber'] :is(.is-glitching:not(.navbar__logo), .glitch-strong)::before,
+:root[data-theme='cyber'] :is(.is-glitching:not(.navbar__logo), .glitch-strong)::after {
+  content: attr(data-text);
+  content: attr(data-text) / '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  white-space: pre-line;
+  text-shadow: none;
+  clip-path: inset(50% 0 50% 0);
+}
+
+/* У светлой полосы фон экрана: она закрывает кусок настоящего текста под
+   собой, и заголовок выглядит именно порванным, а не продублированным. */
+:root[data-theme='cyber'] :is(.is-glitching:not(.navbar__logo), .glitch-strong)::before {
+  color: var(--glitch-pale);
+  background: var(--bg);
+  /* По ширине текста, а не всего блока: иначе полоса фона тянулась бы
+     через всю карточку. */
+  right: auto;
+  width: fit-content;
+}
+
+/* Заголовки ошибок и 404 стоят по центру - и полоса вместе с ними. */
+:root[data-theme='cyber'] .glitch-strong.glitch-strong::before {
+  right: 0;
+  margin-inline: auto;
+}
+
+:root[data-theme='cyber'] :is(.is-glitching:not(.navbar__logo), .glitch-strong)::after {
+  color: var(--glitch-ember);
+}
+
+/* Обычная вспышка: сам заголовок дёргается с RGB-сдвигом, а два среза
+   (бледное золото и медь) рвут его по горизонтали. */
+:root[data-theme='cyber'] .is-glitching:not(.navbar__logo) {
+  animation: cyber-burst 0.32s steps(1, end) 1;
+}
+
+:root[data-theme='cyber'] .is-glitching:not(.navbar__logo)::before {
+  animation: cyber-slice-a 0.32s steps(1, end) 1;
+}
+
+:root[data-theme='cyber'] .is-glitching:not(.navbar__logo)::after {
+  animation: cyber-slice-b 0.32s steps(1, end) 1;
+}
+
+/* Второй рисунок срезов, чтобы сбои не повторялись один в один. */
+:root[data-theme='cyber'] .is-glitching--alt:not(.navbar__logo)::before {
+  animation-name: cyber-slice-b;
+}
+
+:root[data-theme='cyber'] .is-glitching--alt:not(.navbar__logo)::after {
+  animation-name: cyber-slice-a;
+}
+
+@keyframes cyber-burst {
+  0% {
+    transform: translate(-2px, 0) skewX(-5deg);
+    text-shadow: 2px 0 var(--glitch-ember), -2px 0 var(--glitch-pale);
+  }
+  35% {
+    transform: translate(2px, 0);
+    text-shadow: -2px 0 var(--glitch-ember), 2px 0 var(--glitch-pale);
+  }
+  70%, 100% {
+    transform: none;
+  }
+}
+
+@keyframes cyber-slice-a {
+  0% { clip-path: inset(12% 0 58% 0); transform: translate(-6px, 0); }
+  35% { clip-path: inset(62% 0 14% 0); transform: translate(4px, 0); }
+  70%, 100% { clip-path: inset(50% 0 50% 0); transform: none; }
+}
+
+@keyframes cyber-slice-b {
+  0% { clip-path: inset(55% 0 25% 0); transform: translate(5px, 0); }
+  35% { clip-path: inset(20% 0 66% 0); transform: translate(-5px, 0); }
+  70%, 100% { clip-path: inset(50% 0 50% 0); transform: none; }
+}
+
+/* Название в шапке: рядом картинка-логотип, дубль текста встал бы не туда,
+   поэтому только RGB-сдвиг тенью и дрожание. */
+:root[data-theme='cyber'] .navbar__logo.is-glitching {
+  animation: cyber-logo 0.32s steps(1, end) 1;
+}
+
+:root[data-theme='cyber'] .navbar__logo.is-glitching .navbar__logo-img {
+  animation: cyber-logo-img 0.32s steps(1, end) 1;
+}
+
+@keyframes cyber-logo {
+  0% {
+    transform: translate(-2px, 0) skewX(-8deg);
+    text-shadow: 3px 0 var(--glitch-ember), -3px 0 var(--glitch-pale);
+  }
+  35% {
+    transform: translate(2px, 0);
+    text-shadow: -2px 0 var(--glitch-ember), 2px 0 var(--glitch-pale), var(--neon-glow);
+  }
+  70%, 100% { transform: none; }
+}
+
+@keyframes cyber-logo-img {
+  0% { clip-path: inset(0 0 50% 0); transform: translate(3px, 0); }
+  35% { clip-path: inset(40% 0 0 0); transform: translate(-2px, 0); }
+  70%, 100% { clip-path: none; transform: none; }
+}
+
+/* Ошибки и 404: сбой постоянный и крупнее, раз в 2,6 с - экран и должен
+   выглядеть «сломанным», но текст при этом остаётся на месте. */
+:root[data-theme='cyber'] .glitch-strong {
+  animation: cyber-strong 2.6s steps(1, end) infinite;
+}
+
+:root[data-theme='cyber'] .glitch-strong::before {
+  animation: cyber-strong-a 2.6s steps(1, end) infinite;
+}
+
+:root[data-theme='cyber'] .glitch-strong::after {
+  animation: cyber-strong-b 2.6s steps(1, end) infinite;
+}
+
+@keyframes cyber-strong {
+  0%, 84%, 97%, 100% { transform: none; text-shadow: 0 0 18px rgba(255, 182, 39, 0.18); }
+  85% { transform: translate(-3px, 0) skewX(-10deg); text-shadow: 3px 0 var(--glitch-ember), -3px 0 var(--glitch-pale); }
+  90% { transform: translate(4px, 0) skewX(6deg); text-shadow: -4px 0 var(--glitch-ember), 4px 0 var(--glitch-pale); }
+}
+
+@keyframes cyber-strong-a {
+  0%, 84%, 97%, 100% { clip-path: inset(50% 0 50% 0); transform: none; }
+  85% { clip-path: inset(5% 0 62% 0); transform: translate(-10px, 0); }
+  90% { clip-path: inset(48% 0 30% 0); transform: translate(8px, 0); }
+}
+
+@keyframes cyber-strong-b {
+  0%, 84%, 97%, 100% { clip-path: inset(50% 0 50% 0); transform: none; }
+  85% { clip-path: inset(66% 0 8% 0); transform: translate(9px, 0); }
+  90% { clip-path: inset(18% 0 60% 0); transform: translate(-7px, 0); }
+}
+
+/* Переход между страницами: короткий «удар» помех на 240 мс поверх экрана.
+   Сам контент не двигаем: transform на #main сломал бы position: fixed
+   у нижней панели и кнопок внутри страниц. */
+:root[data-theme='cyber'] :is(.cyber-hit, .cyber-noise) {
+  position: fixed;
+  left: 0;
+  right: 0;
+  z-index: 9997;
+  pointer-events: none;
+  opacity: 0;
+}
+
+:root[data-theme='cyber'] .cyber-hit {
+  top: 0;
+  bottom: 0;
+  background:
+    linear-gradient(180deg, transparent 18%, rgba(255, 224, 138, 0.12) 18% 20.5%, transparent 20.5% 57%, rgba(214, 92, 18, 0.16) 57% 58.5%, transparent 58.5% 81%, rgba(255, 182, 39, 0.2) 81% 84%, transparent 84%),
+    repeating-linear-gradient(180deg, rgba(255, 182, 39, 0.05) 0 2px, transparent 2px 5px);
+}
+
+:root[data-theme='cyber'] .cyber-hit.is-on {
+  animation: cyber-hit 0.24s steps(1, end) 1;
+}
+
+@keyframes cyber-hit {
+  0% { opacity: 1; transform: translate(-8px, 0) scaleY(1.04); }
+  40% { opacity: 0.7; transform: translate(6px, -3%); }
+  75%, 100% { opacity: 0; transform: none; }
+}
+
+/* Редкие помехи по фону: тонкая полоса где-то на экране, раз в 9-17 с. */
+:root[data-theme='cyber'] .cyber-noise {
+  top: var(--noise-y, 40vh);
+  height: var(--noise-h, 6px);
+  background: linear-gradient(90deg, transparent, rgba(255, 224, 138, 0.18) 12%, rgba(255, 182, 39, 0.3) 40%, transparent 46%, rgba(214, 92, 18, 0.24) 70%, transparent);
+}
+
+:root[data-theme='cyber'] .cyber-noise.is-on {
+  animation: cyber-noise 0.2s steps(1, end) 1;
+}
+
+@keyframes cyber-noise {
+  0% { opacity: 1; transform: translate(-12%, 0); }
+  50% { opacity: 0.8; transform: translate(9%, 6px) scaleY(0.5); }
+  100% { opacity: 0; transform: none; }
+}
+
+/* Скан-линии изредка «проседают», как у старого монитора. */
+:root[data-theme='cyber'] body::after {
+  animation: cyber-scan 13s steps(1, end) infinite;
+}
+
+@keyframes cyber-scan {
+  0%, 61%, 63%, 100% { opacity: 1; }
+  62% { opacity: 0.45; }
+}
+
+/* Основная кнопка при наведении режется на два куска со сдвигом;
+   при нажатии - один кадр перекоса. */
+:root[data-theme='cyber'] .button:hover:not(:disabled) {
+  animation: cyber-cut 0.24s steps(1, end) 1;
+}
+
+@keyframes cyber-cut {
+  0% { clip-path: inset(0 0 48% 0); transform: translate(3px, 0); }
+  35% { clip-path: inset(46% 0 0 0); transform: translate(-3px, 0); }
+  70%, 100% { clip-path: none; transform: none; }
+}
+
+:root[data-theme='cyber'] :is(.button, .button--secondary, .button--danger):active:not(:disabled) {
+  transform: skewX(-6deg) translateX(1px);
+}
+
+/* Витринные блоки при появлении: рамка на долю секунды «съезжает» и встаёт.
+   Только там, где нет своей анимации появления. */
+:root[data-theme='cyber'] :is(.glass-hero, .streak-card, .empty-state:not(.empty-state--error)) {
+  animation: cyber-frame-in 0.3s steps(1, end) 1 both;
+}
+
+@keyframes cyber-frame-in {
+  0% { opacity: 0.35; transform: translate(4px, 0); }
+  30% { opacity: 1; transform: translate(-3px, 0); }
+  60%, 100% { opacity: 1; transform: none; }
+}
+
 /* ---------- Без движения ---------- */
 
 @media (prefers-reduced-motion: reduce) {
@@ -577,10 +799,26 @@
     display: none;
   }
 
-  :root[data-theme='cyber'] :is(.glass-hero, .page-head, .hero) h1,
   :root[data-theme='cyber'] .glass-hero::after,
+  :root[data-theme='cyber'] body::after,
+  :root[data-theme='cyber'] .is-glitching,
+  :root[data-theme='cyber'] .is-glitching::before,
+  :root[data-theme='cyber'] .is-glitching::after,
+  :root[data-theme='cyber'] .is-glitching .navbar__logo-img,
+  :root[data-theme='cyber'] .glitch-strong,
+  :root[data-theme='cyber'] :is(.glass-hero, .streak-card, .empty-state),
   :root[data-theme='cyber'] .navbar__logo:hover,
   :root[data-theme='cyber'] :is(.button, .button--secondary, .button--danger):hover {
     animation: none;
+  }
+
+  :root[data-theme='cyber'] :is(.cyber-hit, .cyber-noise),
+  :root[data-theme='cyber'] .glitch-strong::before,
+  :root[data-theme='cyber'] .glitch-strong::after {
+    display: none;
+  }
+
+  :root[data-theme='cyber'] :is(.button, .button--secondary, .button--danger):active {
+    transform: none;
   }
 }
