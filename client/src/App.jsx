@@ -7,6 +7,7 @@ import ProtectedRoute from './components/ProtectedRoute.jsx'
 import AdminRoute from './components/AdminRoute.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import OfflineBanner from './components/OfflineBanner.jsx'
+import CyberGlitch from './components/CyberGlitch.jsx'
 import Home from './pages/Home.jsx'
 import { PageLoading } from './components/PageState.jsx'
 
@@ -42,6 +43,8 @@ export default function App() {
       <a className="skip-link" href="#main">Перейти к содержимому</a>
       <Navbar />
       <OfflineBanner />
+      {/* Глитч темы «Киберпанк»: в остальных темах ничего не рисует. */}
+      <CyberGlitch />
       <main className="content" id="main" tabIndex={-1}>
         <ErrorBoundary>
           <Suspense fallback={<PageLoading />}>
