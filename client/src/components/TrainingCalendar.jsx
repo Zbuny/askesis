@@ -11,7 +11,11 @@ function isSameDay(a, b) {
   return dayKey(a) === dayKey(b)
 }
 
-export default function TrainingCalendar({ sessions }) {
+// onSelectDay необязателен: в профиле календарь остаётся просто картой
+// активности, а на статистике по дню раскрывается разбор тренировки.
+// Без обработчика ячейки не становятся кнопками — иначе скринридер обещал
+// бы действие, которого нет.
+export default function TrainingCalendar({ sessions, onSelectDay, selectedKey }) {
   const [offset, setOffset] = useState(0) // 0 — текущий месяц, -1 — предыдущий
 
   const byDay = useMemo(() => {
@@ -94,18 +98,33 @@ export default function TrainingCalendar({ sessions }) {
             entry ? 'is-active' : '',
             isSameDay(date, today) ? 'is-today' : '',
             future ? 'is-future' : '',
+            selectedKey && selectedKey === dayKey(date) ? 'is-selected' : '',
           ].filter(Boolean).join(' ')
 
+          const label = entry
+            ? `${date.toLocaleDateString('ru-RU')} — тренировок: ${entry.count}${entry.minutes ? `, ${entry.minutes} мин` : ''}`
+            : date.toLocaleDateString('ru-RU')
+
+          // Кнопкой делаем только дни с записями: пустой день раскрывать нечем.
+          if (onSelectDay && entry) {
+            return (
+              <button
+                key={dayKey(date)}
+                type="button"
+                className={classes}
+                title={label}
+                aria-label={label}
+                aria-pressed={selectedKey === dayKey(date)}
+                onClick={() => onSelectDay(date, dayKey(date))}
+              >
+                <span className="calendar__num">{date.getDate()}</span>
+                {entry.count > 1 && <span className="calendar__badge">{entry.count}</span>}
+              </button>
+            )
+          }
+
           return (
-            <span
-              key={dayKey(date)}
-              className={classes}
-              title={
-                entry
-                  ? `${date.toLocaleDateString('ru-RU')} — тренировок: ${entry.count}${entry.minutes ? `, ${entry.minutes} мин` : ''}`
-                  : date.toLocaleDateString('ru-RU')
-              }
-            >
+            <span key={dayKey(date)} className={classes} title={label}>
               <span className="calendar__num">{date.getDate()}</span>
               {entry && entry.count > 1 && <span className="calendar__badge">{entry.count}</span>}
             </span>

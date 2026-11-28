@@ -3,9 +3,16 @@
   "private": true,
   "scripts": {
     "import:exercises": "node importExercises.js",
-    "seed:programs": "node seedPrograms.js"
+    "seed:programs": "node seedPrograms.js",
+    "seed:emulator": "node seedEmulator.js",
+    "seed:demo": "node seedDemoUser.js",
+    "e2e": "firebase emulators:exec --only auth,firestore --project askesis-web --config ../firebase.json \"node seedEmulator.js && npm --prefix ../client run test:e2e\"",
+    "emulators": "firebase emulators:start --only auth,firestore --project askesis-web --config ../firebase.json"
   },
   "dependencies": {
     "firebase-admin": "^12.5.0"
+  },
+  "devDependencies": {
+    "firebase-tools": "^15.37.0"
   }
 }

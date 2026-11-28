@@ -2,6 +2,14 @@ rules_version = '2';
 
 // Cloud Functions недоступны на Spark-плане, поэтому клиент работает
 // с Firestore напрямую — все проверки прав живут здесь.
+//
+// Правила ограничивают не только доступ, но и форму записей. Причина
+// практическая: суточная квота записи на Spark-плане общая для всех, и без
+// потолков любой зарегистрированный пользователь мог бы залить документы
+// произвольного размера, выжечь квоту и остановить приложение для всех,
+// включая владельца. Побайтового ограничения документа в правилах нет,
+// поэтому размер ограничивается косвенно — числом полей, длиной строк,
+// длиной списков и диапазонами чисел.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -15,41 +23,297 @@ service cloud.firestore {
         request.auth.uid in get(/databases/$(database)/documents/settings/admins).data.uids;
     }
 
-    // Список админов правится только вручную — через консоль Firestore или
-    // Admin SDK (они правила не проверяют). Из клиента запись закрыта
-    // полностью, иначе на публичном сайте права мог бы забрать кто угодно.
-    // Чтение нужно, чтобы приложение показывало админские разделы своему
-    // владельцу.
-    match /settings/admins {
-      allow read: if isSignedIn();
-      allow write: if false;
+    // ---------- общие проверки для личных записей ----------
+
+    // Владелец уже существующего документа
+    function owns() {
+      return isSignedIn() && resource.data.ownerId == request.auth.uid;
     }
 
-    // Библиотека упражнений и программы — читают все, пишет только админ
+    // Создаваемый документ помечен собственным uid
+    function ownsNew() {
+      return isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+    }
+
+    // ownerId неизменяем. Без этой проверки владелец мог бы при обновлении
+    // переписать поле на чужой uid и подкинуть человеку запись в его список:
+    // условие owns() смотрит на документ до записи и такое пропускает.
+    function keepsOwner() {
+      return request.resource.data.ownerId == resource.data.ownerId;
+    }
+
+    // ISO-строка даты — с запасом на таймзону и миллисекунды
+    function isDateString(value) {
+      return value is string && value.size() <= 40;
+    }
+
+    // ---------- каталоги: читает вошедший, пишет админ ----------
+
+    // Раньше каталоги читались вообще без авторизации. Один проход по
+    // библиотеке — это 873 чтения при суточной квоте порядка 50 000, то есть
+    // анонимный скрипт мог оставить сайт без каталога до сброса квоты.
     match /exercises/{exerciseId} {
-      allow read: if true;
+      allow read: if isSignedIn();
       allow write: if isAdmin();
     }
 
     match /programs/{programId} {
-      allow read: if true;
+      allow read: if isSignedIn();
       allow write: if isAdmin();
     }
 
-    // Тренировки и лог выполнения — доступны только владельцу
+    // Список админов правится только вручную — через консоль Firestore или
+    // Admin SDK (они правила не проверяют). Из клиента запись закрыта
+    // полностью, иначе на публичном сайте права мог бы забрать кто угодно.
+    // Читать документ целиком может только тот, кто уже в списке — иначе
+    // любой зарегистрированный пользователь мог бы перечислить все
+    // админские UID. isAdmin() выше проверяет членство через get() —
+    // это правило на allow read его не ограничивает.
+    match /settings/admins {
+      allow read: if isSignedIn() && request.auth.uid in resource.data.uids;
+      allow write: if false;
+    }
+
+    // ---------- тренировки ----------
+
+    // Форма одного упражнения в тренировке — ровно то, что пишут
+    // WorkoutBuilder/GeneratedPlan/startProgram в client/src. exerciseId
+    // обязателен всегда (это ключ, без него запись бессмысленна), остальные
+    // поля — опциональны по ключу, но если присутствуют, должны быть
+    // нужного типа и размера: старую тренировку, где их могло не быть,
+    // это не ломает, а мусор вроде мегабайтной строки в targetSets — отсекает.
+    function validWorkoutItem(item) {
+      return item.exerciseId is string && item.exerciseId.size() > 0 && item.exerciseId.size() <= 200
+        && (!('exerciseName' in item) || (item.exerciseName is string && item.exerciseName.size() <= 200))
+        && (!('targetSets' in item) || (item.targetSets is number && item.targetSets >= 0 && item.targetSets <= 20))
+        && (!('targetReps' in item) || (item.targetReps is number && item.targetReps >= 0 && item.targetReps <= 200))
+        && (!('targetRepsMax' in item) || (item.targetRepsMax is number && item.targetRepsMax >= 0 && item.targetRepsMax <= 200));
+    }
+
+    // В языке правил Firestore нет цикла/map по спискам, а Cloud Functions,
+    // которые проверили бы весь список одной функцией, недоступны на
+    // Spark-плане (см. шапку файла) — поэтому поэлементно проверяем только
+    // первые позиции явным индексом; общий размер списка ограничен ниже
+    // отдельным потолком в 60.
+    //
+    // Почему первые 3, а не 10. У Firestore потолок — 1000 вычисленных
+    // выражений на запрос, и вызов функции на элемент списка стоит около
+    // сотни выражений, сколько бы полей в элементе ни было. Проверка 10
+    // позиций выбирала потолок уже на 6-10 упражнениях: длинная тренировка
+    // и её лог получали permission-denied («Нет доступа к этой записи»).
+    // Проверка первых 3 стоит одинаково при любой длине списка. Защиты это
+    // не убавляет: позиции дальше проверенных и раньше не проверялись, так
+    // что мусор можно было положить в 11-ю — теперь в 4-ю.
+    function validWorkoutItems(items) {
+      return (items.size() < 1 || validWorkoutItem(items[0]))
+        && (items.size() < 2 || validWorkoutItem(items[1]))
+        && (items.size() < 3 || validWorkoutItem(items[2]));
+    }
+
+    function validWorkout() {
+      let d = request.resource.data;
+      return d.keys().hasAll(['ownerId', 'title', 'items'])
+        && d.keys().size() <= 8
+        && d.title is string && d.title.size() > 0 && d.title.size() <= 120
+        && d.items is list && d.items.size() <= 60
+        && validWorkoutItems(d.items)
+        && (!('programId' in d) || (d.programId is string && d.programId.size() <= 200));
+    }
+
     match /workouts/{workoutId} {
-      allow read, update, delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
-      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow read, delete: if owns();
+      allow create: if ownsNew() && validWorkout();
+      allow update: if owns() && keepsOwner() && validWorkout();
+    }
+
+    // ---------- лог выполнения ----------
+
+    // Один подход внутри entry.sets — {weight, reps}, как формирует
+    // handleLogSession в WorkoutDetail.jsx. Старый формат лога без sets
+    // (одна пара вес×повторы на всё упражнение) клиент больше не пишет —
+    // entrySets() в utils/workoutLog.js читает его только из уже
+    // существующих старых записей, так что здесь sets можно требовать.
+    function validWorkoutLogSet(set) {
+      return set.weight is number && set.weight >= 0 && set.weight <= 1000
+        && set.reps is number && set.reps >= 0 && set.reps <= 1000;
+    }
+
+    function validWorkoutLogEntry(entry) {
+      return entry.keys().size() <= 8
+        && entry.exerciseId is string && entry.exerciseId.size() > 0 && entry.exerciseId.size() <= 200
+        && (!('exerciseName' in entry) || (entry.exerciseName is string && entry.exerciseName.size() <= 200))
+        && entry.sets is list && entry.sets.size() > 0 && entry.sets.size() <= 20
+        && (entry.sets.size() < 1 || validWorkoutLogSet(entry.sets[0]))
+        && (!('followedTarget' in entry) || entry.followedTarget is bool)
+        // Запас до отказа. Шкала короткая (см. RIR_OPTIONS в
+        // client/src/utils/repRanges.js): за её пределами число ничего не
+        // значит, и прогрессия такое всё равно игнорирует.
+        && (!('rir' in entry) || (entry.rir is number && entry.rir >= 0 && entry.rir <= 3));
+    }
+
+    // Та же оговорка про отсутствие циклов и про потолок в 1000 выражений —
+    // проверяем первые 3 записи журнала явным индексом (см. validWorkoutItems
+    // выше: при 10 проверках лог из 6 упражнений уже не сохранялся).
+    function validWorkoutLogEntries(entries) {
+      return (entries.size() < 1 || validWorkoutLogEntry(entries[0]))
+        && (entries.size() < 2 || validWorkoutLogEntry(entries[1]))
+        && (entries.size() < 3 || validWorkoutLogEntry(entries[2]));
+    }
+
+    function validWorkoutLog() {
+      let d = request.resource.data;
+      return d.keys().hasAll(['ownerId', 'workoutId', 'date', 'entries'])
+        && d.keys().size() <= 10
+        && d.workoutId is string && d.workoutId.size() <= 200
+        && isDateString(d.date)
+        && d.entries is list && d.entries.size() > 0 && d.entries.size() <= 60
+        && validWorkoutLogEntries(d.entries)
+        && (!('workoutTitle' in d) || (d.workoutTitle is string && d.workoutTitle.size() <= 120))
+        && (!('startedAt' in d) || d.startedAt == null || isDateString(d.startedAt))
+        // Сутки в зале — заведомо верхняя граница для одной тренировки
+        && (!('durationMinutes' in d) || d.durationMinutes == null
+            || (d.durationMinutes is number && d.durationMinutes >= 0 && d.durationMinutes <= 1440));
     }
 
     match /workoutLogs/{logId} {
-      allow read, update, delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
-      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow read, delete: if owns();
+      allow create: if ownsNew() && validWorkoutLog();
+      allow update: if owns() && keepsOwner() && validWorkoutLog();
     }
 
-    // Личные данные пользователя (вес, рост, возраст) — доступны только владельцу
+    // ---------- личные данные (вес, рост, возраст) ----------
+
+    // Границы те же, что в client/src/utils/bmi.js: рост в метрах вместо
+    // сантиметров и подобные опечатки там уже отсеиваются, правила лишь
+    // не дают записать в базу то, что интерфейс и так считает мусором.
+    // Образ персонажа: только известные ключи и короткие строки-идентификаторы.
+    // Какие вещи открыты на каком уровне, правила проверить не могут —
+    // уровень производный и в базе не лежит (см. client/src/utils/wardrobe.js).
+    function avatarStr(a, k) {
+      return !(k in a) || (a[k] is string && a[k].size() <= 24);
+    }
+
+    function validAvatar(a) {
+      return a is map
+        && a.keys().hasOnly(['body', 'skin', 'top', 'topColor', 'bottom', 'bottomColor',
+                             'shoes', 'shoesColor', 'head', 'headColor', 'hair', 'hairColor',
+                             'extra', 'extraColor'])
+        && avatarStr(a, 'body') && avatarStr(a, 'skin')
+        && avatarStr(a, 'top') && avatarStr(a, 'topColor')
+        && avatarStr(a, 'bottom') && avatarStr(a, 'bottomColor')
+        && avatarStr(a, 'shoes') && avatarStr(a, 'shoesColor')
+        && avatarStr(a, 'head') && avatarStr(a, 'headColor')
+        && avatarStr(a, 'hair') && avatarStr(a, 'hairColor')
+        && avatarStr(a, 'extra') && avatarStr(a, 'extraColor');
+    }
+
+    function validProfile() {
+      let d = request.resource.data;
+      return d.keys().size() <= 16
+        && (!('weight' in d) || d.weight == null || (d.weight is number && d.weight >= 20 && d.weight <= 400))
+        && (!('height' in d) || d.height == null || (d.height is number && d.height >= 80 && d.height <= 260))
+        && (!('age' in d) || d.age == null || (d.age is number && d.age >= 5 && d.age <= 120))
+        // Ответы онбординга. Частота заодно служит недельной целью на
+        // дашборде, поэтому за пределами реальной недели она бессмысленна.
+        && (!('daysPerWeek' in d) || d.daysPerWeek == null
+            || (d.daysPerWeek is number && d.daysPerWeek >= 1 && d.daysPerWeek <= 7))
+        && (!('goal' in d) || d.goal == null || (d.goal is string && d.goal.size() <= 200))
+        && (!('level' in d) || d.level == null || (d.level is string && d.level.size() <= 60))
+        && (!('equipment' in d) || d.equipment == null || (d.equipment is list && d.equipment.size() <= 30))
+        // Травмы и ограничения — единственное поле профиля со свободным
+        // текстом, поэтому длина здесь не формальность: без потолка сюда
+        // уходит документ любого размера. 400 символов — столько же, сколько
+        // пропускает воркер в промпт (worker/src/index.js, sanitizeProfile).
+        && (!('limits' in d) || d.limits == null || (d.limits is string && d.limits.size() <= 400))
+        // Пол нужен ровно для одного — основного обмена в дневных нормах
+        // КБЖУ (client/src/utils/nutrition.js). Поэтому и значений всего два:
+        // формула Миффлина-Сан Жеора различает только их.
+        && (!('sex' in d) || d.sex == null || d.sex in ['male', 'female'])
+        && (!('avatar' in d) || d.avatar == null || validAvatar(d.avatar));
+    }
+
     match /users/{userId} {
-      allow read, write: if isSignedIn() && request.auth.uid == userId;
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow write: if isSignedIn() && request.auth.uid == userId && validProfile();
+    }
+
+    // ---------- история веса ----------
+
+    function validWeightLog() {
+      let d = request.resource.data;
+      return d.keys().hasAll(['ownerId', 'weight', 'date'])
+        && d.keys().size() <= 5
+        && d.weight is number && d.weight >= 20 && d.weight <= 400
+        && isDateString(d.date);
+    }
+
+    match /weightLogs/{logId} {
+      allow read, delete: if owns();
+      allow create: if ownsNew() && validWeightLog();
+      allow update: if owns() && keepsOwner() && validWeightLog();
+    }
+
+    // ---------- лог питания (КБЖУ) ----------
+
+    function validFoodLog() {
+      let d = request.resource.data;
+      return d.keys().hasAll(['ownerId', 'name', 'calories', 'protein', 'fat', 'carbs', 'date'])
+        && d.keys().size() <= 9
+        && d.name is string && d.name.size() > 0 && d.name.size() <= 120
+        && d.calories is number && d.calories >= 0 && d.calories <= 20000
+        && d.protein is number && d.protein >= 0 && d.protein <= 2000
+        && d.fat is number && d.fat >= 0 && d.fat <= 2000
+        && d.carbs is number && d.carbs >= 0 && d.carbs <= 2000
+        && isDateString(d.date);
+    }
+
+    match /foodLogs/{logId} {
+      allow read, delete: if owns();
+      allow create: if ownsNew() && validFoodLog();
+      allow update: if owns() && keepsOwner() && validFoodLog();
+    }
+
+    // ---------- личные цели ----------
+
+    // Факт достижения здесь не хранится и храниться не должен: он выводится
+    // из журнала (client/src/utils/goals.js). Поэтому и полей всего ничего —
+    // цель и точка отсчёта на момент её постановки.
+    function validGoal() {
+      let d = request.resource.data;
+      return d.keys().hasAll(['ownerId', 'exerciseId', 'targetReps'])
+        && d.keys().size() <= 8
+        && d.exerciseId is string && d.exerciseId.size() > 0 && d.exerciseId.size() <= 200
+        && (!('exerciseName' in d) || (d.exerciseName is string && d.exerciseName.size() <= 200))
+        && d.targetReps is number && d.targetReps >= 1 && d.targetReps <= 100
+        && (!('targetWeight' in d) || (d.targetWeight is number && d.targetWeight >= 0 && d.targetWeight <= 500))
+        && (!('startScore' in d) || (d.startScore is number && d.startScore >= 0 && d.startScore <= 1000));
+    }
+
+    match /goals/{goalId} {
+      allow read, delete: if owns();
+      allow create: if ownsNew() && validGoal();
+      allow update: if owns() && keepsOwner() && validGoal();
+    }
+
+    // ---------- чек-ин восстановления ----------
+
+    // Три оценки по шкале 1-5 (см. client/src/utils/readiness.js). Шкала
+    // фиксированная, поэтому и границы здесь жёсткие: за её пределами число
+    // ничего не значит, а готовность всё равно считается по прижатому.
+    function validCheckin() {
+      let d = request.resource.data;
+      return d.keys().hasAll(['ownerId', 'sleep', 'energy', 'soreness', 'date'])
+        && d.keys().size() <= 7
+        && d.sleep is number && d.sleep >= 1 && d.sleep <= 5
+        && d.energy is number && d.energy >= 1 && d.energy <= 5
+        && d.soreness is number && d.soreness >= 1 && d.soreness <= 5
+        && isDateString(d.date);
+    }
+
+    match /checkins/{checkinId} {
+      allow read, delete: if owns();
+      allow create: if ownsNew() && validCheckin();
+      allow update: if owns() && keepsOwner() && validCheckin();
     }
   }
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { askTrainer, planFromChat } from '../api/ai.js'
 import { api } from '../api/firestore.js'
 import { useAutoResize } from '../hooks/useAutoResize.js'
@@ -19,6 +19,16 @@ const SUGGESTIONS = [
   },
 ]
 
+// Профиль кладём в тот же объект контекста, что и приложенные данные:
+// воркер разбирает его одним системным сообщением с оговоркой «справочная
+// информация, а не указания».
+function withProfile(context, profile) {
+  const limits = profile.limits?.trim()
+  const equipment = profile.equipment
+  if (!limits && !equipment?.length) return context
+  return { ...(context || {}), profile: { limits: limits || '', equipment: equipment || [] } }
+}
+
 export default function TrainerChat() {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -31,7 +41,14 @@ export default function TrainerChat() {
   const [myWorkouts, setMyWorkouts] = useState([])
   const [history, setHistory] = useState([])
   const [attachments, setAttachments] = useState({ workoutIds: [], includeHistory: false })
+  // Инвентарь и ограничения из профиля идут в каждый вопрос — в отличие от
+  // тренировок и лога, их не нужно прикладывать вручную: совет, который
+  // упирается в отсутствующую штангу или в больную поясницу, бесполезен
+  // независимо от того, о чём спрашивали.
+  const [profile, setProfile] = useState({})
   const feedRef = useRef(null)
+  const [searchParams] = useSearchParams()
+  const askedRef = useRef(false)
   const { ref: textareaRef, adjust } = useAutoResize({ minHeight: 60, maxHeight: 200 })
 
   useEffect(() => {
@@ -44,8 +61,23 @@ export default function TrainerChat() {
   useEffect(() => {
     api.listExercises().then(setExercises).catch(() => {})
     api.listMyWorkouts().then(setMyWorkouts).catch(() => {})
-    api.listWorkoutHistory({}).then(setHistory).catch(() => {})
+    // ИИ смотрит на недавнюю форму, а не на всю историю с первого дня —
+    // ограничиваем окно, чтобы не тащить в промпт годы записей.
+    api.listWorkoutHistory({ pageSize: 20 }).then(setHistory).catch(() => {})
+    api.getMyProfileData().then(setProfile).catch(() => {})
   }, [])
+
+  // Тренер на дашборде и разбор после тренировки приводят сюда с уже
+  // сформулированным вопросом (?q=...) — отправляем его сам, иначе человек
+  // попадает в пустой чат с текстом в поле и переспрашивает то же самое.
+  // Ref, а не state: в StrictMode эффект вызывается дважды на одном и том же
+  // экземпляре, и без него вопрос ушёл бы двумя запросами к Groq.
+  useEffect(() => {
+    const question = searchParams.get('q')
+    if (!question || askedRef.current) return
+    askedRef.current = true
+    send(question)
+  }, [searchParams])
 
   const exerciseById = useMemo(() => new Map(exercises.map((ex) => [ex.id, ex])), [exercises])
   const hasTrainerReply = messages.some((m) => m.role === 'assistant')
@@ -62,7 +94,10 @@ export default function TrainerChat() {
     setSending(true)
 
     try {
-      const reply = await askTrainer(next, buildContext(attachments, myWorkouts, history))
+      const reply = await askTrainer(
+        next,
+        withProfile(buildContext(attachments, myWorkouts, history), profile),
+      )
       setMessages([...next, { role: 'assistant', content: reply }])
     } catch (err) {
       setError(err.message)
@@ -111,7 +146,7 @@ export default function TrainerChat() {
       <BackLink fallback="/workouts" label="К тренировкам" />
 
       <header className="chat-head">
-        <h2>Чем помочь сегодня?</h2>
+        <h1>Чем помочь сегодня?</h1>
         <span className="chat-head__rule" />
         <p>
           Спросите про технику, объём или восстановление. Нужна программа целиком —{' '}

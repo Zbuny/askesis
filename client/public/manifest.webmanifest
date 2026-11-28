@@ -1,0 +1,22 @@
+{
+  "name": "Askesis — тренировки и прогресс",
+  "short_name": "Askesis",
+  "description": "Программы тренировок, журнал подходов, отдых между подходами и прогресс.",
+  "lang": "ru",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#08080a",
+  "theme_color": "#08080a",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Мои тренировки", "url": "/workouts", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Статистика", "url": "/statistics", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Сканер КБЖУ", "url": "/nutrition", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

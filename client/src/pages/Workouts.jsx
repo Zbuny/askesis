@@ -1,30 +1,87 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/firestore.js'
+import { useAsyncData } from '../hooks/useAsyncData.js'
+import TiltCard from '../components/TiltCard.jsx'
+import { EmptyState, PageError, PageLoading } from '../components/PageState.jsx'
+import { pluralRu, translateMuscle } from '../utils/translate.js'
+import { estimateMinutes, workoutMuscles } from '../utils/planner.js'
+import { exerciseFrames } from '../utils/exerciseFrames.js'
 
+// Сюда приходят, чтобы начать тренировку, поэтому список собственных
+// тренировок — главное на экране и стоит первым. Создание новой — одна
+// кнопка в шапке, а ИИ-варианты ниже как дополнительные пути: раньше три
+// равных по весу призыва стояли над списком и спорили за внимание.
 export default function Workouts() {
-  const [workouts, setWorkouts] = useState([])
-  const [error, setError] = useState(null)
-  const [loading, setLoading] = useState(true)
-
+  const { data: workouts, loading, error, reload } = useAsyncData(api.listMyWorkouts, [])
+  // Каталог нужен только для картинок и групп мышц на карточках. Он кэшируется
+  // на сутки (api/cache.js), так что обычно приходит без запроса; без него
+  // карточки просто остаются текстовыми.
+  const [exercises, setExercises] = useState([])
   useEffect(() => {
-    api
-      .listMyWorkouts()
-      .then(setWorkouts)
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false))
+    api.listExercises().then(setExercises).catch(() => {})
   }, [])
+  const exerciseById = useMemo(() => new Map(exercises.map((ex) => [ex.id, ex])), [exercises])
 
-  if (error) return <p>Ошибка: {error}</p>
-  if (loading) return <p>Загрузка...</p>
+  if (loading) return <PageLoading label="Загружаем тренировки" />
+  if (error) return <PageError message={error} onRetry={reload} backTo="/dashboard" />
 
   return (
     <section>
-      <h2>Мои тренировки</h2>
-      <div className="hero__actions">
-        <Link to="/workouts/new" className="button">+ Собрать тренировку</Link>
+      <div className="page-head">
+        <h1>Мои тренировки</h1>
+        {workouts.length > 0 && (
+          <Link to="/workouts/new" className="button">+ Собрать тренировку</Link>
+        )}
       </div>
 
+      {workouts.length === 0 ? (
+        <EmptyState
+          title="Пока нет ни одной тренировки"
+          text="Соберите свою из библиотеки, начните готовую программу или попросите ИИ-тренера составить план под цель."
+        >
+          <Link to="/workouts/new" className="button">Собрать тренировку</Link>
+          <Link to="/programs" className="button--ghost">Готовые программы</Link>
+        </EmptyState>
+      ) : (
+        <div className="program-grid">
+          {workouts.map((w) => {
+            const count = w.items?.length || 0
+            const muscles = workoutMuscles(w, exerciseById, translateMuscle)
+            // Миниатюры первых упражнений — список тренировок узнаётся по
+            // картинкам быстрее, чем по названиям вроде «День 1» и «День 2».
+            const thumbs = (w.items || [])
+              .map((item) => exerciseFrames(exerciseById.get(item.exerciseId))[0])
+              .filter(Boolean)
+              .slice(0, 3)
+            return (
+              <TiltCard as={Link} to={`/workouts/${w.id}`} className="program-card workout-card" key={w.id}>
+                {thumbs.length > 0 && (
+                  <span className="workout-card__thumbs" aria-hidden="true">
+                    {thumbs.map((src) => (
+                      <img key={src} src={src} alt="" loading="lazy" />
+                    ))}
+                  </span>
+                )}
+                <h3>{w.title}</h3>
+                {muscles.length > 0 && (
+                  <span className="chips">
+                    {muscles.map((muscle) => (
+                      <span key={muscle} className="chip">{muscle}</span>
+                    ))}
+                  </span>
+                )}
+                <p>
+                  {count} {pluralRu(count, 'упражнение', 'упражнения', 'упражнений')}
+                  {estimateMinutes(w) > 0 && ` · ~${estimateMinutes(w)} мин`}
+                </p>
+              </TiltCard>
+            )
+          })}
+        </div>
+      )}
+
+      <span className="eyebrow section-label">С помощью ИИ</span>
       <div className="ai-actions">
         <Link to="/workouts/ai" className="ai-action">
           <span className="ai-action__glow" aria-hidden="true" />
@@ -60,17 +117,6 @@ export default function Workouts() {
           </span>
         </Link>
       </div>
-
-      {workouts.length === 0 && <p>Пока нет ни одной тренировки.</p>}
-
-      <ul className="admin-list">
-        {workouts.map((w) => (
-          <li key={w.id}>
-            <Link to={`/workouts/${w.id}`}>{w.title}</Link>
-            <span>{w.items?.length || 0} упражнений</span>
-          </li>
-        ))}
-      </ul>
     </section>
   )
 }

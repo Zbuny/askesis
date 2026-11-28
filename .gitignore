@@ -6,6 +6,7 @@ worker/.wrangler/
 .firebase/
 firebase-debug.log
 firebase-debug.*.log
+firestore-debug.log
 ui-debug.log
 scripts/serviceAccountKey.json
 client/test-results/

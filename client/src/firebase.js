@@ -1,6 +1,5 @@
 import { initializeApp } from 'firebase/app'
 import { getAuth, connectAuthEmulator } from 'firebase/auth'
-import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore'
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -13,9 +12,11 @@ const firebaseConfig = {
 
 export const app = initializeApp(firebaseConfig)
 export const auth = getAuth(app)
-export const db = getFirestore(app)
 
 if (import.meta.env.VITE_USE_FIREBASE_EMULATORS === 'true') {
   connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true })
-  connectFirestoreEmulator(db, 'localhost', 8080)
 }
+
+// Firestore живёт в отдельном модуле db.js: его SDK весит втрое больше
+// Auth-а, а на главной и на страницах входа не нужен вовсе. Держим его
+// здесь — и он грузился бы вместе с первым экраном.

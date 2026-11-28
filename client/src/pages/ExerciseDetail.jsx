@@ -3,7 +3,8 @@ import { useParams } from 'react-router-dom'
 import { api } from '../api/firestore.js'
 import ExerciseAnimation from '../components/ExerciseAnimation.jsx'
 import BackLink from '../components/BackLink.jsx'
-import { exerciseFrames } from '../utils/exerciseFrames.js'
+import { PageError, PageLoading } from '../components/PageState.jsx'
+import { exerciseFrames, hasExerciseMedia } from '../utils/exerciseFrames.js'
 import {
   exerciseInstructions,
   exerciseName,
@@ -27,8 +28,8 @@ export default function ExerciseDetail() {
     api.getExercise({ id }).then(setExercise).catch((e) => setError(e.message))
   }, [id])
 
-  if (error) return <p>Ошибка: {error}</p>
-  if (!exercise) return <p>Загрузка...</p>
+  if (error) return <PageError title="Не получилось открыть упражнение" message={error} backTo="/exercises" backLabel="К библиотеке" />
+  if (!exercise) return <PageLoading cards={2} label="Загружаем упражнение" />
 
   const steps = exerciseInstructions(exercise)
     .split('\n')
@@ -43,7 +44,7 @@ export default function ExerciseDetail() {
       <BackLink fallback="/exercises" label="К библиотеке" />
 
       <div className="exercise-detail__layout">
-        {exercise.imageUrl && (
+        {hasExerciseMedia(exercise) && (
           <div className="exercise-detail__media">
             <ExerciseAnimation exercise={exercise} alt={exerciseName(exercise)} />
             <span className="exercise-detail__caption">Движение целиком</span>
@@ -62,7 +63,7 @@ export default function ExerciseDetail() {
         )}
 
         <div className="exercise-detail__info">
-          <h2>{exerciseName(exercise)}</h2>
+          <h1>{exerciseName(exercise)}</h1>
 
           <div className="exercise-detail__tags">
             {exercise.muscleGroup && <span className="tag">{translateMuscle(exercise.muscleGroup)}</span>}

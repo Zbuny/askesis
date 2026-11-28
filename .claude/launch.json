@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "client", "run", "dev", "--", "--port", "5173"],
       "port": 5173
+    },
+    {
+      "name": "askesis-client-emulator",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "client", "run", "dev:emulator"],
+      "port": 5174
     }
   ]
 }

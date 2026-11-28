@@ -2,9 +2,13 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api/firestore.js'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useAsyncAction } from '../hooks/useAsyncAction.js'
 import { exerciseName } from '../utils/translate.js'
 import { formatReps, programItems } from '../utils/programItems.js'
 import BackLink from '../components/BackLink.jsx'
+import ConfirmDialog from '../components/ConfirmDialog.jsx'
+import { PageError, PageLoading } from '../components/PageState.jsx'
+import { useConfirm } from '../hooks/useConfirm.js'
 
 export default function ProgramDetail() {
   const { id } = useParams()
@@ -12,32 +16,53 @@ export default function ProgramDetail() {
   const { user } = useAuth()
   const [program, setProgram] = useState(null)
   const [exercises, setExercises] = useState([])
-  const [error, setError] = useState(null)
-  const [starting, setStarting] = useState(false)
+  const [existingWorkout, setExistingWorkout] = useState(null)
+  const [loadError, setLoadError] = useState(null)
+  const { busy: starting, error: startError, run } = useAsyncAction()
+  const { ask, confirmProps } = useConfirm()
 
   useEffect(() => {
-    Promise.all([api.getProgram({ id }), api.listExercises()])
-      .then(([programData, exerciseList]) => {
+    const tasks = [api.getProgram({ id }), api.listExercises()]
+    if (user) tasks.push(api.findWorkoutFromProgram({ programId: id }))
+    Promise.all(tasks)
+      .then(([programData, exerciseList, workout]) => {
         setProgram(programData)
         setExercises(exerciseList)
+        setExistingWorkout(workout || null)
       })
-      .catch((e) => setError(e.message))
-  }, [id])
+      .catch((e) => setLoadError(e.message))
+  }, [id, user])
 
   async function handleStart() {
-    setError(null)
-    setStarting(true)
+    // Уже есть личная тренировка из этой программы — не плодим копии молча,
+    // даём выбор: открыть существующую или всё же завести ещё одну.
+    // Безопасный вариант — «Открыть её»: он стоит на месте отмены, где диалог
+    // держит фокус, так что случайный Enter не плодит копию. Esc (null)
+    // не делает ничего.
+    if (existingWorkout) {
+      const createAnother = await ask({
+        title: 'Вы уже начинали эту программу',
+        message: `Тренировка «${existingWorkout.title}» уже есть в вашем списке.`,
+        confirmLabel: 'Создать ещё одну',
+        cancelLabel: 'Открыть её',
+        danger: false,
+      })
+      if (createAnother === null) return
+      if (!createAnother) {
+        navigate(`/workouts/${existingWorkout.id}`)
+        return
+      }
+    }
     try {
-      const result = await api.startProgram({ programId: id })
+      const result = await run(() => api.startProgram({ programId: id }))
       navigate(`/workouts/${result.id}`)
-    } catch (err) {
-      setError(err.message)
-      setStarting(false)
+    } catch {
+      // ошибка уже показана ниже через startError
     }
   }
 
-  if (error) return <p>Ошибка: {error}</p>
-  if (!program) return <p>Загрузка...</p>
+  if (loadError) return <PageError title="Не получилось открыть программу" message={loadError} backTo="/programs" backLabel="К программам" />
+  if (!program) return <PageLoading cards={2} label="Загружаем программу" />
 
   const exerciseById = new Map(exercises.map((ex) => [ex.id, ex]))
   const items = programItems(program)
@@ -45,18 +70,18 @@ export default function ProgramDetail() {
   return (
     <section>
       <BackLink fallback="/programs" label="К программам" />
-      <h2>{program.title}</h2>
+      <h1 className="page-title">{program.title}</h1>
       <p>{program.level} · {program.duration}</p>
       <p>{program.description}</p>
 
       {user ? (
         <button type="button" className="button" onClick={handleStart} disabled={starting || items.length === 0}>
-          {starting ? 'Создаём тренировку...' : 'Начать программу'}
+          {starting ? 'Создаём тренировку...' : existingWorkout ? 'Открыть или начать заново' : 'Начать программу'}
         </button>
       ) : (
         <p><Link to="/login">Войдите</Link>, чтобы начать эту программу.</p>
       )}
-      {error && <p className="error">{error}</p>}
+      {startError && <p className="error">{startError}</p>}
 
       <ul className="program-exercise-list">
         {items.map((item) => {
@@ -71,6 +96,8 @@ export default function ProgramDetail() {
           )
         })}
       </ul>
+
+      <ConfirmDialog {...confirmProps} />
     </section>
   )
 }

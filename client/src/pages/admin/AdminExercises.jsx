@@ -1,16 +1,34 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api } from '../../api/firestore.js'
+import { useAsyncAction } from '../../hooks/useAsyncAction.js'
+import { emptyFilters, filterExercises } from '../../utils/exerciseFilters.js'
+import ExerciseFilterBar from '../../components/ExerciseFilterBar.jsx'
+import ConfirmDialog from '../../components/ConfirmDialog.jsx'
+import { useConfirm } from '../../hooks/useConfirm.js'
 
-const emptyForm = { id: null, name: '', muscleGroup: '', equipment: '', instructions: '', imageUrl: '' }
+const emptyForm = { id: null, name: '', muscleGroup: '', equipment: '', instructions: '', imageUrl: '', animationUrl: '' }
+const PAGE_SIZE = 40
 
 export default function AdminExercises() {
   const [exercises, setExercises] = useState([])
   const [form, setForm] = useState(emptyForm)
-  const [error, setError] = useState(null)
-  const [saving, setSaving] = useState(false)
+  const { busy: saving, error, setError, run } = useAsyncAction()
+  const { ask, confirmProps } = useConfirm()
+
+  const [filters, setFilters] = useState(emptyFilters)
+  const filtered = useMemo(() => filterExercises(exercises, filters), [exercises, filters])
+
+  // Список — 873 упражнения; рисуем порциями и сбрасываем счётчик при смене
+  // фильтра, как в ExercisePicker (тот же паттерн, та же причина).
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  const [lastFilters, setLastFilters] = useState(filters)
+  if (lastFilters !== filters) {
+    setLastFilters(filters)
+    setVisibleCount(PAGE_SIZE)
+  }
 
   function load() {
-    api.listExercises().then(setExercises).catch((e) => setError(e.message))
+    api.listExercisesFull().then(setExercises).catch((e) => setError(e.message))
   }
 
   useEffect(load, [])
@@ -23,6 +41,7 @@ export default function AdminExercises() {
       equipment: ex.equipment || '',
       instructions: ex.instructions || '',
       imageUrl: ex.imageUrl || '',
+      animationUrl: ex.animationUrl || '',
     })
     // Список — все 873 упражнения подряд, форма — вверху страницы.
     // Без прокрутки клик по «Изменить» в конце списка выглядит так,
@@ -32,30 +51,26 @@ export default function AdminExercises() {
 
   async function handleSubmit(e) {
     e.preventDefault()
-    setError(null)
-    setSaving(true)
     try {
-      if (form.id) {
-        await api.updateExercise(form)
-      } else {
-        await api.createExercise(form)
-      }
+      await run(() => (form.id ? api.updateExercise(form) : api.createExercise(form)))
       setForm(emptyForm)
       load()
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setSaving(false)
+    } catch {
+      // ошибка уже показана ниже через error
     }
   }
 
-  async function handleDelete(id) {
-    setError(null)
+  async function handleDelete(id, name) {
+    const confirmed = await ask({
+      title: 'Удалить упражнение?',
+      message: `«${name}» исчезнет из библиотеки у всех пользователей.`,
+    })
+    if (!confirmed) return
     try {
-      await api.deleteExercise({ id })
+      await run(() => api.deleteExercise({ id }))
       load()
-    } catch (err) {
-      setError(err.message)
+    } catch {
+      // ошибка уже показана ниже через error
     }
   }
 
@@ -85,6 +100,14 @@ export default function AdminExercises() {
           value={form.imageUrl}
           onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
         />
+        {/* Каталог даёт два кадра на упражнение, и гифки из них не выйдет.
+            Сюда кладётся готовая анимация, когда она есть: показ переключается
+            сам, а без ссылки работает прежняя перелистовка кадров. */}
+        <input
+          placeholder="Ссылка на GIF-анимацию (необязательно)"
+          value={form.animationUrl}
+          onChange={(e) => setForm({ ...form, animationUrl: e.target.value })}
+        />
         <textarea
           placeholder="Инструкция по выполнению"
           value={form.instructions}
@@ -105,17 +128,27 @@ export default function AdminExercises() {
 
       {error && <p className="error">{error}</p>}
 
+      <ExerciseFilterBar exercises={exercises} filters={filters} onChange={setFilters} total={filtered.length} />
+      <p className="picker__count">Найдено: {filtered.length}</p>
+
       <ul className="admin-list">
-        {exercises.map((ex) => (
+        {filtered.slice(0, visibleCount).map((ex) => (
           <li key={ex.id}>
             <span>{ex.name} <small>({ex.muscleGroup})</small></span>
             <span className="admin-list__actions">
               <button type="button" onClick={() => startEdit(ex)}>Изменить</button>
-              <button type="button" onClick={() => handleDelete(ex.id)}>Удалить</button>
+              <button type="button" className="is-danger" onClick={() => handleDelete(ex.id, ex.name)}>Удалить</button>
             </span>
           </li>
         ))}
       </ul>
+      {visibleCount < filtered.length && (
+        <button type="button" className="picker__more" onClick={() => setVisibleCount(visibleCount + PAGE_SIZE)}>
+          Показать ещё ({filtered.length - visibleCount})
+        </button>
+      )}
+
+      <ConfirmDialog {...confirmProps} />
     </section>
   )
 }

@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api/firestore.js'
-import { generateWorkoutPlan } from '../api/ai.js'
-import { translateEquipment } from '../utils/translate.js'
+import { aiConfigured, generateWorkoutPlan } from '../api/ai.js'
+import { buildStarterPlan } from '../utils/starterPlan.js'
 import { uniqueValues } from '../utils/exerciseFilters.js'
 import BackLink from '../components/BackLink.jsx'
 import GeneratedPlan from '../components/GeneratedPlan.jsx'
+import EquipmentPicker from '../components/EquipmentPicker.jsx'
 import { calcBmi } from '../utils/bmi.js'
+import { TRAINING_LEVELS } from '../utils/repRanges.js'
 
 const GOALS = [
   'Набрать мышечную массу',
@@ -14,8 +16,6 @@ const GOALS = [
   'Поддерживать форму',
   'Развить выносливость',
 ]
-
-const LEVELS = ['Начинающий', 'Средний', 'Продвинутый']
 
 const STEPS = ['Цель', 'Уровень', 'График', 'Инвентарь', 'Ограничения']
 
@@ -31,6 +31,7 @@ export default function AiWorkoutBuilder() {
   })
   const [plan, setPlan] = useState(null)
   const [generating, setGenerating] = useState(false)
+  const [usedAi, setUsedAi] = useState(false)
   const [error, setError] = useState(null)
 
   useEffect(() => {
@@ -41,6 +42,14 @@ export default function AiWorkoutBuilder() {
       const bmi = calcBmi(data.weight, data.height)
       setProfile((prev) => ({
         ...prev,
+        // Уровень уже указан в профиле — не спрашиваем его второй раз,
+        // просто подставляем в мастер как выбранный.
+        level: prev.level || data.level || '',
+        // То же и с инвентарём с ограничениями: оба поля правятся в профиле
+        // и нужны не только здесь, поэтому мастер начинает с них, а не с
+        // чистого листа. Ответ остаётся исправимым — это те же шаги 4 и 5.
+        equipment: prev.equipment.length ? prev.equipment : data.equipment || [],
+        limits: prev.limits || data.limits || '',
         age: data.age,
         weight: data.weight,
         height: data.height,
@@ -52,15 +61,6 @@ export default function AiWorkoutBuilder() {
   const equipmentOptions = useMemo(() => uniqueValues(exercises, 'equipment'), [exercises])
   const exerciseById = useMemo(() => new Map(exercises.map((ex) => [ex.id, ex])), [exercises])
 
-  function toggleEquipment(value) {
-    setProfile((prev) => ({
-      ...prev,
-      equipment: prev.equipment.includes(value)
-        ? prev.equipment.filter((item) => item !== value)
-        : [...prev.equipment, value],
-    }))
-  }
-
   const canAdvance =
     (step === 0 && profile.goal) ||
     (step === 1 && profile.level) ||
@@ -68,16 +68,33 @@ export default function AiWorkoutBuilder() {
     (step === 3 && profile.equipment.length > 0) ||
     step === 4
 
+  // Ответы собраны — человек обязан уйти отсюда с программой. Модель может
+  // быть не развёрнута или упереться в квоту Groq, и «помощник не настроен»
+  // вместо результата после пяти вопросов — худший из возможных ответов.
+  // Тот же запасной сплит, что и в онбординге (см. utils/starterPlan.js).
   async function handleGenerate() {
     setError(null)
     setGenerating(true)
     setPlan(null)
-    setSavedTitles([])
+    // Ответы про инвентарь и ограничения больше не одноразовые: по ним
+    // подбирается замена упражнения в тренировке и отвечает тренер в чате.
+    // Пишем их в профиль до генерации и молча — программа важнее, и ронять
+    // её из-за неудачной записи в Firestore незачем.
+    api
+      .updateMyProfileData({ equipment: profile.equipment, limits: profile.limits.trim() || null })
+      .catch(() => {})
     try {
-      const result = await generateWorkoutPlan({ profile, exercises })
-      setPlan(result)
+      if (!aiConfigured) {
+        setPlan(buildStarterPlan({ exercises, ...profile }))
+        setUsedAi(false)
+        return
+      }
+      setPlan(await generateWorkoutPlan({ profile, exercises }))
+      setUsedAi(true)
     } catch (err) {
-      setError(err.message)
+      setError(`${err.message}. Ниже — программа, собранная по вашим ответам без ИИ.`)
+      setPlan(buildStarterPlan({ exercises, ...profile }))
+      setUsedAi(false)
     } finally {
       setGenerating(false)
     }
@@ -86,7 +103,7 @@ export default function AiWorkoutBuilder() {
   return (
     <section>
       <BackLink fallback="/workouts" label="К тренировкам" />
-      <h2>ИИ-тренер</h2>
+      <h1 className="page-title">ИИ-тренер</h1>
       <p>Ответьте на пять вопросов — и получите программу, собранную из упражнений вашей библиотеки.</p>
 
       <ol className="wizard-steps">
@@ -121,7 +138,7 @@ export default function AiWorkoutBuilder() {
           <>
             <h3>Ваш уровень подготовки?</h3>
             <div className="choice-grid">
-              {LEVELS.map((level) => (
+              {TRAINING_LEVELS.map((level) => (
                 <button
                   key={level}
                   type="button"
@@ -155,19 +172,12 @@ export default function AiWorkoutBuilder() {
 
         {step === 3 && (
           <>
-            <h3>Что у вас есть из инвентаря?</h3>
-            <div className="choice-grid">
-              {equipmentOptions.map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  className={profile.equipment.includes(value) ? 'choice is-selected' : 'choice'}
-                  onClick={() => toggleEquipment(value)}
-                >
-                  {translateEquipment(value)}
-                </button>
-              ))}
-            </div>
+            <h3>Где и чем будете тренироваться?</h3>
+            <EquipmentPicker
+              available={equipmentOptions}
+              selected={profile.equipment}
+              onChange={(equipment) => setProfile({ ...profile, equipment })}
+            />
           </>
         )}
 
@@ -177,10 +187,15 @@ export default function AiWorkoutBuilder() {
             <textarea
               className="wizard-textarea"
               rows={4}
+              maxLength={400}
               placeholder="Например: болит поясница, не делаю становую. Можно оставить пустым."
               value={profile.limits}
               onChange={(e) => setProfile({ ...profile, limits: e.target.value })}
             />
+            <p className="wizard-hint">
+              Сохраним в профиль: по этому же тексту подбирается замена
+              упражнения в тренировке и отвечает тренер в чате.
+            </p>
           </>
         )}
 
@@ -201,7 +216,13 @@ export default function AiWorkoutBuilder() {
 
       {error && <p className="error">{error}</p>}
 
-      {plan && <GeneratedPlan plan={plan} exerciseById={exerciseById} />}
+      {plan && (
+        <GeneratedPlan
+          plan={plan}
+          exerciseById={exerciseById}
+          heading={usedAi ? 'Ваша программа' : 'Программа по вашим ответам'}
+        />
+      )}
     </section>
   )
 }

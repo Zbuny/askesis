@@ -1,37 +1,36 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/firestore.js'
+import { useAsyncData } from '../hooks/useAsyncData.js'
 import { exerciseName, translateEquipment, translateMuscle } from '../utils/translate.js'
 import { emptyFilters, filterExercises } from '../utils/exerciseFilters.js'
 import ExerciseFilterBar from '../components/ExerciseFilterBar.jsx'
+import { hasExerciseMedia } from '../utils/exerciseFrames.js'
 import ExerciseAnimation from '../components/ExerciseAnimation.jsx'
+import { PageError, PageLoading } from '../components/PageState.jsx'
 
 export default function Exercises() {
-  const [exercises, setExercises] = useState([])
-  const [error, setError] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const { data, loading, error, reload } = useAsyncData(api.listExercises, [])
+  const exercises = data || []
   const [filters, setFilters] = useState(emptyFilters)
   // В сетке крутим кадры только у карточки под курсором — иначе сотни
   // одновременных таймеров и предзагрузок вторых кадров.
   const [hoveredId, setHoveredId] = useState(null)
 
-  useEffect(() => {
-    api
-      .listExercises()
-      .then(setExercises)
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false))
-  }, [])
-
   const filtered = useMemo(() => filterExercises(exercises, filters), [exercises, filters])
 
-  if (error) return <p>Не удалось загрузить упражнения: {error}</p>
-  if (loading) return <p>Загрузка...</p>
+  if (loading) return <PageLoading cards={4} label="Загружаем упражнения" />
+  if (error) return <PageError title="Не получилось загрузить упражнения" message={error} onRetry={reload} backTo="/dashboard" />
 
   return (
     <section>
-      <h2>Библиотека упражнений</h2>
-      <ExerciseFilterBar exercises={exercises} filters={filters} onChange={setFilters} />
+      <h1 className="page-title">Библиотека упражнений</h1>
+      <ExerciseFilterBar
+        exercises={exercises}
+        filters={filters}
+        onChange={setFilters}
+        total={filtered.length}
+      />
       {exercises.length === 0 && (
         <p>Библиотека пуста — импортируйте датасет (см. README/SETUP).</p>
       )}
@@ -47,7 +46,7 @@ export default function Exercises() {
             onFocus={() => setHoveredId(ex.id)}
             onBlur={() => setHoveredId(null)}
           >
-            {ex.imageUrl && (
+            {hasExerciseMedia(ex) && (
               <ExerciseAnimation
                 exercise={ex}
                 alt={exerciseName(ex)}
