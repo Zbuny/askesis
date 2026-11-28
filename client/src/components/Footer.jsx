@@ -1,11 +1,15 @@
 import { Link } from 'react-router-dom'
+import BrandMark from './BrandMark.jsx'
 
 export default function Footer() {
   return (
     <footer className="footer">
       <div className="footer__inner">
         <div className="footer__brand">
-          <span className="footer__wordmark">Askesis</span>
+          <span className="footer__wordmark">
+            <BrandMark variant="full" />
+            <span className="brand-word">Askesis</span>
+          </span>
           <p>Система дисциплины и прогресса для тех, кто выбирает контроль над собой.</p>
         </div>
         <nav className="footer__links">

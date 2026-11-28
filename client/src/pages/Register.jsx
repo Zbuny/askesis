@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
+import BrandMark from '../components/BrandMark.jsx'
 import { useAsyncAction } from '../hooks/useAsyncAction.js'
 
 export default function Register() {
@@ -80,7 +81,8 @@ export default function Register() {
       <div className="auth-card">
         <div className="auth-card__inner">
           <div className="auth-card__mark" aria-hidden="true">
-            <img src="/logo.png" alt="" />
+            <BrandMark variant="full" />
+            <span className="brand-word">Askesis</span>
           </div>
 
           <span className="eyebrow">Askesis · Регистрация</span>

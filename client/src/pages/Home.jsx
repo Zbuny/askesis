@@ -1,6 +1,7 @@
 import { Link, Navigate } from 'react-router-dom'
 import { hadSession, useAuth } from '../context/AuthContext.jsx'
 import TiltCard from '../components/TiltCard.jsx'
+import BrandMark from '../components/BrandMark.jsx'
 import ProgressChart from '../components/ProgressChart.jsx'
 import InstallApp from '../components/InstallApp.jsx'
 
@@ -238,6 +239,7 @@ export default function Home() {
       <section className="hero hero--photo">
         <div className="hero__overlay" />
         <div className="hero__content">
+          <BrandMark variant="full" className="hero__mark" />
           <span className="eyebrow">Askesis · Дневник тренировок</span>
           <h1>Знай, какой вес<br />брать сегодня.</h1>
           <p>
