@@ -1,0 +1,268 @@
+/* ==========================================================================
+   «Пентеликон» — основной облик тёмной и светлой темы.
+
+   Мрамор и свет, в меру: фон — тёмная (светлая) мраморная плита в два
+   масштаба прожилок и мягкие пятна тёплого света; карточки — полированные
+   плиты с бликом по верхней кромке, многослойной тенью и двумя тонкими
+   шампань-уголками по диагонали; надзаголовки внутри карточек — плашки с
+   фаской; основная кнопка «Слиток + Грань» получает едва заметную прожилку.
+
+   Всё только через переменные и общий список карточек ниже. Тема «Киберпанк»
+   сюда не попадает: каждое правило смотрит на :not([data-theme='cyber']).
+
+   Производительность: текстуры — статичные SVG (feTurbulence) в data URI,
+   рисуются один раз; фиксированные слои фона не перерисовываются при
+   прокрутке; движется только слой света (transform), а при
+   prefers-reduced-motion он стоит на месте.
+   ========================================================================== */
+
+:root:not([data-theme='cyber']) {
+  /* Прожилки: крупный план фона, глубокий слой под ним, мелкие на карточках
+     и на кнопке. Цвет и прозрачность зашиты в SVG — для светлой схемы свои. */
+  --marble-veins: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='760' height='760'%3E%3Cfilter id='m' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='turbulence' baseFrequency='0.0032 0.0085' numOctaves='5' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.902 0 0 0 0 0.847 0 0 0 0 0.737 -7 0 0 0 1.05'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23m)' opacity='0.09'/%3E%3C/svg%3E");
+  --marble-deep: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='1200'%3E%3Cfilter id='m' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='turbulence' baseFrequency='0.0015 0.0042' numOctaves='4' seed='21' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.804 0 0 0 0 0.722 0 0 0 0 0.569 -7 0 0 0 1.05'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23m)' opacity='0.06'/%3E%3C/svg%3E");
+  --marble-card: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='520' height='520'%3E%3Cfilter id='m' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='turbulence' baseFrequency='0.005 0.012' numOctaves='5' seed='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.902 0 0 0 0 0.847 0 0 0 0 0.737 -7 0 0 0 1.05'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23m)' opacity='0.06'/%3E%3C/svg%3E");
+  --marble-btn: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='m' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='turbulence' baseFrequency='0.012 0.03' numOctaves='5' seed='11' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 -7 0 0 0 1.05'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23m)' opacity='0.35'/%3E%3C/svg%3E");
+
+  /* Свет: три мягких тёплых пятна и виньетка по краям. */
+  --marble-light:
+    radial-gradient(38% 30% at 14% 4%, rgba(205, 184, 145, 0.14), transparent 70%),
+    radial-gradient(30% 26% at 92% 42%, rgba(235, 228, 214, 0.06), transparent 70%),
+    radial-gradient(44% 30% at 34% 96%, rgba(205, 184, 145, 0.08), transparent 70%);
+  --marble-vignette: radial-gradient(130% 95% at 50% 0%, transparent 55%, rgba(0, 0, 0, 0.45));
+
+  /* Плита карточки. */
+  --slab-hi: #1a1917;
+  --slab-lo: #131210;
+  --slab-line: rgba(205, 184, 145, 0.13);
+  --slab-line-hover: rgba(205, 184, 145, 0.38);
+  --slab-corner: rgba(205, 184, 145, 0.75);
+  --slab-shadow:
+    inset 0 1px 0 rgba(255, 245, 225, 0.06),
+    0 1px 0 rgba(0, 0, 0, 0.5),
+    0 16px 30px -18px rgba(0, 0, 0, 0.7),
+    0 40px 80px -48px rgba(205, 184, 145, 0.12);
+  --slab-shadow-hover:
+    inset 0 1px 0 rgba(255, 245, 225, 0.08),
+    0 1px 0 rgba(0, 0, 0, 0.5),
+    0 20px 36px -18px rgba(0, 0, 0, 0.75),
+    0 40px 80px -40px rgba(205, 184, 145, 0.22);
+  --slab-tint: rgba(205, 184, 145, 0.08);
+  /* Два уголка по диагонали — фоновыми слоями, без псевдоэлементов: у многих
+     карточек ::before/::after уже заняты обложкой и свечением. */
+  --slab-corners:
+    linear-gradient(var(--slab-corner), var(--slab-corner)) left top / 14px 1px no-repeat,
+    linear-gradient(var(--slab-corner), var(--slab-corner)) left top / 1px 14px no-repeat,
+    linear-gradient(var(--slab-corner), var(--slab-corner)) right bottom / 14px 1px no-repeat,
+    linear-gradient(var(--slab-corner), var(--slab-corner)) right bottom / 1px 14px no-repeat;
+
+  /* Основная кнопка: тот же слиток, поверх золота тонкая прожилка. */
+  --btn-primary-face: var(--marble-btn), linear-gradient(105deg, #b48a45 0%, #e9cf98 28%, #c9a462 46%, #f3dcab 62%, #b8914d 100%);
+  --btn-primary-size: 300px 300px, 220% 100%;
+  --btn-primary-pos: 0 0, 0% 0;
+  --btn-primary-pos-hover: 0 0, 100% 0;
+}
+
+:root[data-theme='light'] {
+  --marble-veins: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='760' height='760'%3E%3Cfilter id='m' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='turbulence' baseFrequency='0.0032 0.0085' numOctaves='5' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.431 0 0 0 0 0.384 0 0 0 0 0.314 -7 0 0 0 1.05'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23m)' opacity='0.14'/%3E%3C/svg%3E");
+  --marble-deep: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='1200'%3E%3Cfilter id='m' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='turbulence' baseFrequency='0.0015 0.0042' numOctaves='4' seed='21' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.604 0 0 0 0 0.533 0 0 0 0 0.384 -7 0 0 0 1.05'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23m)' opacity='0.1'/%3E%3C/svg%3E");
+  --marble-card: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='520' height='520'%3E%3Cfilter id='m' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='turbulence' baseFrequency='0.005 0.012' numOctaves='5' seed='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.541 0 0 0 0 0.478 0 0 0 0 0.361 -7 0 0 0 1.05'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23m)' opacity='0.09'/%3E%3C/svg%3E");
+
+  --marble-light:
+    radial-gradient(38% 30% at 14% 4%, rgba(255, 255, 255, 0.8), transparent 70%),
+    radial-gradient(30% 26% at 92% 42%, rgba(205, 184, 145, 0.16), transparent 70%),
+    radial-gradient(44% 30% at 34% 96%, rgba(255, 255, 255, 0.5), transparent 70%);
+  --marble-vignette: radial-gradient(130% 95% at 50% 0%, transparent 55%, rgba(110, 90, 50, 0.12));
+
+  --slab-hi: #ffffff;
+  --slab-lo: #f8f7f3;
+  --slab-line: rgba(70, 58, 35, 0.13);
+  --slab-line-hover: rgba(140, 119, 72, 0.45);
+  --slab-corner: rgba(140, 112, 62, 0.7);
+  --slab-shadow:
+    inset 0 1px 0 #ffffff,
+    0 1px 0 rgba(60, 50, 30, 0.06),
+    0 16px 30px -18px rgba(60, 50, 30, 0.2),
+    0 40px 80px -48px rgba(205, 184, 145, 0.35);
+  --slab-shadow-hover:
+    inset 0 1px 0 #ffffff,
+    0 1px 0 rgba(60, 50, 30, 0.06),
+    0 20px 36px -18px rgba(60, 50, 30, 0.24),
+    0 40px 80px -40px rgba(205, 184, 145, 0.45);
+  --slab-tint: rgba(140, 119, 72, 0.08);
+}
+
+/* ---------- Фон ---------- */
+
+:root:not([data-theme='cyber']) body {
+  background: var(--bg);
+}
+
+:root:not([data-theme='cyber']) body::before,
+:root:not([data-theme='cyber']) body::after {
+  content: '';
+  position: fixed;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* Плита: два масштаба прожилок и виньетка. */
+:root:not([data-theme='cyber']) body::before {
+  inset: 0;
+  background: var(--marble-vignette), var(--marble-veins) 0 0 / 760px 760px, var(--marble-deep) 0 0 / 1200px 1200px;
+}
+
+/* Свет: шире экрана, чтобы медленный дрейф не открывал края. */
+:root:not([data-theme='cyber']) body::after {
+  inset: -8%;
+  background: var(--marble-light);
+  animation: marble-drift 48s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+@keyframes marble-drift {
+  to {
+    transform: translate3d(3%, 2.5%, 0) scale(1.05);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-theme='cyber']) body::after {
+    animation: none;
+  }
+}
+
+/* Под шапкой вместо серой черты — золотая линия, которая загорается слева
+   и гаснет к краям. */
+:root:not([data-theme='cyber']) .navbar {
+  border-bottom-color: transparent;
+}
+
+:root:not([data-theme='cyber']) .navbar::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold) 28%, var(--slab-line-hover) 64%, transparent);
+  pointer-events: none;
+}
+
+/* ---------- Карточки-плиты ---------- */
+
+/* Крупные одиночные блоки — с уголками. */
+:root:not([data-theme='cyber']) :is(
+  .glass-hero,
+  .program-card,
+  .feature-card,
+  .calendar,
+  .plan-card,
+  .wizard-panel,
+  .coach
+) {
+  border-color: var(--slab-line);
+  background: var(--slab-corners), var(--marble-card) 0 0 / 520px 520px, linear-gradient(180deg, var(--slab-hi), var(--slab-lo));
+  box-shadow: var(--slab-shadow);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* Мелкие повторяющиеся карточки (сетки упражнений, плитки, достижения) —
+   та же плита, но без уголков: в сетке из десятков штук они бы рябили. */
+:root:not([data-theme='cyber']) :is(
+  .glass-card,
+  .exercise-card,
+  .record-card,
+  .achievement,
+  .goal,
+  .progress-chart
+) {
+  border-color: var(--slab-line);
+  background: var(--marble-card) 0 0 / 520px 520px, linear-gradient(180deg, var(--slab-hi), var(--slab-lo));
+  box-shadow: var(--slab-shadow);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+:root:not([data-theme='cyber']) :is(.glass-card, .program-card, .exercise-card, .feature-card):hover {
+  border-color: var(--slab-line-hover);
+  box-shadow: var(--slab-shadow-hover);
+}
+
+/* Акцентные плиты («сегодня», серия) — тот же мрамор под золотой дымкой. */
+:root:not([data-theme='cyber']) :is(.today-card, .streak-card) {
+  background:
+    var(--slab-corners),
+    var(--marble-card) 0 0 / 520px 520px,
+    linear-gradient(150deg, var(--slab-tint), transparent 70%),
+    linear-gradient(180deg, var(--slab-hi), var(--slab-lo));
+  box-shadow: var(--slab-shadow);
+}
+
+/* ---------- Скол угла у главных блоков ----------
+   Герой и «сегодня» срезаны в правом верхнем углу; срез и края у него
+   подсвечены шампанью и гаснут вдоль верхней и правой стороны. Срезанный
+   угол обрезает и внешнюю тень, поэтому скол только у этих блоков, а не у
+   всех карточек. */
+:root:not([data-theme='cyber']) :is(.glass-hero, .today-card, .streak-card) {
+  --cc: 20px;
+  border-radius: 4px;
+  clip-path: polygon(0 0, calc(100% - var(--cc)) 0, 100% var(--cc), 100% 100%, 0 100%);
+  background:
+    linear-gradient(225deg, transparent 0 calc(var(--cc) * 0.7071 - 1.5px), var(--gold) calc(var(--cc) * 0.7071 - 1.5px) calc(var(--cc) * 0.7071), transparent calc(var(--cc) * 0.7071)) right top / 40px 40px no-repeat,
+    linear-gradient(270deg, var(--gold), transparent 45%) right top / 100% 1px no-repeat,
+    linear-gradient(180deg, var(--gold), transparent 45%) right top / 1px 100% no-repeat,
+    linear-gradient(var(--slab-corner), var(--slab-corner)) left bottom / 14px 1px no-repeat,
+    linear-gradient(var(--slab-corner), var(--slab-corner)) left bottom / 1px 14px no-repeat,
+    var(--marble-card) 0 0 / 520px 520px,
+    linear-gradient(150deg, var(--slab-tint), transparent 70%),
+    linear-gradient(180deg, var(--slab-hi), var(--slab-lo));
+}
+
+/* «Сегодня» — золотая кромка слева, как у блока плана в макете. */
+:root:not([data-theme='cyber']) .today-card {
+  box-shadow: inset 2px 0 0 var(--gold), var(--slab-shadow);
+}
+
+/* ---------- Косые золотые плашки ----------
+   Надзаголовок внутри плиты лежит на наклонной золотой плашке (угол 22°,
+   как у глыбы в логотипе). Черта ::before становится самой плашкой. */
+:root:not([data-theme='cyber']) :is(.glass-hero, .today-card, .program-card, .plan-card, .wizard-panel, .coach, .streak-card) .eyebrow {
+  position: relative;
+  isolation: isolate;
+  padding: 0.3rem 0.95rem 0.26rem;
+  color: #16110a;
+  font-weight: 600;
+}
+
+:root:not([data-theme='cyber']) :is(.glass-hero, .today-card, .program-card, .plan-card, .wizard-panel, .coach, .streak-card) .eyebrow::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  display: block;
+  width: auto;
+  height: auto;
+  background: linear-gradient(100deg, #b99d66, var(--gold) 50%, #e2d2ad);
+  transform: skewX(-22deg);
+}
+
+/* Чипы мышц — косые, как плашки. */
+:root:not([data-theme='cyber']) .chip {
+  border: 0;
+  border-radius: 0;
+  padding: 0.3rem 0.85rem;
+  background: var(--slab-tint);
+  color: var(--text);
+  clip-path: polygon(5px 0, 100% 0, calc(100% - 5px) 100%, 0 100%);
+}
+
+/* Открытое достижение и выполненная цель — та же золотая дымка, что у
+   «сегодня», поверх мрамора. */
+:root:not([data-theme='cyber']) :is(.achievement.is-unlocked, .goal--done) {
+  border-color: var(--slab-line-hover);
+  background:
+    var(--marble-card) 0 0 / 520px 520px,
+    linear-gradient(150deg, var(--slab-tint), transparent 70%),
+    linear-gradient(180deg, var(--slab-hi), var(--slab-lo));
+}

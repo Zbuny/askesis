@@ -5,6 +5,8 @@ import App from './App.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
 import { ThemeProvider } from './context/ThemeContext.jsx'
 import './index.css'
+// Облик «Пентеликон» (мрамор и свет) для тёмной и светлой темы.
+import './styles/pentelikon.css'
 // Тема «Киберпанк» — поверх основной, включается data-theme="cyber".
 import './styles/theme-cyber.css'
 // Ради побочного эффекта: ловит beforeinstallprompt до первого рендера.
