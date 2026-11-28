@@ -15,12 +15,22 @@
      hover. Тот же цвет повторён в тёмных полосах ниже (hero, cta, auth). */
   --text-faint: #88888e;
 
-  /* Rare accents */
-  --gold: #b9985e;
-  --gold-bright: #d8bb84;
+  /* Акцент — champagne. Контраст (WCAG) к --bg / --surface / --surface-hover:
+     --gold        #cdb891  10.3 / 9.6 / 8.9, текст --accent-contrast на нём 10.3
+     --gold-bright #e3d5b8  13.8 / 12.8 / 11.9 — наведение и яркий текст
+     --gold-muted  #9a8a6c   5.9 / 5.5 / 5.1 — приглушённый текст, AA
+     --gold-deep   #2a251c  — тёмная подложка под акцентом (выбранное, чипы)
+     Имя --gold историческое: так переменную знают все правила ниже. */
+  --champagne: #cdb891;
+  --gold: var(--champagne);
+  --gold-bright: #e3d5b8;
+  --gold-muted: #9a8a6c;
+  --gold-deep: #2a251c;
   --silver: #c9cbd1;
   --accent: var(--gold);
   --accent-contrast: #08080a;
+  /* Знак и словесный знак в шапке, подвале и на входе. */
+  --brand-ink: var(--champagne);
   --danger: #b9615b;
 
   --radius: 3px;
@@ -28,10 +38,13 @@
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
 
   --font-display: 'Space Grotesk', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  /* Только для словесного знака «Askesis». Шрифт грузится подмножеством
+     из одних этих букв (index.html, text=Askesis), остальной текст им не набрать. */
+  --font-brand: 'Caesar Dressing', 'Trajan Pro', 'Cinzel', Georgia, serif;
   /* Узкий спортивный — только для цифр (объём, минуты, XP, таймер, рекорды):
      так числа читаются как табло, а заголовки остаются в фирменном гротеске. */
   --font-numeric: 'Barlow Condensed', 'Space Grotesk', system-ui, sans-serif;
-  --gold-glow: 0 0 0 1px rgba(216, 187, 132, 0.35), 0 18px 44px -14px rgba(216, 187, 132, 0.55);
+  --gold-glow: 0 0 0 1px rgba(227, 213, 184, 0.35), 0 18px 44px -14px rgba(227, 213, 184, 0.55);
   --font-body: 'Inter', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
   font-family: var(--font-body);
 }
@@ -52,17 +65,25 @@
   --text-muted: #57575e;
   --text-faint: #6b6b72;
 
-  --gold: #a3803f;
-  --gold-bright: #8a6a34;
+  /* Сам champagne к светлому фону даёт 1.8:1, поэтому здесь тёмные оттенки
+     той же гаммы. К --bg / --surface:
+     --gold        #9c8457  3.3 / 3.6 — заливки и рамки; текст #0c0c0c на нём 5.5
+     --gold-bright #6f5b36  5.9 / 6.5 — текст, наведение, знак
+     --gold-muted  #7a6844  4.9 / 5.4 */
+  --gold: #9c8457;
+  --gold-bright: #6f5b36;
+  --gold-muted: #7a6844;
+  --gold-deep: #ebe4d6;
   --silver: #63656c;
   --accent-contrast: #0c0c0c;
+  --brand-ink: #6f5b36;
   --danger: #a8453e;
 }
 
 :root[data-theme='light'] body {
   background:
     radial-gradient(ellipse 1100px 700px at 50% -12%, rgba(10, 9, 6, 0.035), transparent 60%),
-    radial-gradient(ellipse 900px 600px at 100% 100%, rgba(163, 128, 63, 0.06), transparent 60%),
+    radial-gradient(ellipse 900px 600px at 100% 100%, rgba(156, 132, 87, 0.06), transparent 60%),
     var(--bg);
 }
 
@@ -99,7 +120,7 @@ body {
   margin: 0;
   background:
     radial-gradient(ellipse 1100px 700px at 50% -12%, rgba(255, 255, 255, 0.055), transparent 60%),
-    radial-gradient(ellipse 900px 600px at 100% 100%, rgba(185, 152, 94, 0.05), transparent 60%),
+    radial-gradient(ellipse 900px 600px at 100% 100%, rgba(205, 184, 145, 0.05), transparent 60%),
     var(--bg);
   background-attachment: fixed;
   color: var(--text);
@@ -243,25 +264,78 @@ main:focus {
   height: 62px;
 }
 
+/* Lockup: знак + «Askesis» в Caesar Dressing. Цвет задаёт ссылка, знак и
+   слово берут его через currentColor (тема «Киберпанк» перекрашивает
+   .navbar__logo своим правилом, и lockup идёт следом). */
 .navbar__logo {
   display: inline-flex;
   align-items: center;
-  gap: 0.65rem;
+  gap: 0.6rem;
   font-family: var(--font-display);
   font-weight: 600;
   font-size: 0.95rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--text);
+  color: var(--brand-ink);
   text-decoration: none;
+  transition: color 0.2s var(--ease);
 }
 
-.navbar__logo-img {
-  width: 23px;
-  height: 23px;
-  object-fit: cover;
-  border-radius: 1px;
-  box-shadow: 0 0 0 1px var(--border-strong);
+.navbar__logo:hover {
+  color: var(--gold-bright);
+}
+
+:root[data-theme='light'] .navbar__logo:hover {
+  color: var(--text);
+}
+
+.navbar__mark {
+  flex: none;
+  width: 34px;
+  height: 34px;
+}
+
+/* На телефоне — упрощённый знак: у полного на 28 px сливаются каннелюры. */
+.navbar__mark--simple {
+  display: none;
+}
+
+.brand-word {
+  font-family: var(--font-brand);
+  font-weight: 400;
+  font-size: 1.5rem;
+  line-height: 1;
+  letter-spacing: 0.03em;
+  text-transform: none;
+  /* Caesar Dressing рисует буквы выше линии строки — опускаем на глаз к знаку. */
+  translate: 0 0.06em;
+}
+
+/* Киберпанк держит свой моноширинный логотип — фирменный шрифт ему чужой. */
+:root[data-theme='cyber'] .brand-word {
+  font-family: inherit;
+  font-weight: inherit;
+  font-size: 0.95rem;
+  letter-spacing: inherit;
+  text-transform: uppercase;
+  translate: none;
+}
+
+@media (max-width: 640px) {
+  .navbar__mark {
+    width: 28px;
+    height: 28px;
+  }
+
+  .navbar__mark--full {
+    display: none;
+  }
+
+  .navbar__mark--simple {
+    display: block;
+  }
+
+  .navbar__logo .brand-word {
+    font-size: 1.3rem;
+  }
 }
 
 .navbar__bar-actions {
@@ -581,7 +655,7 @@ main:focus {
   --btn-primary-plate: #5e4720;
   --btn-primary-fg: #120d05;
   --btn-primary-fg-hover: #120d05;
-  --btn-primary-glow: 0 8px 14px rgba(185, 152, 94, 0.38);
+  --btn-primary-glow: 0 8px 14px rgba(205, 184, 145, 0.38);
 
   /* Вторичная: графит, обод золотеет, заливка идёт слева. */
   --btn-secondary-base: #18191c;
@@ -593,7 +667,7 @@ main:focus {
   --btn-secondary-fg-hover: var(--gold-bright);
 
   /* Акцентная вторичная — действия ИИ-тренера: золотой обод сразу. */
-  --btn-accent-rim: rgba(216, 187, 132, 0.6);
+  --btn-accent-rim: rgba(227, 213, 184, 0.6);
   --btn-accent-fg: var(--gold-bright);
 
   --btn-danger-face: linear-gradient(180deg, #cf7067, #b0534b);
@@ -624,12 +698,12 @@ main:focus {
   --btn-secondary-base: #ffffff;
   --btn-secondary-sweep: #f6efe0;
   --btn-secondary-rim: rgba(10, 9, 6, 0.24);
-  --btn-secondary-rim-hover: #a3803f;
+  --btn-secondary-rim-hover: #9c8457;
   --btn-secondary-plate: rgba(10, 9, 6, 0.2);
   --btn-secondary-fg: var(--text);
   --btn-secondary-fg-hover: #6b5224;
 
-  --btn-accent-rim: rgba(138, 106, 52, 0.6);
+  --btn-accent-rim: rgba(111, 91, 54, 0.6);
   --btn-accent-fg: #6b5224;
 
   --btn-danger-face: linear-gradient(180deg, #b9554d, #9c3f38);
@@ -646,7 +720,7 @@ main:focus {
   --btn-disabled-face: #ecebe6;
   --btn-disabled-rim: rgba(10, 9, 6, 0.1);
   --btn-disabled-fg: #6f6f75;
-  --btn-focus: #8a6a34;
+  --btn-focus: #6f5b36;
 }
 
 /* --- Скелет: общий для всех видов ---
@@ -1065,7 +1139,7 @@ main:focus {
 }
 
 .pillar:hover {
-  border-color: rgba(216, 187, 132, 0.45);
+  border-color: rgba(227, 213, 184, 0.45);
   transform: translateY(-3px);
   background:
     linear-gradient(165deg, rgba(255, 255, 255, 0.065), rgba(255, 255, 255, 0) 45%),
@@ -1193,9 +1267,9 @@ main:focus {
   top: 1.5rem;
   right: 1.5rem;
   padding: 0.25rem 0.6rem;
-  border: 1px solid rgba(185, 152, 94, 0.45);
+  border: 1px solid rgba(205, 184, 145, 0.45);
   border-radius: 999px;
-  background: rgba(185, 152, 94, 0.12);
+  background: rgba(205, 184, 145, 0.12);
   color: var(--gold-bright);
   font-family: var(--font-display);
   font-size: 0.66rem;
@@ -1360,7 +1434,7 @@ main:focus {
   font-family: var(--font-display);
   font-size: 0.95rem;
   letter-spacing: 0;
-  color: #d8bb84;
+  color: #e3d5b8;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1428,7 +1502,7 @@ main:focus {
   height: 28px;
   border-radius: 50%;
   border: 2px solid rgba(255, 255, 255, 0.15);
-  border-top-color: #d8bb84;
+  border-top-color: #e3d5b8;
   animation: avatar-loader-spin 0.8s linear infinite;
 }
 
@@ -1448,7 +1522,7 @@ main:focus {
   z-index: 0;
   border-radius: 50%;
   pointer-events: none;
-  background: radial-gradient(circle at center, rgba(216, 187, 132, 0.35), transparent 78%);
+  background: radial-gradient(circle at center, rgba(227, 213, 184, 0.35), transparent 78%);
   filter: blur(38px);
   opacity: 0;
   transition: opacity 0.25s var(--ease), transform 0.12s linear;
@@ -1490,7 +1564,7 @@ main:focus {
      без него на границе секции был резкий, заметный шов. */
   background:
     linear-gradient(180deg, var(--bg) 0%, transparent 140px),
-    radial-gradient(ellipse 900px 450px at 50% 0%, rgba(185, 152, 94, 0.1), transparent 70%),
+    radial-gradient(ellipse 900px 450px at 50% 0%, rgba(205, 184, 145, 0.1), transparent 70%),
     repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 44px),
     repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 44px),
     var(--surface);
@@ -1557,9 +1631,9 @@ main:focus {
   top: 1rem;
   right: 1rem;
   padding: 0.3rem 0.7rem;
-  border: 1px solid rgba(185, 152, 94, 0.45);
+  border: 1px solid rgba(205, 184, 145, 0.45);
   border-radius: 999px;
-  background: rgba(185, 152, 94, 0.12);
+  background: rgba(205, 184, 145, 0.12);
   color: var(--gold-bright);
   font-family: var(--font-display);
   font-size: 0.66rem;
@@ -1665,7 +1739,7 @@ main:focus {
 
 .part.is-selected {
   border-color: var(--gold);
-  background: rgba(185, 152, 94, 0.12);
+  background: rgba(205, 184, 145, 0.12);
   color: var(--gold-bright);
 }
 
@@ -1747,7 +1821,7 @@ main:focus {
 
 .muscle-card.is-selected {
   border-color: var(--gold);
-  background: rgba(185, 152, 94, 0.1);
+  background: rgba(205, 184, 145, 0.1);
 }
 
 .muscle-card.is-selected .muscle-card__name,
@@ -2098,7 +2172,7 @@ main:focus {
   border-radius: 4px;
   box-shadow:
     0 50px 110px -30px rgba(0, 0, 0, 0.85),
-    0 0 140px -60px rgba(185, 152, 94, 0.35),
+    0 0 140px -60px rgba(205, 184, 145, 0.35),
     0 0 0 1px rgba(255, 255, 255, 0.03) inset;
   text-align: center;
   /* Карточка сама по себе не использует --bg/--surface (фон — фиксированный
@@ -2130,7 +2204,7 @@ main:focus {
   width: 460px;
   height: 460px;
   transform: translateX(-50%);
-  background: radial-gradient(circle, rgba(185, 152, 94, 0.1), transparent 65%);
+  background: radial-gradient(circle, rgba(205, 184, 145, 0.1), transparent 65%);
   pointer-events: none;
   z-index: 0;
 }
@@ -2140,22 +2214,42 @@ main:focus {
   z-index: 1;
 }
 
+/* Lockup на входе. Карточка всегда тёмная (см. выше), поэтому знак — сам
+   champagne, а не --brand-ink, который в светлой теме темнеет. */
 .auth-card__mark {
-  width: 40px;
-  height: 40px;
   margin: 0 auto 1.75rem;
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 0.7rem;
+  color: var(--champagne);
 }
 
-.auth-card__mark img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  filter: invert(1);
-  mix-blend-mode: screen;
-  opacity: 0.9;
+.auth-card__mark svg {
+  width: 52px;
+  height: 52px;
+  flex: none;
+}
+
+.auth-card__mark .brand-word {
+  font-size: 2rem;
+}
+
+:root[data-theme='cyber'] .auth-card__mark {
+  color: var(--gold);
+}
+
+/* Знак над заголовком лендинга. Полоса hero тёмная в обеих темах. */
+.hero__mark {
+  display: block;
+  width: 64px;
+  height: 64px;
+  margin-bottom: 1.25rem;
+  color: var(--champagne);
+}
+
+:root[data-theme='cyber'] .hero__mark {
+  color: var(--gold);
 }
 
 .auth-card .eyebrow {
@@ -2279,8 +2373,8 @@ main:focus {
   --btn-secondary-rim: rgba(255, 255, 255, 0.2);
   --btn-secondary-plate: rgba(0, 0, 0, 0.6);
   --btn-secondary-fg: #f3f3f1;
-  --btn-secondary-fg-hover: #d8bb84;
-  --btn-focus: #d8bb84;
+  --btn-secondary-fg-hover: #e3d5b8;
+  --btn-focus: #e3d5b8;
 }
 
 .auth-card__footer {
@@ -2545,9 +2639,9 @@ main:focus {
   display: inline-block;
   margin-left: 0.6rem;
   padding: 0.2rem 0.55rem;
-  border: 1px solid rgba(185, 152, 94, 0.45);
+  border: 1px solid rgba(205, 184, 145, 0.45);
   border-radius: 999px;
-  background: rgba(185, 152, 94, 0.12);
+  background: rgba(205, 184, 145, 0.12);
   color: var(--gold-bright);
   font-family: var(--font-display);
   font-size: 0.66rem;
@@ -2578,7 +2672,7 @@ main:focus {
   width: 460px;
   height: 460px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(185, 152, 94, 0.24), transparent 68%);
+  background: radial-gradient(circle, rgba(205, 184, 145, 0.24), transparent 68%);
   pointer-events: none;
 }
 
@@ -2615,7 +2709,7 @@ main:focus {
 }
 
 .glass-card:hover {
-  border-color: rgba(216, 187, 132, 0.42);
+  border-color: rgba(227, 213, 184, 0.42);
   background: rgba(255, 255, 255, 0.06);
   transform: translateY(-2px);
 }
@@ -2634,7 +2728,7 @@ main:focus {
 }
 
 :root[data-theme='light'] .glass-card:hover {
-  border-color: rgba(163, 128, 63, 0.4);
+  border-color: rgba(156, 132, 87, 0.4);
   background: rgba(10, 9, 6, 0.05);
 }
 
@@ -2690,7 +2784,7 @@ main:focus {
 }
 
 .picker__item.is-added {
-  border-color: rgba(185, 152, 94, 0.45);
+  border-color: rgba(205, 184, 145, 0.45);
 }
 
 .picker__media,
@@ -3395,7 +3489,7 @@ main:focus {
   border: 1px solid var(--gold);
   border-radius: 14px;
   background: var(--surface);
-  box-shadow: 0 22px 50px -18px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(216, 187, 132, 0.12);
+  box-shadow: 0 22px 50px -18px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(227, 213, 184, 0.12);
   animation: rest-in 0.28s var(--ease);
 }
 
@@ -3488,11 +3582,11 @@ main:focus {
 
 @keyframes rest-pulse {
   50% {
-    box-shadow: 0 0 0 10px rgba(216, 187, 132, 0);
+    box-shadow: 0 0 0 10px rgba(227, 213, 184, 0);
   }
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(216, 187, 132, 0.55);
+    box-shadow: 0 0 0 0 rgba(227, 213, 184, 0.55);
   }
 }
 
@@ -3536,9 +3630,9 @@ main:focus {
 .ai-import {
   margin: 1.5rem 0;
   padding: 1.25rem;
-  border: 1px solid rgba(185, 152, 94, 0.25);
+  border: 1px solid rgba(205, 184, 145, 0.25);
   border-radius: var(--radius-lg);
-  background: rgba(185, 152, 94, 0.04);
+  background: rgba(205, 184, 145, 0.04);
 }
 
 .ai-import__head {
@@ -3551,7 +3645,7 @@ main:focus {
 
 .ai-import__badge {
   padding: 0.25rem 0.65rem;
-  border: 1px solid rgba(185, 152, 94, 0.45);
+  border: 1px solid rgba(205, 184, 145, 0.45);
   border-radius: 999px;
   color: var(--gold-bright);
   font-family: var(--font-display);
@@ -3664,7 +3758,7 @@ main:focus {
     conic-gradient(
       from var(--ai-angle, 0deg),
       transparent 0deg,
-      rgba(185, 152, 94, 0.75) 60deg,
+      rgba(205, 184, 145, 0.75) 60deg,
       rgba(201, 203, 209, 0.45) 130deg,
       transparent 200deg,
       transparent 360deg
@@ -3692,7 +3786,7 @@ main:focus {
 .ai-action__glow {
   position: absolute;
   inset: -40%;
-  background: radial-gradient(circle at 30% 30%, rgba(185, 152, 94, 0.22), transparent 60%);
+  background: radial-gradient(circle at 30% 30%, rgba(205, 184, 145, 0.22), transparent 60%);
   opacity: 0;
   transition: opacity 0.35s var(--ease);
   pointer-events: none;
@@ -3727,8 +3821,8 @@ main:focus {
   display: grid;
   place-items: center;
   border-radius: 11px;
-  border: 1px solid rgba(185, 152, 94, 0.3);
-  background: rgba(185, 152, 94, 0.09);
+  border: 1px solid rgba(205, 184, 145, 0.3);
+  background: rgba(205, 184, 145, 0.09);
   color: var(--gold-bright);
 }
 
@@ -3784,7 +3878,7 @@ main:focus {
 @supports not (background: conic-gradient(from 0deg, red, blue)) {
   .ai-action {
     background: var(--surface);
-    border-color: rgba(185, 152, 94, 0.35);
+    border-color: rgba(205, 184, 145, 0.35);
     animation: none;
   }
 }
@@ -3825,7 +3919,7 @@ main:focus {
   left: 12%;
   width: 340px;
   height: 340px;
-  background: rgba(185, 152, 94, 0.22);
+  background: rgba(205, 184, 145, 0.22);
 }
 
 .chat-ambient__blob--2 {
@@ -3842,7 +3936,7 @@ main:focus {
   left: 45%;
   width: 260px;
   height: 260px;
-  background: rgba(216, 187, 132, 0.14);
+  background: rgba(227, 213, 184, 0.14);
   animation-delay: 6s;
 }
 
@@ -3974,8 +4068,8 @@ main:focus {
 }
 
 .chat-msg--user .chat-msg__body {
-  background: rgba(185, 152, 94, 0.11);
-  border-color: rgba(185, 152, 94, 0.32);
+  background: rgba(205, 184, 145, 0.11);
+  border-color: rgba(205, 184, 145, 0.32);
 }
 
 .chat-typing {
@@ -4031,9 +4125,9 @@ main:focus {
 }
 
 .attach__toggle.is-active {
-  border-color: rgba(185, 152, 94, 0.5);
+  border-color: rgba(205, 184, 145, 0.5);
   color: var(--gold-bright);
-  background: rgba(185, 152, 94, 0.08);
+  background: rgba(205, 184, 145, 0.08);
 }
 
 .attach__panel {
@@ -4115,8 +4209,8 @@ main:focus {
 }
 
 .chat-composer.is-focused {
-  border-color: rgba(185, 152, 94, 0.45);
-  box-shadow: 0 0 0 3px rgba(185, 152, 94, 0.08), 0 26px 60px -34px rgba(185, 152, 94, 0.5);
+  border-color: rgba(205, 184, 145, 0.45);
+  box-shadow: 0 0 0 3px rgba(205, 184, 145, 0.08), 0 26px 60px -34px rgba(205, 184, 145, 0.5);
 }
 
 .chat-composer textarea {
@@ -4186,8 +4280,8 @@ main:focus {
 }
 
 .chat-pills button:hover:not(:disabled) {
-  border-color: rgba(185, 152, 94, 0.5);
-  background: rgba(185, 152, 94, 0.08);
+  border-color: rgba(205, 184, 145, 0.5);
+  background: rgba(205, 184, 145, 0.08);
   color: var(--gold-bright);
 }
 
@@ -4333,7 +4427,7 @@ main:focus {
 /* Золотая кромка слева — карточки упражнений читаются как шаги одной
    тренировки, а не как одинаковые серые блоки. */
 .log-exercise {
-  border-left: 2px solid rgba(216, 187, 132, 0.45);
+  border-left: 2px solid rgba(227, 213, 184, 0.45);
 }
 
 .log-exercise__name {
@@ -4379,7 +4473,7 @@ main:focus {
   min-height: 36px;
   padding: 0.3rem 0.9rem;
   background: none;
-  border: 1px solid rgba(185, 152, 94, 0.55);
+  border: 1px solid rgba(205, 184, 145, 0.55);
   border-radius: 999px;
   color: var(--gold-bright);
   font-family: var(--font-display);
@@ -4456,7 +4550,7 @@ main:focus {
 }
 
 .log-set.is-done {
-  background: linear-gradient(90deg, rgba(185, 152, 94, 0.1), transparent 70%), var(--bg);
+  background: linear-gradient(90deg, rgba(205, 184, 145, 0.1), transparent 70%), var(--bg);
 }
 
 .log-set__check {
@@ -4542,11 +4636,11 @@ main:focus {
 .log-set__input:focus {
   outline: none;
   border-color: var(--gold);
-  box-shadow: 0 0 0 3px rgba(185, 152, 94, 0.22);
+  box-shadow: 0 0 0 3px rgba(205, 184, 145, 0.22);
 }
 
 .log-set.is-done .log-set__input {
-  border-color: rgba(185, 152, 94, 0.45);
+  border-color: rgba(205, 184, 145, 0.45);
   color: var(--gold-bright);
 }
 
@@ -4785,11 +4879,11 @@ main:focus {
 }
 
 .theme-picker__option--dark .theme-picker__swatch {
-  background: linear-gradient(135deg, #131316 0 55%, #d8bb84 55% 100%);
+  background: linear-gradient(135deg, #131316 0 55%, #e3d5b8 55% 100%);
 }
 
 .theme-picker__option--light .theme-picker__swatch {
-  background: linear-gradient(135deg, #f5f4f0 0 55%, #a3803f 55% 100%);
+  background: linear-gradient(135deg, #f5f4f0 0 55%, #9c8457 55% 100%);
 }
 
 .theme-picker__option--cyber .theme-picker__swatch {
@@ -5090,12 +5184,20 @@ main:focus {
 }
 
 .footer__wordmark {
-  font-family: var(--font-display);
-  font-size: 0.92rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.18em;
-  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--brand-ink);
+}
+
+.footer__wordmark svg {
+  width: 30px;
+  height: 30px;
+  flex: none;
+}
+
+.footer__wordmark .brand-word {
+  font-size: 1.3rem;
 }
 
 .footer__brand p {
@@ -5541,13 +5643,13 @@ main:focus {
 .today-card {
   padding: 2rem 2.25rem;
   border-radius: var(--radius-lg);
-  border: 1px solid rgba(185, 152, 94, 0.35);
-  background: linear-gradient(150deg, rgba(185, 152, 94, 0.1), rgba(255, 255, 255, 0.02));
+  border: 1px solid rgba(205, 184, 145, 0.35);
+  background: linear-gradient(150deg, rgba(205, 184, 145, 0.1), rgba(255, 255, 255, 0.02));
 }
 
 :root[data-theme='light'] .today-card {
-  background: linear-gradient(150deg, rgba(163, 128, 63, 0.1), rgba(10, 9, 6, 0.02));
-  border-color: rgba(163, 128, 63, 0.32);
+  background: linear-gradient(150deg, rgba(156, 132, 87, 0.1), rgba(10, 9, 6, 0.02));
+  border-color: rgba(156, 132, 87, 0.32);
 }
 
 /* На телефоне приветствие с уровнем занимало ~290px, и «Начать тренировку»
@@ -5683,12 +5785,12 @@ main:focus {
 
 .achievement.is-unlocked {
   opacity: 1;
-  border-color: rgba(185, 152, 94, 0.4);
-  background: linear-gradient(150deg, rgba(185, 152, 94, 0.09), transparent);
+  border-color: rgba(205, 184, 145, 0.4);
+  background: linear-gradient(150deg, rgba(205, 184, 145, 0.09), transparent);
 }
 
 :root[data-theme='light'] .achievement.is-unlocked {
-  border-color: rgba(163, 128, 63, 0.36);
+  border-color: rgba(156, 132, 87, 0.36);
 }
 
 .achievement__title {
@@ -5750,7 +5852,7 @@ main:focus {
   fill: none;
   stroke-linecap: round;
   transition: stroke-dashoffset 0.9s cubic-bezier(0.22, 1, 0.36, 1);
-  filter: drop-shadow(0 0 6px rgba(216, 187, 132, 0.45));
+  filter: drop-shadow(0 0 6px rgba(227, 213, 184, 0.45));
 }
 
 .ring__value {
@@ -5784,7 +5886,7 @@ main:focus {
 
 /* Цель недели закрыта — кольцо загорается целиком. */
 .ring.is-done .ring__fill {
-  filter: drop-shadow(0 0 10px rgba(216, 187, 132, 0.8));
+  filter: drop-shadow(0 0 10px rgba(227, 213, 184, 0.8));
 }
 
 .ring.is-done .ring__value strong {
@@ -5824,7 +5926,7 @@ main:focus {
   width: 70%;
   aspect-ratio: 1;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(185, 152, 94, 0.22), transparent 65%);
+  background: radial-gradient(circle, rgba(205, 184, 145, 0.22), transparent 65%);
   pointer-events: none;
 }
 
@@ -5857,9 +5959,9 @@ main:focus {
 
 .chip {
   padding: 0.28rem 0.7rem;
-  border: 1px solid rgba(216, 187, 132, 0.35);
+  border: 1px solid rgba(227, 213, 184, 0.35);
   border-radius: 999px;
-  background: rgba(185, 152, 94, 0.1);
+  background: rgba(205, 184, 145, 0.1);
   color: var(--gold-bright);
   font-size: 0.74rem;
   line-height: 1.3;
@@ -5873,7 +5975,7 @@ main:focus {
    издалека, остальные кнопки сайта остаются спокойными. Ореол — через
    --btn-glow-rest, чтобы он повторял срезанный силуэт кнопки. */
 .today-card__cta {
-  --btn-glow-rest: 0 10px 22px rgba(185, 152, 94, 0.35);
+  --btn-glow-rest: 0 10px 22px rgba(205, 184, 145, 0.35);
 }
 
 .stat-tile {
@@ -5934,8 +6036,8 @@ main:focus {
 }
 
 .workout-card:hover {
-  border-color: rgba(216, 187, 132, 0.45);
-  box-shadow: 0 18px 40px -26px rgba(216, 187, 132, 0.6);
+  border-color: rgba(227, 213, 184, 0.45);
+  box-shadow: 0 18px 40px -26px rgba(227, 213, 184, 0.6);
 }
 
 /* Три кадра встык во всю ширину карточки — как лента «что сегодня делаем». */
@@ -6175,12 +6277,12 @@ main:focus {
   padding: 1.75rem 2rem;
   margin-bottom: 1.25rem;
   border-radius: var(--radius-lg);
-  border: 1px solid rgba(185, 152, 94, 0.35);
-  background: linear-gradient(150deg, rgba(185, 152, 94, 0.1), transparent);
+  border: 1px solid rgba(205, 184, 145, 0.35);
+  background: linear-gradient(150deg, rgba(205, 184, 145, 0.1), transparent);
 }
 
 :root[data-theme='light'] .streak-card {
-  border-color: rgba(163, 128, 63, 0.32);
+  border-color: rgba(156, 132, 87, 0.32);
 }
 
 .streak-card strong {
@@ -6440,12 +6542,12 @@ button.calendar__cell {
     height: 2px;
     border-radius: 0 0 2px 2px;
     background: var(--gold-bright);
-    box-shadow: 0 0 12px 1px rgba(216, 187, 132, 0.75);
+    box-shadow: 0 0 12px 1px rgba(227, 213, 184, 0.75);
     transform: translateX(-50%);
   }
 
   .bottom-nav__item.active svg {
-    filter: drop-shadow(0 0 6px rgba(216, 187, 132, 0.45));
+    filter: drop-shadow(0 0 6px rgba(227, 213, 184, 0.45));
   }
 
   .bottom-nav__action {
@@ -6459,7 +6561,7 @@ button.calendar__cell {
     color: var(--accent-contrast);
     font-size: 1.6rem;
     line-height: 1;
-    box-shadow: 0 10px 24px -10px rgba(185, 152, 94, 0.9);
+    box-shadow: 0 10px 24px -10px rgba(205, 184, 145, 0.9);
     transition: transform 0.2s var(--ease);
   }
 
@@ -6607,7 +6709,7 @@ button.calendar__cell {
 
 .readiness__options button.is-selected {
   border-color: var(--gold);
-  background: rgba(185, 152, 94, 0.14);
+  background: rgba(205, 184, 145, 0.14);
   color: var(--gold-bright);
 }
 
@@ -7137,7 +7239,7 @@ button.calendar__cell {
 
 .equipment__preset.is-selected {
   border-color: var(--gold);
-  background: rgba(185, 152, 94, 0.1);
+  background: rgba(205, 184, 145, 0.1);
 }
 
 .equipment__preset.is-selected strong {
@@ -7237,8 +7339,8 @@ button.calendar__cell {
 /* Взятая цель гаснет, а не исчезает: список должен показывать и путь,
    который уже пройден. */
 .goal--done {
-  border-color: rgba(185, 152, 94, 0.35);
-  background: linear-gradient(150deg, rgba(185, 152, 94, 0.08), var(--surface) 70%);
+  border-color: rgba(205, 184, 145, 0.35);
+  background: linear-gradient(150deg, rgba(205, 184, 145, 0.08), var(--surface) 70%);
 }
 
 .goal__head {
@@ -7389,7 +7491,7 @@ button.calendar__cell {
    взгляда, когда человек проглядывает список упражнений сверху вниз. */
 .log-rir__options button.is-selected {
   border-color: var(--gold);
-  background: rgba(185, 152, 94, 0.14);
+  background: rgba(205, 184, 145, 0.14);
   color: var(--gold-bright);
 }
 
@@ -7502,13 +7604,13 @@ button.calendar__cell {
   margin-top: 1.25rem;
   padding: 1rem 1.15rem;
   border-radius: var(--radius);
-  border: 1px solid rgba(185, 152, 94, 0.28);
-  background: rgba(185, 152, 94, 0.06);
+  border: 1px solid rgba(205, 184, 145, 0.28);
+  background: rgba(205, 184, 145, 0.06);
 }
 
 :root[data-theme='light'] .coach__reply {
-  border-color: rgba(163, 128, 63, 0.28);
-  background: rgba(163, 128, 63, 0.07);
+  border-color: rgba(156, 132, 87, 0.28);
+  background: rgba(156, 132, 87, 0.07);
 }
 
 .coach__reply-author {
@@ -7561,8 +7663,8 @@ button.calendar__cell {
 /* Рекорд — единственный повод для золотой рамки: если подсвечивать каждую
    записанную тренировку, подсветка перестанет что-либо значить. */
 .review--ok {
-  border-color: rgba(185, 152, 94, 0.4);
-  background: linear-gradient(150deg, rgba(185, 152, 94, 0.08), var(--surface) 60%);
+  border-color: rgba(205, 184, 145, 0.4);
+  background: linear-gradient(150deg, rgba(205, 184, 145, 0.08), var(--surface) 60%);
 }
 
 @keyframes review-in {
@@ -7646,8 +7748,8 @@ button.calendar__cell {
   margin-top: 1.1rem;
   padding: 0.9rem 1.15rem;
   border-radius: var(--radius);
-  border: 1px solid rgba(185, 152, 94, 0.45);
-  background: rgba(185, 152, 94, 0.1);
+  border: 1px solid rgba(205, 184, 145, 0.45);
+  background: rgba(205, 184, 145, 0.1);
   animation: levelup-in 0.5s var(--ease) both 0.25s;
 }
 
@@ -7669,7 +7771,7 @@ button.calendar__cell {
   height: 10px;
   border-radius: 50%;
   background: var(--gold-bright);
-  box-shadow: 0 0 0 0 rgba(216, 187, 132, 0.6);
+  box-shadow: 0 0 0 0 rgba(227, 213, 184, 0.6);
   animation: levelup-pulse 2.4s var(--ease) infinite;
 }
 
@@ -7679,8 +7781,8 @@ button.calendar__cell {
 }
 
 @keyframes levelup-pulse {
-  0%, 70%, 100% { box-shadow: 0 0 0 0 rgba(216, 187, 132, 0); }
-  35% { box-shadow: 0 0 0 7px rgba(216, 187, 132, 0.18); }
+  0%, 70%, 100% { box-shadow: 0 0 0 0 rgba(227, 213, 184, 0); }
+  35% { box-shadow: 0 0 0 7px rgba(227, 213, 184, 0.18); }
 }
 
 .review__records {
@@ -7711,8 +7813,8 @@ button.calendar__cell {
   gap: 0.45rem;
   padding: 0.5rem 0.9rem;
   border-radius: 999px;
-  border: 1px solid rgba(185, 152, 94, 0.35);
-  background: rgba(185, 152, 94, 0.08);
+  border: 1px solid rgba(205, 184, 145, 0.35);
+  background: rgba(205, 184, 145, 0.08);
   font-size: 0.8rem;
 }
 
@@ -7995,7 +8097,7 @@ button.calendar__cell {
 
 .session-demo__take {
   padding: 0.25rem 0.8rem;
-  border: 1px solid rgba(185, 152, 94, 0.55);
+  border: 1px solid rgba(205, 184, 145, 0.55);
   border-radius: 999px;
   font-family: var(--font-display);
   font-size: 0.72rem;
@@ -8025,7 +8127,7 @@ button.calendar__cell {
 }
 
 .session-demo__row.is-done {
-  background: linear-gradient(90deg, rgba(185, 152, 94, 0.1), transparent 70%), var(--bg);
+  background: linear-gradient(90deg, rgba(205, 184, 145, 0.1), transparent 70%), var(--bg);
 }
 
 .session-demo__row--head {
@@ -8083,7 +8185,7 @@ button.calendar__cell {
 }
 
 .is-done .session-demo__cell {
-  border-color: rgba(185, 152, 94, 0.45);
+  border-color: rgba(205, 184, 145, 0.45);
   color: var(--gold-bright);
 }
 
@@ -8157,7 +8259,7 @@ button.calendar__cell {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background:
-    radial-gradient(ellipse 600px 300px at 0% 0%, rgba(185, 152, 94, 0.09), transparent 70%),
+    radial-gradient(ellipse 600px 300px at 0% 0%, rgba(205, 184, 145, 0.09), transparent 70%),
     var(--surface);
 }
 
@@ -8375,7 +8477,7 @@ button.calendar__cell {
   border-radius: var(--radius-lg);
   border: 1px solid rgba(255, 255, 255, 0.1);
   background:
-    radial-gradient(ellipse 60% 45% at 50% 38%, rgba(216, 187, 132, 0.12), transparent 70%),
+    radial-gradient(ellipse 60% 45% at 50% 38%, rgba(227, 213, 184, 0.12), transparent 70%),
     rgba(4, 4, 5, 0.96);
 }
 
@@ -8396,7 +8498,7 @@ button.calendar__cell {
 .avatar-panel__tip strong {
   font-family: var(--font-display);
   font-size: 1rem;
-  color: #d8bb84;
+  color: #e3d5b8;
 }
 
 .avatar-panel__tip span {
@@ -8409,9 +8511,9 @@ button.calendar__cell {
   left: 1rem;
   padding: 0.3rem 0.7rem;
   border-radius: 999px;
-  border: 1px solid rgba(216, 187, 132, 0.4);
-  background: rgba(185, 152, 94, 0.14);
-  color: #d8bb84;
+  border: 1px solid rgba(227, 213, 184, 0.4);
+  background: rgba(205, 184, 145, 0.14);
+  color: #e3d5b8;
   font-size: 0.72rem;
   pointer-events: none;
 }
@@ -8434,7 +8536,7 @@ button.calendar__cell {
 
 .character__bars .muscle-bar.is-hovered,
 .character__bars .muscle-bar:focus-visible {
-  background: rgba(216, 187, 132, 0.08);
+  background: rgba(227, 213, 184, 0.08);
 }
 
 .character__bars .muscle-bar.is-hovered .muscle-bar__label {
@@ -8528,7 +8630,7 @@ button.wardrobe__item:hover:not(:disabled) {
 
 button.wardrobe__item.is-active {
   border-color: var(--gold);
-  background: rgba(185, 152, 94, 0.16);
+  background: rgba(205, 184, 145, 0.16);
   color: var(--gold-bright);
 }
 

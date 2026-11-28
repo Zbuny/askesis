@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
+import BrandMark from './BrandMark.jsx'
 
 function SunIcon() {
   return (
@@ -33,8 +34,9 @@ export default function Navbar() {
     <header className="navbar">
       <div className="navbar__bar">
         <Link to={user ? '/dashboard' : '/'} className="navbar__logo" onClick={closeMenu}>
-          <img src="/logo.png" alt="" className="navbar__logo-img" />
-          Askesis
+          <BrandMark variant="full" className="navbar__mark navbar__mark--full" />
+          <BrandMark variant="simple" className="navbar__mark navbar__mark--simple" />
+          <span className="brand-word">Askesis</span>
         </Link>
         <div className="navbar__bar-actions">
           {/* Киберпанк бывает только тёмным, и выключают его в профиле:
